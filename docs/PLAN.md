@@ -31,7 +31,7 @@ The pilot from `docs/SPEC.md`: a backend that holds the queue and enforces the r
 The database, the seed and the read-only API.
 
 - `backend/db.py`: the schema (claims, policies, customers, plans, handlers, decisions, payments, steps), the seed from `data/`, and a connection per request.
-- Routes: `list_claims`, `get_claim` (with its policy, plan, customer, decision, payment and steps), `get_policy_wording`, `get_instructions` and `list_handlers`.
+- Routes: `list_claims`, `get_claim` (with its policy, plan, customer, decision and payment; the steps have their own route, `list_steps`, so the agent never reads its own earlier steps back), `get_policy_wording`, `get_instructions` and `list_handlers`.
 - The agent's instructions in `backend/instructions.md`, served read only.
 
 Success criteria:
@@ -57,13 +57,13 @@ The rules, enforced in the backend.
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes, with a test for each transition and each refusal.
-- [ ] An approval of $650 goes to `decided`, and `pay_claim` with $650 records a payment.
-- [ ] An approval of $800.00 is `decided`, and $800.01 is `awaiting_sign_off`.
-- [ ] On an approval of $1,200 waiting for sign-off, `pay_claim` with $1,200 returns 409 and no payment is recorded. After `sign_off` by HND-01, the payment is recorded with the handler and the claim is `decided`.
-- [ ] `pay_claim` with a different amount from the approved payout returns 409.
-- [ ] A decline with a payout above $0 returns 422.
-- [ ] `npm run check:python` passes with coverage of at least 80%.
+- [x] `uv run pytest -q` passes, with a test for each transition and each refusal.
+- [x] An approval of $650 goes to `decided`, and `pay_claim` with $650 records a payment.
+- [x] An approval of $800.00 is `decided`, and $800.01 is `awaiting_sign_off`.
+- [x] On an approval of $1,200 waiting for sign-off, `pay_claim` with $1,200 returns 409 and no payment is recorded. After `sign_off` by HND-01, the payment is recorded with the handler and the claim is `decided`.
+- [x] `pay_claim` with a different amount from the approved payout returns 409.
+- [x] A decline with a payout above $0 returns 422.
+- [x] `npm run check:python` passes with coverage of at least 80%.
 
 ## Phase 3: the UnderCover Agent
 

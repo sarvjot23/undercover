@@ -5,15 +5,51 @@ import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 from backend import db
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
+APPROVAL_LIMIT = 800.0
 
 Db = Annotated[sqlite3.Connection, Depends(db.get_db)]
+
+
+class Decision(BaseModel):
+    """The agent's decision on a claim."""
+
+    decision: Literal["approve", "decline", "refer"]
+    payout: float = Field(ge=0)
+    reasons: str = Field(min_length=1)
+    policy_section: str = Field(min_length=1)
+
+
+class Payment(BaseModel):
+    """A payment of a claim's approved payout."""
+
+    amount: float
+
+
+class SignOff(BaseModel):
+    """A handler's sign-off on a payout over the approval limit."""
+
+    handler_id: str
+
+
+class Step(BaseModel):
+    """One step of the agent's work on a claim."""
+
+    kind: Literal["tool_call", "tool_result", "answer", "error"]
+    text: str
+
+
+class Failure(BaseModel):
+    """Why the agent's run on a claim failed."""
+
+    reason: str
 
 
 @asynccontextmanager
@@ -54,6 +90,25 @@ def decision_of(conn: sqlite3.Connection, claim_id: str) -> dict[str, Any] | Non
         "SELECT * FROM decisions WHERE claim_id = ?", (claim_id,)
     ).fetchone()
     return dict(row) if row else None
+
+
+def move(conn: sqlite3.Connection, claim_id: str, before: str, after: str) -> None:
+    """Move a claim from one state to another, or raise 409."""
+    find_claim(conn, claim_id)
+    cursor = conn.execute(
+        "UPDATE claims SET status = ? WHERE claim_id = ? AND status = ?",
+        (after, claim_id, before),
+    )
+    if cursor.rowcount == 0:
+        raise HTTPException(409, f"Claim {claim_id} is not {before}")
+
+
+def add(conn: sqlite3.Connection, claim_id: str, kind: str, text: str) -> None:
+    """Record one step of the agent's work."""
+    conn.execute(
+        "INSERT INTO steps (claim_id, kind, text, at) VALUES (?, ?, ?, ?)",
+        (claim_id, kind, text, db.now()),
+    )
 
 
 @app.get("/api/health", operation_id="health")
@@ -133,3 +188,112 @@ def list_handlers(conn: Db) -> list[dict[str, Any]]:
     return [
         json.loads(row["body"]) for row in conn.execute("SELECT body FROM handlers")
     ]
+
+
+@app.get("/api/claims/{claim_id}/steps", operation_id="list_steps")
+def list_steps(claim_id: str, conn: Db) -> list[dict[str, Any]]:
+    """List the steps of the agent's work on a claim, in order."""
+    find_claim(conn, claim_id)
+    rows = conn.execute(
+        "SELECT * FROM steps WHERE claim_id = ? ORDER BY step_id", (claim_id,)
+    )
+    return [dict(row) for row in rows]
+
+
+@app.post("/api/claims/{claim_id}/start", operation_id="start_claim")
+def start_claim(claim_id: str, conn: Db) -> dict[str, str]:
+    """Mark a waiting claim as in progress."""
+    with conn:
+        move(conn, claim_id, "waiting", "in_progress")
+    return {"claim_id": claim_id, "status": "in_progress"}
+
+
+@app.post("/api/claims/{claim_id}/steps", operation_id="add_step")
+def add_step(claim_id: str, step: Step, conn: Db) -> dict[str, str]:
+    """Record one step of the agent's work on a claim."""
+    find_claim(conn, claim_id)
+    with conn:
+        add(conn, claim_id, step.kind, step.text)
+    return {"claim_id": claim_id, "kind": step.kind}
+
+
+@app.post("/api/claims/{claim_id}/decision", operation_id="record_decision")
+def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, str]:
+    """Record the decision on a claim that is in progress."""
+    approve = decision.decision == "approve"
+    if not approve and decision.payout != 0:
+        raise HTTPException(422, "A decline or a referral pays $0")
+    over_limit = approve and decision.payout > APPROVAL_LIMIT
+    status = "awaiting_sign_off" if over_limit else "decided"
+    with conn:
+        move(conn, claim_id, "in_progress", status)
+        conn.execute(
+            "INSERT INTO decisions VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                claim_id,
+                decision.decision,
+                round(decision.payout, 2),
+                decision.reasons,
+                decision.policy_section,
+                db.now(),
+            ),
+        )
+    return {"claim_id": claim_id, "status": status}
+
+
+@app.post("/api/claims/{claim_id}/payment", operation_id="pay_claim")
+def pay_claim(claim_id: str, payment: Payment, conn: Db) -> dict[str, Any]:
+    """Pay a claim's approved payout, unless it waits for a handler's sign-off."""
+    row = find_claim(conn, claim_id)
+    if row["status"] == "awaiting_sign_off":
+        raise HTTPException(
+            409, f"A payout over ${APPROVAL_LIMIT:,.2f} waits for a handler's sign-off"
+        )
+    decision = decision_of(conn, claim_id)
+    if decision is None or decision["decision"] != "approve":
+        raise HTTPException(409, f"Claim {claim_id} has no approved payout")
+    if conn.execute(
+        "SELECT 1 FROM payments WHERE claim_id = ?", (claim_id,)
+    ).fetchone():
+        raise HTTPException(409, f"Claim {claim_id} is already paid")
+    if round(payment.amount, 2) != decision["payout"]:
+        raise HTTPException(
+            409, f"The amount must be the approved payout, ${decision['payout']:,.2f}"
+        )
+    with conn:
+        conn.execute(
+            "INSERT INTO payments VALUES (?, ?, NULL, ?)",
+            (claim_id, decision["payout"], db.now()),
+        )
+    return {"claim_id": claim_id, "amount": decision["payout"]}
+
+
+@app.post("/api/claims/{claim_id}/sign-off", operation_id="sign_off")
+def sign_off(claim_id: str, sign_off: SignOff, conn: Db) -> dict[str, Any]:
+    """Sign off a payout over the approval limit and release the payment."""
+    if (
+        conn.execute(
+            "SELECT 1 FROM handlers WHERE handler_id = ?", (sign_off.handler_id,)
+        ).fetchone()
+        is None
+    ):
+        raise HTTPException(404, f"No handler {sign_off.handler_id}")
+    with conn:
+        move(conn, claim_id, "awaiting_sign_off", "decided")
+        payout = conn.execute(
+            "SELECT payout FROM decisions WHERE claim_id = ?", (claim_id,)
+        ).fetchone()["payout"]
+        conn.execute(
+            "INSERT INTO payments VALUES (?, ?, ?, ?)",
+            (claim_id, payout, sign_off.handler_id, db.now()),
+        )
+    return {"claim_id": claim_id, "amount": payout, "status": "decided"}
+
+
+@app.post("/api/claims/{claim_id}/fail", operation_id="fail_claim")
+def fail_claim(claim_id: str, failure: Failure, conn: Db) -> dict[str, str]:
+    """Send a claim back to waiting after the agent's run failed."""
+    with conn:
+        move(conn, claim_id, "in_progress", "waiting")
+        add(conn, claim_id, "error", failure.reason)
+    return {"claim_id": claim_id, "status": "waiting"}

@@ -1,8 +1,8 @@
 # Status
 
-The claims pilot, being built from `docs/PLAN.md`. Phase 1 of 7 is done.
+The claims pilot, being built from `docs/PLAN.md`. Phases 1 and 2 of 7 are done.
 
-- `backend/`: FastAPI on SQLite. On first start it creates `undercover.db` and seeds it from `data/` (never `data/evals/`); set `UNDERCOVER_DB` to use another file. Delete the file to start again from the seed. Read-only routes for the queue, a claim in full, the policy wording, the agent's instructions (`backend/instructions.md`) and the handlers.
+- `backend/`: FastAPI on SQLite. On first start it creates `undercover.db` and seeds it from `data/` (never `data/evals/`); set `UNDERCOVER_DB` to use another file. Delete the file to start again from the seed. Read-only routes for the queue, a claim in full, the policy wording, the agent's instructions (`backend/instructions.md`) and the handlers. Routes to start a claim, record the agent's steps and decision, pay a claim and sign off: an approval over $800 waits for a handler's sign-off, and the payment is refused until then.
 - `agent/`: still the skeleton's entry point `run(claim_id, thread_id)`.
 - `dashboard/`: still the skeleton's health page.
 - `e2e/`: one test of that page.

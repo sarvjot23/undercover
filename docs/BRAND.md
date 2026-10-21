@@ -10,22 +10,22 @@ From Google Fonts:
 
 ## Colors
 
-- **Primary**: Sea Green `#06D6A0`, Midnight text
-- **Secondary**: Marigold `#FFC145`, Midnight text
-- **Tertiary**: Coral `#F78C6B`, Midnight text
-- **Information**: Cerulean `#118AB2`, white text
-- **Highlight or alert**: Raspberry `#EF476F`, white text
-- **Ink on light backgrounds**: Midnight `#073B4C`
-- **Ink on dark backgrounds**: Sea Mist `#CDD8DB`
+- **Primary**: Gold `#D4AF37`, Black text
+- **Secondary**: Champagne Gold `#F5D76E`, Black text
+- **Tertiary**: Antique Gold `#B08D57`, Black text
+- **Information**: Steel Gray `#64748B`, white text
+- **Highlight or alert**: Burnished Gold `#C49A27`, Black text
+- **Ink on light backgrounds**: Black `#121212`
+- **Ink on dark backgrounds**: Warm Ivory `#F5F1E8`
 
-Use Sea Green, Marigold and Coral when three things sit side by side, such as a claim's states or chart series. Add Cerulean fourth and Raspberry fifth.
+Use Gold, Champagne Gold, and Antique Gold when three things sit side by side, such as a claim's states or chart series. Add Steel Gray fourth and Burnished Gold fifth.
 
 ## Surfaces
 
-- **Light mode**: page background `#F0F4F5`, white panels and cards
-- **Dark mode**: page background `#04232E`, black panels and cards
+- **Light mode**: page background `#F5F3EE`, white panels and cards
+- **Dark mode**: page background `#0A0A0A`, black panels and cards
 
-Panels are rounded with no outline. Sea Green and Marigold are too bright for small text, so darken them for headings and body text on light backgrounds and lighten them on dark ones.
+Panels are rounded with no outline. Gold is too bright for small text, so darken it for headings and body text on light backgrounds and lighten it on dark ones.
 
 ## Avoid
 

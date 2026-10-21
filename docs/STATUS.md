@@ -1,9 +1,9 @@
 # Status
 
-The claims pilot, being built from `docs/PLAN.md`. Phases 1 and 2 of 7 are done.
+The claims pilot, being built from `docs/PLAN.md`. Phases 1 to 3 of 7 are done.
 
 - `backend/`: FastAPI on SQLite. On first start it creates `undercover.db` and seeds it from `data/` (never `data/evals/`); set `UNDERCOVER_DB` to use another file. Delete the file to start again from the seed. Read-only routes for the queue, a claim in full, the policy wording, the agent's instructions (`backend/instructions.md`) and the handlers. Routes to start a claim, record the agent's steps and decision, pay a claim and sign off: an approval over $800 waits for a handler's sign-off, and the payment is refused until then.
-- `agent/`: still the skeleton's entry point `run(claim_id, thread_id)`.
+- `agent/`: the UnderCover Agent, `run(claim_id, thread_id)`, with four tools that call the backend: `get_claim`, `get_policy_wording`, `record_decision` and `pay_claim`. Its instructions come from the backend, and it posts each step as it works. It uses `openai/gpt-6-luna` with low effort, or `MODEL_NAME`. Run it on one claim with `uv run -m agent CLM-1001` while the backend is running, or with `POST /api/claims/{id}/run`.
 - `dashboard/`: still the skeleton's health page.
 - `e2e/`: one test of that page.
 

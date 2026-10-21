@@ -77,12 +77,12 @@ The agent decides claims through the backend.
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes. With a stub model, scripted runs: an approval under $800 that ends paid and `decided`; a decline; and an approval over $800 where the stub then calls `pay_claim` and is refused, leaving the claim `awaiting_sign_off` with no payment.
-- [ ] A test shows that a run records its steps in order: tool calls, results and the final answer.
-- [ ] A test shows that a run that raises sends the claim back to `waiting` with a step saying it failed.
-- [ ] A test shows that the agent's tools call only `/api/` routes on the backend and that the prompt comes from `/api/instructions`.
-- [ ] A live run on CLM-1001 with `gpt-6-luna` (about a tenth of a cent) ends with a decision, two or three sentences of reasons, a policy section and its steps in `GET /api/claims/CLM-1001`. This is the only check that calls a real model.
-- [ ] `npm run check:python` passes with coverage of at least 80%.
+- [x] `uv run pytest -q` passes. With a stub model, scripted runs: an approval under $800 that ends paid and `decided`; a decline; and an approval over $800 where the stub then calls `pay_claim` and is refused, leaving the claim `awaiting_sign_off` with no payment.
+- [x] A test shows that a run records its steps in order: tool calls, results and the final answer.
+- [x] A test shows that a run that raises sends the claim back to `waiting` with a step saying it failed.
+- [x] A test shows that the agent's tools call only `/api/` routes on the backend and that the prompt comes from `/api/instructions`.
+- [x] A live run on CLM-1001 with `gpt-6-luna` (about a tenth of a cent) ends with a decision, two or three sentences of reasons, a policy section and its steps in `GET /api/claims/CLM-1001`. This is the only check that calls a real model.
+- [x] `npm run check:python` passes with coverage of at least 80%.
 
 ## Phase 4: the dashboard's queue and instructions
 

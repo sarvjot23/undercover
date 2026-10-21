@@ -2,14 +2,16 @@
 
 import json
 import sqlite3
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from agent import main as agent
 from backend import db
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
@@ -297,3 +299,15 @@ def fail_claim(claim_id: str, failure: Failure, conn: Db) -> dict[str, str]:
         move(conn, claim_id, "in_progress", "waiting")
         add(conn, claim_id, "error", failure.reason)
     return {"claim_id": claim_id, "status": "waiting"}
+
+
+@app.post("/api/claims/{claim_id}/run", operation_id="run_claim")
+def run_claim(
+    claim_id: str, background_tasks: BackgroundTasks, conn: Db
+) -> dict[str, str]:
+    """Start the UnderCover Agent on a waiting claim."""
+    if find_claim(conn, claim_id)["status"] != "waiting":
+        raise HTTPException(409, f"Claim {claim_id} is not waiting")
+    thread_id = f"{claim_id}-{uuid.uuid4().hex[:8]}"
+    background_tasks.add_task(agent.run, claim_id, thread_id)
+    return {"claim_id": claim_id, "thread_id": thread_id}

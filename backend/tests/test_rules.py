@@ -1,5 +1,7 @@
 import pytest
 
+from backend import main
+
 
 def decide(client, claim_id, decision="approve", payout=650.0):
     client.post(f"/api/claims/{claim_id}/start")
@@ -144,3 +146,17 @@ def test_fail_sends_the_claim_back_to_waiting(client):
     steps = client.get("/api/claims/CLM-1001/steps").json()
     assert steps[-1]["kind"] == "error"
     assert steps[-1]["text"] == "Timed out"
+
+
+def test_run_starts_the_agent(client, monkeypatch):
+    runs = []
+    monkeypatch.setattr(main.agent, "run", lambda *args: runs.append(args))
+    started = client.post("/api/claims/CLM-1001/run").json()
+    assert started["thread_id"].startswith("CLM-1001-")
+    assert runs == [("CLM-1001", started["thread_id"])]
+
+
+def test_run_needs_a_waiting_claim(client, monkeypatch):
+    monkeypatch.setattr(main.agent, "run", lambda *args: None)
+    client.post("/api/claims/CLM-1001/start")
+    assert client.post("/api/claims/CLM-1001/run").status_code == 409

@@ -160,3 +160,19 @@ def test_run_needs_a_waiting_claim(client, monkeypatch):
     monkeypatch.setattr(main.agent, "run", lambda *args: None)
     client.post("/api/claims/CLM-1001/start")
     assert client.post("/api/claims/CLM-1001/run").status_code == 409
+
+
+def test_agent_working_until_its_answer(client):
+    def working():
+        return client.get("/api/claims/CLM-1001").json()["agent_working"]
+
+    assert not working()
+    client.post("/api/claims/CLM-1001/start")
+    assert working()
+    decide(client, "CLM-1001")
+    assert not working()
+    step = {"kind": "tool_call", "text": "pay_claim"}
+    client.post("/api/claims/CLM-1001/steps", json=step)
+    assert working()
+    client.post("/api/claims/CLM-1001/steps", json={"kind": "answer", "text": "Done"})
+    assert not working()

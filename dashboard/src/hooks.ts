@@ -35,21 +35,29 @@ export interface Loaded<T> {
   reload: () => void;
 }
 
-/** Fetch JSON from the backend, again every `everyMs` while it is above 0. */
-export function useJson<T>(path: string, everyMs = 0): Loaded<T> {
+/**
+ * Fetch JSON from the backend. `every` gives the wait in ms before fetching
+ * again, as a number or from the data just loaded; 0 stops. Pass a stable value.
+ */
+export function useJson<T>(
+  path: string,
+  every: number | ((data: T) => number) = 0,
+): Loaded<T> {
   const [data, setData] = useState<T>();
   const [error, setError] = useState(false);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const load = () => {
       getJson<T>(path).then(
         (value) => {
-          if (live) {
-            setData(value);
-            setError(false);
-          }
+          if (!live) return;
+          setData(value);
+          setError(false);
+          const wait = typeof every === "number" ? every : every(value);
+          if (wait > 0) timer = setTimeout(load, wait);
         },
         () => {
           if (live) setError(true);
@@ -57,12 +65,11 @@ export function useJson<T>(path: string, everyMs = 0): Loaded<T> {
       );
     };
     load();
-    const timer = everyMs > 0 ? setInterval(load, everyMs) : undefined;
     return () => {
       live = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
-  }, [path, everyMs, version]);
+  }, [path, every, version]);
 
   return {
     data,

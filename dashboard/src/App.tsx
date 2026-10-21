@@ -1,3 +1,4 @@
+import { ClaimView } from "./ClaimView";
 import { useRoute } from "./hooks";
 import { Instructions } from "./Instructions";
 import { Queue } from "./Queue";
@@ -28,7 +29,11 @@ export function App() {
         </nav>
       </header>
       <main>
-        {route.view === "instructions" ? <Instructions /> : <Queue />}
+        {route.view === "instructions" && <Instructions />}
+        {route.view === "claim" && (
+          <ClaimView key={route.claimId} claimId={route.claimId} />
+        )}
+        {(route.view === "queue" || route.view === "live") && <Queue />}
       </main>
     </div>
   );

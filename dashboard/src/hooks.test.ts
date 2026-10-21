@@ -1,9 +1,10 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { parseRoute, useJson, useRoute } from "./hooks";
 import { stubBackend } from "./testing";
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   vi.useRealTimers();
   window.location.hash = "";
@@ -56,4 +57,21 @@ it("polls and reloads", async () => {
   await waitFor(() => {
     expect(fetchMock.mock.calls.length).toBeGreaterThan(calls);
   });
+});
+
+it("polls while the data asks for it", async () => {
+  const routes: Record<string, unknown> = { "/api/a": { more: true } };
+  const fetchMock = stubBackend(routes);
+  const every = (data: { more: boolean }) => (data.more ? 20 : 0);
+  const { result } = renderHook(() => useJson("/api/a", every));
+  await waitFor(() => {
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(2);
+  });
+  routes["/api/a"] = { more: false };
+  await waitFor(() => {
+    expect(result.current.data).toEqual({ more: false });
+  });
+  const calls = fetchMock.mock.calls.length;
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(fetchMock.mock.calls).toHaveLength(calls);
 });

@@ -103,15 +103,15 @@ Success criteria:
 ## Phase 5: a claim in full, the agent at work and sign-off
 
 - The claim view: the story, the items, the documents, the policy and plan, the customer's claim history, and the decision with its payout, reasons and policy section.
-- "Run the agent" on a waiting claim. While the claim is in progress, the view polls every second and adds each step as it arrives.
+- "Run the agent" on a waiting claim. While the claim is in progress, the view polls every second and adds each step as it arrives. A claim is decided as soon as the agent records its decision, but the agent then pays it and gives its answer, so the backend also reports `agent_working` (in progress, or its last step is a tool call or a result), and the view follows the claim until the agent has finished.
 - On a claim waiting for sign-off: a handler picker and "Sign off". The payout and reasons are shown above it.
 
 Success criteria:
 
-- [ ] `npm run check:ts` passes, with tests for the claim view, polling that stops once the claim leaves `in_progress`, and sign-off. Coverage is at least 80%.
-- [ ] In the browser, CLM-1001 shows its story, its three items totaling $420.00, its four documents and Maya Patel's earlier claim.
-- [ ] In the browser, with a live run on one claim, the steps appear one by one while it runs, and then the decision.
-- [ ] In the browser, an approval over $800 (recorded through the API) shows "Waiting for sign-off" and no payment. After signing off as Dana Whitfield, it shows "Decided" and the payment, with her name.
+- [x] `npm run check:ts` passes, with tests for the claim view, polling that stops once the claim leaves `in_progress`, and sign-off. Coverage is at least 80%.
+- [x] In the browser, CLM-1001 shows its story, its three items totaling $420.00, its four documents and Maya Patel's earlier claim.
+- [x] In the browser, with a live run on one claim, the steps appear one by one while it runs, and then the decision.
+- [x] In the browser, an approval over $800 (recorded through the API) shows "Waiting for sign-off" and no payment. After signing off as Dana Whitfield, it shows "Decided" and the payment, with her name.
 
 ## Phase 6: the live view
 

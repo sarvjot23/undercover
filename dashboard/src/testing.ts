@@ -1,11 +1,15 @@
 import { vi } from "vitest";
 import type { Claim, ClaimSummary } from "./api";
 
-/** Stub fetch so each path returns its JSON, and any other path a 404. */
+export function pathOf(input: RequestInfo | URL): string {
+  return input instanceof Request ? input.url : input.toString();
+}
+
+/** Stub fetch so each path returns its JSON, and any other a 404. Key POSTs as "POST <path>". */
 export function stubBackend(routes: Record<string, unknown>) {
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
-    const path = input instanceof Request ? input.url : String(input);
-    const body = routes[path];
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const path = pathOf(input);
+    const body = routes[init?.method === "POST" ? `POST ${path}` : path];
     return Promise.resolve(
       body === undefined
         ? new Response("{}", { status: 404 })
@@ -25,6 +29,7 @@ export function summary(overrides: Partial<ClaimSummary> = {}): ClaimSummary {
     amount_claimed: 420,
     submitted_on: "2026-06-24",
     status: "waiting",
+    agent_working: false,
     decision: null,
     payout: null,
     ...overrides,
@@ -58,6 +63,7 @@ export function claim(overrides: Partial<Claim> = {}): Claim {
       },
     ],
     status: "waiting",
+    agent_working: false,
     policy: {
       policy_id: "POL-2001",
       plan: "premium",

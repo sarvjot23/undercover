@@ -217,3 +217,182 @@ button:disabled {
   opacity: 0.5;
   cursor: default;
 }
+
+.claim-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.claim-head h2 {
+  margin-right: auto;
+}
+
+.claim-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .claim-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.claim-main,
+.claim-side {
+  display: grid;
+  gap: 20px;
+}
+
+.panel h3 {
+  margin-top: 0;
+}
+
+.story {
+  font-size: 1.05rem;
+}
+
+.items td,
+.items th {
+  padding: 6px 0;
+}
+
+.items tfoot th {
+  text-align: left;
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.document {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.document summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.history {
+  padding-left: 18px;
+}
+
+.outcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.outcome-approve {
+  color: var(--accent-text);
+}
+
+.outcome-decline {
+  color: var(--steel);
+}
+
+.outcome-refer {
+  color: var(--antique);
+}
+
+.paid {
+  font-weight: 600;
+}
+
+.sign-off {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+select {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+  animation: step-in 300ms ease-out;
+}
+
+.step-kind {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 2px;
+}
+
+.step-text {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 7.5em;
+  overflow: hidden;
+}
+
+.step-answer .step-text {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.step-error .step-kind {
+  color: var(--burnished);
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step {
+    animation: none;
+  }
+}

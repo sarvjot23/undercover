@@ -86,6 +86,17 @@ def find_claim(conn: sqlite3.Connection, claim_id: str) -> sqlite3.Row:
     return row
 
 
+def agent_working(conn: sqlite3.Connection, row: sqlite3.Row) -> bool:
+    """Whether the agent is still at work: in progress, or not yet given its answer."""
+    last = conn.execute(
+        "SELECT kind FROM steps WHERE claim_id = ? ORDER BY step_id DESC LIMIT 1",
+        (row["claim_id"],),
+    ).fetchone()
+    return row["status"] == "in_progress" or (
+        last is not None and last["kind"] in ("tool_call", "tool_result")
+    )
+
+
 def decision_of(conn: sqlite3.Connection, claim_id: str) -> dict[str, Any] | None:
     """Return the decision on a claim, if there is one."""
     row = conn.execute(
@@ -139,6 +150,7 @@ def list_claims(conn: Db) -> list[dict[str, Any]]:
                 "amount_claimed": claim["amount_claimed"],
                 "submitted_on": claim["submitted_on"],
                 "status": row["status"],
+                "agent_working": agent_working(conn, row),
                 "decision": decision["decision"] if decision else None,
                 "payout": decision["payout"] if decision else None,
             }
@@ -159,6 +171,7 @@ def get_claim(claim_id: str, conn: Db) -> dict[str, Any]:
     return {
         **claim,
         "status": row["status"],
+        "agent_working": agent_working(conn, row),
         "policy": policy,
         "plan": record(conn, "plan", policy["plan"]),
         "customer": {

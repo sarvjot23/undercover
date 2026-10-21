@@ -10,6 +10,7 @@ export interface ClaimSummary {
   amount_claimed: number;
   submitted_on: string;
   status: Status;
+  agent_working: boolean;
   decision: Outcome | null;
   payout: number | null;
 }
@@ -68,6 +69,7 @@ export interface Claim {
   amount_claimed: number;
   documents: Document[];
   status: Status;
+  agent_working: boolean;
   policy: {
     policy_id: string;
     plan: string;

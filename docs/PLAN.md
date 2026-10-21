@@ -36,14 +36,14 @@ The database, the seed and the read-only API.
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes, with tests for each route and the seed.
-- [ ] A fresh start seeds 25 claims, all `waiting`: `GET /api/claims` returns 25 rows.
-- [ ] `GET /api/claims/CLM-1001` returns the claim with policy `POL-2001` on the Premium plan, its limits and Maya Patel's earlier claim CLM-0412.
-- [ ] `GET /api/claims/CLM-9999` returns 404.
-- [ ] `GET /api/policy-wording` returns the wording, starting with "# UnderCover Travel Insurance: Policy Wording".
-- [ ] A test shows that no file under `data/evals/` is opened while seeding, and that no response contains eval fields such as `difficulty` or `failure_class`.
-- [ ] Every route has an `operation_id`, a one-line docstring and no optional inputs: a test walks `app.openapi()` to check.
-- [ ] `npm run check:python` passes with coverage of at least 80%.
+- [x] `uv run pytest -q` passes, with tests for each route and the seed.
+- [x] A fresh start seeds 25 claims, all `waiting`: `GET /api/claims` returns 25 rows.
+- [x] `GET /api/claims/CLM-1001` returns the claim with policy `POL-2001` on the Premium plan, its limits and Maya Patel's earlier claim CLM-0412.
+- [x] `GET /api/claims/CLM-9999` returns 404.
+- [x] `GET /api/policy-wording` returns the wording, starting with "# UnderCover Travel Insurance: Policy Wording".
+- [x] A test shows that no file under `data/evals/` is opened while seeding, and that no response contains eval fields such as `difficulty` or `failure_class`.
+- [x] Every route has an `operation_id`, a one-line docstring and no optional inputs: a test walks `app.openapi()` to check.
+- [x] `npm run check:python` passes with coverage of at least 80%.
 
 ## Phase 2: decisions, payment and sign-off
 

@@ -95,10 +95,10 @@ The look from `docs/BRAND.md`, and the first two views.
 
 Success criteria:
 
-- [ ] `npm run check:ts` passes, with vitest tests for the queue, the badges, money formatting and the router, and coverage of at least 80%.
-- [ ] In the browser with the Playwright MCP server, the queue shows 25 rows, all "Waiting", in light and dark mode, and the colors and fonts match `docs/BRAND.md` (screenshots checked).
-- [ ] The instructions view shows the text from `backend/instructions.md` and has no way to edit it.
-- [ ] No panel has an outline or a one-edge border, and nothing uses a gradient.
+- [x] `npm run check:ts` passes, with vitest tests for the queue, the badges, money formatting and the router, and coverage of at least 80%.
+- [x] In the browser (Playwright screenshots, as the Playwright MCP server isn't set up in this repo), the queue shows 25 rows, all "Waiting", in light and dark mode, and the colors and fonts match `docs/BRAND.md` (screenshots checked).
+- [x] The instructions view shows the text from `backend/instructions.md` and has no way to edit it.
+- [x] No panel has an outline or a one-edge border, and nothing uses a gradient.
 
 ## Phase 5: a claim in full, the agent at work and sign-off
 

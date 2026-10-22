@@ -15,6 +15,8 @@ export const LEAVE_MS = 450;
 export interface LiveState {
   claims: ClaimSummary[];
   running: boolean;
+  /** The claims in the queue run, in order, as the backend has them. */
+  run: string[];
   focus: string | null;
   stage: "working" | "stamped" | "leaving";
   held: boolean;
@@ -22,13 +24,14 @@ export interface LiveState {
 }
 
 export type LiveEvent =
-  | { type: "poll"; claims: ClaimSummary[]; running: boolean }
+  | { type: "poll"; claims: ClaimSummary[]; running: boolean; run: string[] }
   | { type: "held" }
   | { type: "left" };
 
 export const START: LiveState = {
   claims: [],
   running: false,
+  run: [],
   focus: null,
   stage: "working",
   held: false,
@@ -80,7 +83,12 @@ function settle(state: LiveState): LiveState {
 export function reduce(state: LiveState, event: LiveEvent): LiveState {
   switch (event.type) {
     case "poll":
-      return settle({ ...state, claims: event.claims, running: event.running });
+      return settle({
+        ...state,
+        claims: event.claims,
+        running: event.running,
+        run: event.run,
+      });
     case "held":
       return settle({ ...state, held: true });
     case "left":
@@ -94,6 +102,20 @@ export interface Tally {
   awaiting: number;
 }
 
+/**
+ * The claims with an outcome to count: every decided claim in the queue run,
+ * even ones decided before this view opened, and any claim it stamped.
+ */
+function counted(state: LiveState): [ClaimSummary, LiveOutcome][] {
+  return state.claims.flatMap((claim) => {
+    const outcome = outcomeOf(claim);
+    const ours =
+      state.finished.includes(claim.claim_id) ||
+      state.run.includes(claim.claim_id);
+    return outcome && ours ? [[claim, outcome]] : [];
+  });
+}
+
 export function tally(state: LiveState): Tally {
   const counts: Record<LiveOutcome, number> = {
     approve: 0,
@@ -103,9 +125,7 @@ export function tally(state: LiveState): Tally {
   };
   let paid = 0;
   let awaiting = 0;
-  for (const claim of state.claims) {
-    const outcome = outcomeOf(claim);
-    if (!outcome || !state.finished.includes(claim.claim_id)) continue;
+  for (const [claim, outcome] of counted(state)) {
     counts[outcome] += 1;
     if (outcome === "approve") paid += claim.payout ?? 0;
     if (outcome === "sign_off") awaiting += claim.payout ?? 0;
@@ -113,17 +133,27 @@ export function tally(state: LiveState): Tally {
   return { counts, paid, awaiting };
 }
 
-/** Where the live view is: "Claim 4 of 25". */
+/**
+ * Where the live view is: "Claim 4 of 25". In a queue run this comes from the
+ * run itself, so it is the same however long the view has been open.
+ */
 export function progress(state: LiveState): {
   position: number;
   total: number;
+  done: number;
 } {
+  const done = counted(state).length;
+  const index = state.focus === null ? -1 : state.run.indexOf(state.focus);
+  if (index >= 0 || (state.focus === null && state.run.length > 0)) {
+    const position = index >= 0 ? index + 1 : done;
+    return { position, total: state.run.length, done };
+  }
   const remaining = state.claims.filter(
     (claim) =>
       !state.finished.includes(claim.claim_id) &&
       (claim.status === "waiting" || claim.status === "in_progress"),
   ).length;
-  const done = state.finished.length;
-  const position = state.stage === "working" && state.focus ? done + 1 : done;
-  return { position, total: done + remaining };
+  const shown = state.finished.length;
+  const position = state.stage === "working" && state.focus ? shown + 1 : shown;
+  return { position, total: shown + remaining, done };
 }

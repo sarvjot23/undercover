@@ -12,7 +12,7 @@ The claims pilot from `docs/PLAN.md` is built: all 7 phases are done.
 - `dashboard/`: React in UnderCover's brand, light and dark.
   - `#/`: the queue, with a count of claims in each state, "Run the queue" and "Watch live".
   - `#/claims/CLM-1001`: a claim in full, with its decision, the agent's steps as they arrive, "Run the agent" and sign-off.
-  - `#/live`: the live view. It goes full screen, follows the claim the agent is on, stamps each outcome (Approved, Declined, Referred, Waiting for sign-off), moves on to the next claim and ends on a summary. Esc leaves.
+  - `#/live`: the live view. It goes full screen, follows the claim the agent is on, stamps each outcome (Approved, Declined, Referred, Waiting for sign-off), moves on to the next claim and ends on a summary. Esc leaves. Its numbers ("Claim 4 of 25", the tally and the summary) come from the queue run in the backend, so they're the same if it's opened part way through a run or after one. Screenshots are in `docs/screenshots/`.
   - `#/instructions`: the agent's instructions, read only.
 - `e2e/`: Playwright tests of the queue, a claim, the sign-off rule, the live view and the instructions. They run on their own ports (backend 8001, dashboard 5174) with a fresh database in the temp folder, so they never touch `undercover.db`, and they record decisions through the API in place of a model.
 

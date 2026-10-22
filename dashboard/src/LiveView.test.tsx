@@ -48,10 +48,10 @@ function stamp() {
   return screen.getByRole("status");
 }
 
-function backend(claims: ClaimSummary[], running = true) {
+function backend(claims: ClaimSummary[], running = true, run: string[] = []) {
   const routes: Record<string, unknown> = {
     "/api/claims": claims,
-    "/api/queue/run": { running },
+    "/api/queue/run": { running, claim_ids: run, done: 0, current: null },
     "/api/claims/CLM-1001/steps": [
       { step_id: 1, kind: "tool_call", text: "get_claim CLM-1001", at: "" },
     ],
@@ -137,7 +137,12 @@ it("shows each claim full screen, stamps it and moves on to a summary", async ()
       payout: 1200,
     }),
   ];
-  routes["/api/queue/run"] = { running: false };
+  routes["/api/queue/run"] = {
+    running: false,
+    claim_ids: [],
+    done: 0,
+    current: null,
+  };
   await until(() => {
     expect(stamp().textContent).toContain("Waiting for sign-off");
   });
@@ -186,6 +191,46 @@ it("waits for the agent, and can start the queue", async () => {
   ).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "Run the queue" }));
   expect(fullscreen).toHaveBeenCalled();
+});
+
+it("keeps the queue run's numbers when it opens part way through", async () => {
+  const decline = { decision: "decline" as const, payout: 0 };
+  backend(
+    [
+      summary({ status: "decided", ...decline }),
+      summary({ claim_id: "CLM-1002", status: "in_progress" }),
+      summary({ claim_id: "CLM-1003" }),
+    ],
+    true,
+    ["CLM-1001", "CLM-1002", "CLM-1003"],
+  );
+  render(<LiveView />);
+  await wait(100);
+  expect(screen.getByText("Claim 2 of 3")).toBeDefined();
+  expect(
+    screen.getByRole("list", { name: "Outcomes so far" }).textContent,
+  ).toContain("1 Declined");
+});
+
+it("shows the last queue run's summary when it opens after the run", async () => {
+  const approve = { decision: "approve" as const, payout: 420 };
+  backend(
+    [
+      summary({ status: "decided", ...approve }),
+      summary({ claim_id: "CLM-1002", status: "decided", ...approve }),
+    ],
+    false,
+    ["CLM-1001", "CLM-1002"],
+  );
+  render(<LiveView />);
+  await wait(100);
+  expect(
+    screen.getByRole("heading", { name: "The queue is done" }),
+  ).toBeDefined();
+  expect(
+    screen.getByText("2 claims decided by the UnderCover Agent"),
+  ).toBeDefined();
+  expect(screen.getByText("Claim 2 of 2")).toBeDefined();
 });
 
 it("leaves on Esc", async () => {

@@ -96,6 +96,14 @@ export interface Step {
   at: string;
 }
 
+/** The agent's run through the queue: the claims in it, and how far it has got. */
+export interface QueueRun {
+  running: boolean;
+  claim_ids: string[];
+  done: number;
+  current: string | null;
+}
+
 export interface Handler {
   handler_id: string;
   name: string;

@@ -1,5 +1,5 @@
 import { useEffect, useReducer } from "react";
-import type { Claim, ClaimSummary, Decision, Step } from "./api";
+import type { Claim, ClaimSummary, Decision, QueueRun, Step } from "./api";
 import { getJson, postJson } from "./api";
 import { label, money } from "./format";
 import { enterFullscreen, leaveLiveView, useCountUp, useJson } from "./hooks";
@@ -25,10 +25,17 @@ export function LiveView() {
     const poll = () => {
       Promise.all([
         getJson<ClaimSummary[]>("/api/claims"),
-        getJson<{ running: boolean }>("/api/queue/run"),
+        getJson<QueueRun>("/api/queue/run"),
       ]).then(
         ([claims, run]) => {
-          if (live) dispatch({ type: "poll", claims, running: run.running });
+          if (live) {
+            dispatch({
+              type: "poll",
+              claims,
+              running: run.running,
+              run: run.claim_ids,
+            });
+          }
         },
         () => undefined,
       );
@@ -71,6 +78,7 @@ export function LiveView() {
   }, []);
 
   const focus = state.claims.find((claim) => claim.claim_id === state.focus);
+  const { done } = progress(state);
 
   return (
     <div className="live">
@@ -79,21 +87,17 @@ export function LiveView() {
         {focus && (
           <LiveCard key={focus.claim_id} summary={focus} stage={state.stage} />
         )}
-        {!focus && state.finished.length > 0 && !state.running && (
-          <LiveSummary state={state} />
-        )}
-        {!focus && (state.finished.length === 0 || state.running) && (
-          <LiveIdle state={state} />
-        )}
+        {!focus && done > 0 && !state.running && <LiveSummary state={state} />}
+        {!focus && (done === 0 || state.running) && <LiveIdle state={state} />}
       </div>
     </div>
   );
 }
 
 function LiveTop({ state }: Readonly<{ state: LiveState }>) {
-  const { position, total } = progress(state);
+  const { position, total, done } = progress(state);
   const { counts } = tally(state);
-  const share = total === 0 ? 0 : (state.finished.length / total) * 100;
+  const share = total === 0 ? 0 : (done / total) * 100;
   return (
     <header className="live-top">
       <span className="brand">UnderCover</span>
@@ -106,7 +110,7 @@ function LiveTop({ state }: Readonly<{ state: LiveState }>) {
         aria-label="Claims decided"
         aria-valuemin={0}
         aria-valuemax={total}
-        aria-valuenow={state.finished.length}
+        aria-valuenow={done}
       >
         <div
           className="live-progress-fill"
@@ -239,12 +243,11 @@ function Stamp({
 
 function LiveSummary({ state }: Readonly<{ state: LiveState }>) {
   const { counts, paid, awaiting } = tally(state);
+  const { done } = progress(state);
   return (
     <section className="live-summary panel" aria-labelledby="summary-heading">
       <h1 id="summary-heading">The queue is done</h1>
-      <p className="tagline">
-        {state.finished.length} claims decided by the UnderCover Agent
-      </p>
+      <p className="tagline">{done} claims decided by the UnderCover Agent</p>
       <ul className="summary-counts">
         {OUTCOMES.map((outcome) => (
           <li key={outcome} className={`summary-count chip-${outcome}`}>

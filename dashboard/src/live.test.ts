@@ -4,8 +4,13 @@ import type { LiveState } from "./live";
 import { outcomeOf, progress, reduce, START, tally } from "./live";
 import { summary } from "./testing";
 
-function poll(state: LiveState, claims: ClaimSummary[], running = true) {
-  return reduce(state, { type: "poll", claims, running });
+function poll(
+  state: LiveState,
+  claims: ClaimSummary[],
+  running = true,
+  run: string[] = [],
+) {
+  return reduce(state, { type: "poll", claims, running, run });
 }
 
 const second = summary({ claim_id: "CLM-1002" });
@@ -34,7 +39,7 @@ it("follows a claim from in progress to its stamp, then moves on", () => {
 
   state = poll(state, [summary({ status: "in_progress" }), second]);
   expect(state).toMatchObject({ focus: "CLM-1001", stage: "working" });
-  expect(progress(state)).toEqual({ position: 1, total: 2 });
+  expect(progress(state)).toEqual({ position: 1, total: 2, done: 0 });
 
   const decided = summary({
     status: "decided",
@@ -43,7 +48,7 @@ it("follows a claim from in progress to its stamp, then moves on", () => {
   });
   state = poll(state, [decided, second]);
   expect(state).toMatchObject({ stage: "stamped", finished: ["CLM-1001"] });
-  expect(progress(state)).toEqual({ position: 1, total: 2 });
+  expect(progress(state)).toEqual({ position: 1, total: 2, done: 1 });
 
   state = reduce(state, { type: "held" });
   expect(state.stage).toBe("stamped");
@@ -54,7 +59,7 @@ it("follows a claim from in progress to its stamp, then moves on", () => {
 
   state = reduce(state, { type: "left" });
   expect(state).toMatchObject({ focus: "CLM-1002", stage: "working" });
-  expect(progress(state)).toEqual({ position: 2, total: 2 });
+  expect(progress(state)).toEqual({ position: 2, total: 2, done: 1 });
 });
 
 it("leaves the last stamp once the queue run has ended", () => {
@@ -106,4 +111,26 @@ it("counts payouts waiting for sign-off apart from those paid", () => {
     ],
   };
   expect(tally(state)).toMatchObject({ paid: 100, awaiting: 1200 });
+});
+
+it("counts from the queue run, however late the view opens", () => {
+  const run = ["CLM-1001", "CLM-1002", "CLM-1003", "CLM-1004"];
+  const declined = summary({
+    status: "decided",
+    decision: "decline",
+    payout: 0,
+  });
+  const claims = [
+    declined,
+    summary({ claim_id: "CLM-1002", status: "in_progress" }),
+    summary({ claim_id: "CLM-1003" }),
+    summary({ claim_id: "CLM-1004" }),
+  ];
+  let state = poll(START, claims, true, run);
+  expect(state.focus).toBe("CLM-1002");
+  expect(progress(state)).toEqual({ position: 2, total: 4, done: 1 });
+  expect(tally(state).counts.decline).toBe(1);
+
+  state = poll(START, [declined], false, ["CLM-1001"]);
+  expect(progress(state)).toEqual({ position: 1, total: 1, done: 1 });
 });

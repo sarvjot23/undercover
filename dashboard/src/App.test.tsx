@@ -95,8 +95,13 @@ it("says when the instructions can't load", async () => {
 it("runs the queue full screen in the live view", async () => {
   const fetchMock = stubBackend({
     "/api/claims": queue,
-    "POST /api/queue/run": { running: true },
-    "/api/queue/run": { running: true },
+    "POST /api/queue/run": {
+      running: true,
+      claim_ids: [],
+      done: 0,
+      current: null,
+    },
+    "/api/queue/run": { running: true, claim_ids: [], done: 0, current: null },
   });
   const fullscreen = vi.fn().mockResolvedValue(undefined);
   document.documentElement.requestFullscreen = fullscreen;
@@ -117,7 +122,15 @@ it("runs the queue full screen in the live view", async () => {
 
 it("leaves the live view and full screen", async () => {
   window.location.hash = "#/live";
-  stubBackend({ "/api/claims": queue, "/api/queue/run": { running: false } });
+  stubBackend({
+    "/api/claims": queue,
+    "/api/queue/run": {
+      running: false,
+      claim_ids: [],
+      done: 0,
+      current: null,
+    },
+  });
   const exitFullscreen = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(document, "fullscreenElement", {
     configurable: true,

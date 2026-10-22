@@ -139,7 +139,7 @@ Success criteria:
 
 Success criteria:
 
-- [ ] `npm run e2e` passes, with tests for: the queue shows 25 claims; a claim's detail page; an approval under $800 shows "Decided"; an approval over $800 shows "Waiting for sign-off", the payment is refused, and after sign-off it's "Decided" with the payment; the instructions page; and the live view following two claims through to their stamps.
-- [ ] `npm run check` passes in full: ruff, pyright, pytest, ESLint, Prettier, tsc, vitest and Playwright.
-- [ ] Following `docs/STATUS.md` from a fresh clone (`uv sync`, `npm install`, `npm run dev`) gives a working dashboard at http://localhost:5173.
-- [ ] Every checkbox in this plan is ticked and each phase has its own commit, made with the pre-commit hook.
+- [x] `npm run e2e` passes, with tests for: the queue shows 25 claims; a claim's detail page; an approval under $800 shows "Decided"; an approval over $800 shows "Waiting for sign-off", the payment is refused, and after sign-off it's "Decided" with the payment; the instructions page; and the live view following two claims through to their stamps.
+- [x] `npm run check` passes in full: ruff, pyright, pytest, ESLint, Prettier, tsc, vitest and Playwright.
+- [x] Following `docs/STATUS.md` from a fresh clone (`uv sync`, `npm install`, `npm run dev`) gives a working dashboard at http://localhost:5173.
+- [x] Every checkbox in this plan is ticked and each phase has its own commit, made with the pre-commit hook.

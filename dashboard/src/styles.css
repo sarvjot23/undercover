@@ -396,3 +396,384 @@ select {
     animation: none;
   }
 }
+
+.queue-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.queue-head h2 {
+  margin-right: auto;
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--ink);
+}
+
+/* The live view: one claim at a time, full screen */
+
+.live {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--page);
+  overflow: hidden;
+}
+
+.live-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 32px;
+  flex-wrap: wrap;
+}
+
+.live-position {
+  min-width: 140px;
+  font-size: 1rem;
+}
+
+.live-progress {
+  flex: 1;
+  min-width: 160px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--soft);
+  overflow: hidden;
+}
+
+.live-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold);
+  transition: width 600ms ease;
+}
+
+.live-tally {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #121212;
+}
+
+.chip-approve {
+  background: var(--gold);
+}
+
+.chip-decline {
+  background: var(--steel);
+  color: #ffffff;
+}
+
+.chip-refer {
+  background: var(--antique);
+}
+
+.chip-sign_off {
+  background: var(--burnished);
+}
+
+.live-stage {
+  display: grid;
+  place-items: center;
+  padding: 8px 32px 32px;
+  min-height: 0;
+}
+
+.live-card {
+  width: min(1400px, 100%);
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 24px;
+  min-height: 0;
+  animation: card-in 550ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.live-card.leaving {
+  animation: card-out 450ms ease-in forwards;
+}
+
+.live-claim {
+  position: relative;
+  padding: 40px 48px;
+  overflow: hidden;
+}
+
+.live-id {
+  font-size: 1.1rem;
+  color: var(--accent-text);
+  margin: 0;
+}
+
+.live-claim h1 {
+  font-size: clamp(2rem, 3.6vw, 3.4rem);
+  margin: 8px 0 12px;
+}
+
+.live-meta {
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.live-story {
+  font-size: 1.15rem;
+  max-width: 62ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.live-items {
+  list-style: none;
+  padding: 0;
+  max-width: 62ch;
+}
+
+.live-items li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.live-steps {
+  overflow: hidden;
+}
+
+.live-steps h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.live-steps .step {
+  grid-template-columns: 1fr;
+}
+
+.stamp-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 48px;
+  text-align: center;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  animation: fade-in 300ms ease-out;
+}
+
+.stamp {
+  --stamp: var(--accent-text);
+  display: grid;
+  justify-items: center;
+  padding: 20px 48px;
+  border: 8px solid var(--stamp);
+  border-radius: 24px;
+  color: var(--stamp);
+  transform: rotate(-8deg);
+  animation: stamp-in 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.stamp-approve .stamp {
+  --stamp: var(--gold);
+}
+
+.stamp-decline .stamp {
+  --stamp: var(--steel);
+}
+
+.stamp-refer .stamp {
+  --stamp: var(--antique);
+}
+
+.stamp-sign_off .stamp {
+  --stamp: var(--burnished);
+}
+
+.stamp-word {
+  font-size: clamp(2.6rem, 6vw, 5.5rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+}
+
+.stamp-sign_off .stamp-word {
+  font-size: clamp(1.8rem, 3.8vw, 3.4rem);
+  white-space: nowrap;
+}
+
+.stamp-amount {
+  font-size: clamp(1.8rem, 3.5vw, 3rem);
+  font-weight: 600;
+}
+
+.stamp-reasons {
+  max-width: 60ch;
+  font-size: 1.15rem;
+  animation: rise-in 500ms 450ms ease-out both;
+}
+
+.stamp-section {
+  color: var(--muted);
+  animation: rise-in 500ms 600ms ease-out both;
+}
+
+.live-summary {
+  width: min(900px, 100%);
+  padding: 48px;
+  text-align: center;
+  animation: card-in 550ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.live-summary h1 {
+  font-size: 3rem;
+  margin: 0;
+}
+
+.summary-counts {
+  list-style: none;
+  padding: 0;
+  margin: 32px 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.summary-count {
+  display: grid;
+  gap: 4px;
+  padding: 20px 12px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  color: #121212;
+}
+
+.summary-count.chip-decline {
+  color: #ffffff;
+}
+
+.summary-number {
+  font-size: 2.6rem;
+}
+
+.summary-money {
+  font-size: 1.25rem;
+}
+
+.live-idle {
+  display: grid;
+  justify-items: center;
+  gap: 20px;
+  font-size: 1.3rem;
+  color: var(--muted);
+}
+
+.pulse {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateX(80px);
+  }
+}
+
+@keyframes card-out {
+  to {
+    opacity: 0;
+    transform: translateX(-80px);
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: scale(2.4) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-7deg);
+  }
+  to {
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 900px) {
+  .live-card {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .summary-counts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-card,
+  .live-summary,
+  .stamp,
+  .stamp-reasons,
+  .stamp-section {
+    animation: fade-in 300ms ease-out both;
+  }
+
+  .live-card.leaving {
+    animation: fade-out 300ms ease-in forwards;
+  }
+
+  .pulse {
+    animation: none;
+  }
+
+  .live-progress-fill {
+    transition: none;
+  }
+}

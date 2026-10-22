@@ -1,4 +1,11 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { stubBackend, summary } from "./testing";
@@ -83,4 +90,46 @@ it("says when the instructions can't load", async () => {
   stubBackend({});
   render(<App />);
   expect(await screen.findByRole("alert")).toBeDefined();
+});
+
+it("runs the queue full screen in the live view", async () => {
+  const fetchMock = stubBackend({
+    "/api/claims": queue,
+    "POST /api/queue/run": { running: true },
+    "/api/queue/run": { running: true },
+  });
+  const fullscreen = vi.fn().mockResolvedValue(undefined);
+  document.documentElement.requestFullscreen = fullscreen;
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Run the queue" }));
+  expect(fullscreen).toHaveBeenCalled();
+  await waitFor(() => {
+    expect(window.location.hash).toBe("#/live");
+  });
+  expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
+    true,
+  );
+  expect(
+    await screen.findByRole("button", { name: "Leave (Esc)" }),
+  ).toBeDefined();
+});
+
+it("leaves the live view and full screen", async () => {
+  window.location.hash = "#/live";
+  stubBackend({ "/api/claims": queue, "/api/queue/run": { running: false } });
+  const exitFullscreen = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(document, "fullscreenElement", {
+    configurable: true,
+    value: document.documentElement,
+  });
+  document.exitFullscreen = exitFullscreen;
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Leave (Esc)" }));
+  expect(exitFullscreen).toHaveBeenCalled();
+  expect(window.location.hash).toBe("#/");
+  Object.defineProperty(document, "fullscreenElement", {
+    configurable: true,
+    value: null,
+  });
 });

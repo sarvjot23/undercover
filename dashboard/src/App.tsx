@@ -1,10 +1,13 @@
 import { ClaimView } from "./ClaimView";
 import { useRoute } from "./hooks";
 import { Instructions } from "./Instructions";
+import { LiveView } from "./LiveView";
 import { Queue } from "./Queue";
 
 export function App() {
   const route = useRoute();
+
+  if (route.view === "live") return <LiveView />;
 
   return (
     <div className="page">
@@ -33,7 +36,7 @@ export function App() {
         {route.view === "claim" && (
           <ClaimView key={route.claimId} claimId={route.claimId} />
         )}
-        {(route.view === "queue" || route.view === "live") && <Queue />}
+        {route.view === "queue" && <Queue />}
       </main>
     </div>
   );

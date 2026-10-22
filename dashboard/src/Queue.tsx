@@ -1,9 +1,19 @@
 import type { ClaimSummary, Status } from "./api";
+import { postJson } from "./api";
 import { date, label, money, STATUS_LABELS } from "./format";
-import { useJson } from "./hooks";
+import { enterFullscreen, useJson } from "./hooks";
 import { StatusBadge } from "./StatusBadge";
 
 const STATUSES = Object.keys(STATUS_LABELS) as Status[];
+
+function runQueue() {
+  enterFullscreen();
+  postJson("/api/queue/run")
+    .catch(() => undefined)
+    .finally(() => {
+      window.location.hash = "#/live";
+    });
+}
 
 export function Queue() {
   const { data: claims, error } = useJson<ClaimSummary[]>("/api/claims", 3000);
@@ -13,7 +23,17 @@ export function Queue() {
 
   return (
     <section aria-labelledby="queue-heading">
-      <h2 id="queue-heading">The claims queue</h2>
+      <div className="queue-head">
+        <h2 id="queue-heading">The claims queue</h2>
+        <a href="#/live">Watch live</a>
+        <button
+          type="button"
+          onClick={runQueue}
+          disabled={!claims.some((claim) => claim.status === "waiting")}
+        >
+          Run the queue
+        </button>
+      </div>
       <ul className="tiles">
         {STATUSES.map((status) => (
           <li key={status} className="panel tile">

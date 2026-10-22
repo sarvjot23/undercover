@@ -79,3 +79,38 @@ export function useJson<T>(
     },
   };
 }
+
+export function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Count up from 0 to `target` over `ms`, or show it at once with reduced motion. */
+export function useCountUp(target: number, ms = 900): number {
+  const [value, setValue] = useState(() =>
+    prefersReducedMotion() ? target : 0,
+  );
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const t = Math.min(1, (Date.now() - started) / ms);
+      setValue(target * (1 - (1 - t) ** 3));
+      if (t === 1) clearInterval(timer);
+    }, 30);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [target, ms]);
+  return value;
+}
+
+export function enterFullscreen(): void {
+  document.documentElement.requestFullscreen().catch(() => undefined);
+}
+
+export function leaveLiveView(): void {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => undefined);
+  }
+  window.location.hash = "#/";
+}

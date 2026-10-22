@@ -126,11 +126,11 @@ A full-screen view of the agent working through the queue, one claim after anoth
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes, with stub-model tests that a queue run decides every waiting claim in order, skips claims that aren't waiting, and returns 409 while one is running. Coverage is at least 80%.
-- [ ] `npm run check:ts` passes, with vitest tests using fake timers: the stamp for each of the four outcomes, the hold before the next claim, the progress and counts, the summary screen, and Esc leaving the view. Coverage is at least 80%.
-- [ ] In the browser, with decisions recorded through the API, the live view shows each claim full screen, then its stamp, then moves on to the next, and ends on the summary screen (screenshots of a claim in progress, each stamp and the summary).
-- [ ] In the browser, with reduced motion turned on, the stamps and the move to the next claim fade without scaling or sliding.
-- [ ] A live queue run with `gpt-6-luna` on the 25 claims (about a cent) plays through in the live view and ends on the summary screen.
+- [x] `uv run pytest -q` passes, with stub-model tests that a queue run decides every waiting claim in order, skips claims that aren't waiting, and returns 409 while one is running. Coverage is at least 80%.
+- [x] `npm run check:ts` passes, with vitest tests using fake timers: the stamp for each of the four outcomes, the hold before the next claim, the progress and counts, the summary screen, and Esc leaving the view. Coverage is at least 80%.
+- [x] In the browser, with decisions recorded through the API, the live view shows each claim full screen, then its stamp, then moves on to the next, and ends on the summary screen (screenshots of a claim in progress, each stamp and the summary).
+- [x] In the browser, with reduced motion turned on, the stamps and the move to the next claim fade without scaling or sliding.
+- [x] A live queue run with `gpt-6-luna` on the 25 claims (about a cent) plays through in the live view and ends on the summary screen. It took 6.5 minutes: 10 approved, 6 declined, 4 referred and 5 waiting for sign-off.
 
 ## Phase 7: end-to-end tests and handover
 

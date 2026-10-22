@@ -98,6 +98,8 @@ it("runs the agent and follows its steps until it decides", async () => {
     decision: { ...approval, payout: 420 },
   });
   expect(await screen.findByText("Paid.", {}, { timeout: 3000 })).toBeDefined();
+  // Let the last poll that was already due land, then expect no more.
+  await new Promise((resolve) => setTimeout(resolve, 1200));
   const settled = calls(fetchMock, "/api/claims/CLM-1001");
   await new Promise((resolve) => setTimeout(resolve, 1500));
   expect(calls(fetchMock, "/api/claims/CLM-1001")).toBe(settled);

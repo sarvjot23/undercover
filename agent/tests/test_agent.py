@@ -1,73 +1,12 @@
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
 from agent import client, middleware, model, tools
+from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
-
-
-class StubModel(GenericFakeChatModel):
-    """A chat model that gives scripted replies in place of a real model."""
-
-    def bind_tools(self, tools, **kwargs):
-        return self
-
-
-class BrokenModel(StubModel):
-    """A chat model whose provider is down."""
-
-    def _generate(self, *args, **kwargs):
-        raise RuntimeError("model down")
-
-
-class FlakyModel(StubModel):
-    """A chat model whose provider fails once, then answers."""
-
-    failed: bool = False
-
-    def _generate(self, *args, **kwargs):
-        if not self.failed:
-            self.failed = True
-            raise RuntimeError("provider hiccup")
-        return super()._generate(*args, **kwargs)
-
-
-class Backend(TestClient):
-    """The backend as the agent sees it: already running, so no startup per call."""
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-
-@pytest.fixture
-def requests(tmp_path, monkeypatch) -> list[str]:
-    """Point the agent at the backend with a fresh database; collect its requests."""
-    monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "test.db"))
-    with TestClient(app):
-        pass
-    paths: list[str] = []
-
-    def backend():
-        client = Backend(app)
-        client.event_hooks = {
-            "request": [lambda request: paths.append(request.url.path)]
-        }
-        return client
-
-    monkeypatch.setattr(client, "backend", backend)
-    monkeypatch.setattr(claim_agent, "RETRY_DELAY", 0.0)
-    return paths
-
-
-def call(name, **args):
-    return AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": name}])
 
 
 def decision(decision, payout):
@@ -175,15 +114,7 @@ def test_a_provider_error_is_retried(requests):
 
 
 def test_a_claim_stops_after_thirty_model_calls(requests):
-    looping = [
-        AIMessage(
-            content="",
-            tool_calls=[
-                {"name": "get_claim", "args": {"claim_id": "CLM-1001"}, "id": f"c{i}"}
-            ],
-        )
-        for i in range(31)
-    ]
+    looping = [call("get_claim", claim_id="CLM-1001") for _ in range(31)]
     answer = run(*looping)
     assert "failed" in answer
     assert claim()["status"] == "waiting"

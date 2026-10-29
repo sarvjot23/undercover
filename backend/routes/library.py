@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from backend import db
 from backend.db import Db
 
-INSTRUCTIONS = Path(__file__).parent.parent / "instructions" / "claim.md"
+INSTRUCTIONS = Path(__file__).parent.parent / "instructions"
 
 router = APIRouter(prefix="/api")
 
@@ -22,8 +22,11 @@ def get_policy_wording() -> dict[str, str]:
 
 @router.get("/instructions", operation_id="get_instructions")
 def get_instructions() -> dict[str, str]:
-    """Get the UnderCover Agent's instructions."""
-    return {"text": INSTRUCTIONS.read_text(encoding="utf-8")}
+    """Get the UnderCover Agent's instructions for the queue and for a claim."""
+    return {
+        name: (INSTRUCTIONS / f"{name}.md").read_text(encoding="utf-8")
+        for name in ("queue", "claim")
+    }
 
 
 @router.get("/handlers", operation_id="list_handlers")

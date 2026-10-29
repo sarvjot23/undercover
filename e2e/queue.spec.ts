@@ -15,6 +15,10 @@ test("the queue shows the 25 claims", async ({ page }) => {
 test("the instructions are shown read only", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Instructions" }).click();
-  await expect(page.getByText(/You are the UnderCover Agent/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Working the queue" }),
+  ).toBeVisible();
+  await expect(page.getByText(/running the claims queue/)).toBeVisible();
+  await expect(page.getByText(/You decide one claim/)).toBeVisible();
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });

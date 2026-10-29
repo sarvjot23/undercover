@@ -49,8 +49,10 @@ def test_policy_wording(client):
 
 
 def test_instructions(client):
-    text = client.get("/api/instructions").json()["text"]
-    assert text.startswith("You are the UnderCover Agent.")
+    instructions = client.get("/api/instructions").json()
+    assert instructions["claim"].startswith("You are the UnderCover Agent.")
+    assert "running the claims queue" in instructions["queue"]
+    assert "data/evals" not in instructions["claim"] + instructions["queue"]
 
 
 def test_handlers(client):

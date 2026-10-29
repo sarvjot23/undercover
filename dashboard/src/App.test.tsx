@@ -71,11 +71,19 @@ it("says when the backend is down", async () => {
 it("shows the instructions read only", async () => {
   window.location.hash = "#/instructions";
   stubBackend({
-    "/api/instructions": { text: "You are the UnderCover Agent." },
+    "/api/instructions": {
+      queue: "You run the claims queue.",
+      claim: "You decide one claim.",
+    },
   });
   render(<App />);
+  expect(await screen.findByText("You run the claims queue.")).toBeDefined();
+  expect(screen.getByText("You decide one claim.")).toBeDefined();
   expect(
-    await screen.findByText("You are the UnderCover Agent."),
+    screen.getByRole("heading", { name: "Working the queue" }),
+  ).toBeDefined();
+  expect(
+    screen.getByRole("heading", { name: "Working a claim" }),
   ).toBeDefined();
   expect(screen.queryByRole("textbox")).toBeNull();
   expect(

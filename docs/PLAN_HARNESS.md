@@ -164,11 +164,11 @@ Success criteria:
   - `uv run -m agent --cap 5` starts a run through the backend and prints the summary when it's done.
   - `uv run -m agent CLM-1001` works one claim.
 - `GET /api/instructions` returns both sets of instructions: `{"queue": ..., "claim": ...}`.
-- The pilot's `POST /api/queue/run` and `GET /api/queue/run` go, replaced by the run routes.
+- The pilot's `POST /api/queue/run` and `GET /api/queue/run` go, replaced by the run routes. (They stay until phase 5 moves the dashboard to the run routes, so every commit stays green.)
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes, with stub-model tests for:
+- [x] `uv run pytest -q` passes, with stub-model tests for:
   - a run with a cap of 2 on 25 waiting claims: the agent writes a to-do list, works 2 claims in the order it chose (not the submitted order), finishes with a summary; 23 claims stay waiting
   - the to-do list stored and returned by `GET /api/runs/current` with each item's state as the agent left it
   - a claim whose subagent fails: the run carries on to the next claim, then retries it, and it's decided on the second attempt
@@ -176,9 +176,9 @@ Success criteria:
   - the missed-claim check: `finish_run` is refused while a claim within the cap is waiting, the agent works it, and then finishes
   - the cap: a third `work_claim` with a cap of 2 is refused and leaves the claim waiting
   - a queue agent that raises: the run is `failed` and no claim is left in progress
-- [ ] A test shows each claim's steps are recorded on that claim, and none of them on any other claim.
-- [ ] `POST /api/runs` returns 409 while a run is going.
-- [ ] `npm run check:python` passes with coverage of at least 80%.
+- [x] A test shows each claim's steps are recorded on that claim, and none of them on any other claim.
+- [x] `POST /api/runs` returns 409 while a run is going.
+- [x] `npm run check:python` passes with coverage of at least 80%.
 
 ## Phase 5: the dashboard
 

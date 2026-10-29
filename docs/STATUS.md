@@ -1,6 +1,6 @@
 # Status
 
-The claims pilot from `docs/PLAN.md` is built: all 7 phases are done. The harness from `docs/HARNESS.md` is being built to `docs/PLAN_HARNESS.md`: phases 1 (the codebase split), 2 (the manual and the wording by section) and 3 (failures put right) are done.
+The claims pilot from `docs/PLAN.md` is built: all 7 phases are done. The harness from `docs/HARNESS.md` is being built to `docs/PLAN_HARNESS.md`: phases 1 (the codebase split), 2 (the manual and the wording by section) 3 (failures put right) and 4 (one run works the queue) are done.
 
 ## What's built
 
@@ -8,8 +8,8 @@ The claims pilot from `docs/PLAN.md` is built: all 7 phases are done. The harnes
   - Read: the queue, a claim in full (its policy, plan, the customer's name and claim history, the decision and the payment), the agent's steps, the policy wording, the sections of the wording and the claims manual and a search across them (`/api/documents/...`), the agent's instructions (`backend/instructions/claim.md`) and the handlers.
   - Failures: each failed attempt is counted on the claim. The first sends it back to `waiting`, the second leaves it `needs_handler` (Left for a handler). On startup the backend fails any claim a crash left `in_progress`, so none stays stuck.
   - The rules: start a claim, record the decision, pay it and sign it off. An approval over $800 (`payout_approval_limit` in `data/company.json`) waits for a handler's sign-off, and the backend refuses the payment until then, whatever the agent does.
-  - Running the agent: `POST /api/claims/{id}/run` on one claim, or `POST /api/queue/run` on every waiting claim in the order submitted, one at a time.
-- `agent/`: the UnderCover Agent, `run(claim_id, thread_id)` in `agent/claim.py`, on LangChain's `create_agent`, with its backend client, model and tools in their own modules. Its tools call the backend: `get_claim`, `list_sections`, `read_section` and `search_documents` (the policy wording and the claims manual a section at a time), `record_decision` and `pay_claim`. Its instructions (`backend/instructions/claim.md`) come from the backend, and its middleware (`agent/middleware.py`) records each step on the claim, with each section it reads as a `read` step. It uses `deepseek/deepseek-v4.1-flash` with low effort and a 120-second timeout, or the model in `MODEL_NAME`. Provider errors are retried twice, a claim stops after 30 model calls, and whatever goes wrong, the run fails the claim and reports back in one line instead of raising.
+  - Running the agent: `POST /api/claims/{id}/run` on one claim, or `POST /api/runs` with a cap for a queue run. A run is a record (`GET /api/runs/current`): its cap, the number of claims it will work, the claims in the order the agent took them, the agent's to-do list and its summary. The backend holds the run to its cap, and refuses to let it finish while a claim within the cap is still waiting. The dashboard still uses the pilot's `/api/queue/run` until phase 5.
+- `agent/`: the UnderCover Agent, in two parts. The queue agent (`agent/queue.py`, instructions in `backend/instructions/queue.md`) plans a run as a to-do list, works the waiting claims in the order it chooses through `work_claim`, and finishes with a summary. `work_claim` hands each claim to the claim agent, `run(claim_id, thread_id)` in `agent/claim.py`, a subagent with a fresh thread that reports back in one line. The claim agent is on LangChain's `create_agent`, with its backend client, model and tools in their own modules. Its tools call the backend: `get_claim`, `list_sections`, `read_section` and `search_documents` (the policy wording and the claims manual a section at a time), `record_decision` and `pay_claim`. Its instructions (`backend/instructions/claim.md`) come from the backend, and its middleware (`agent/middleware.py`) records each step on the claim, with each section it reads as a `read` step. It uses `deepseek/deepseek-v4.1-flash` with low effort and a 120-second timeout, or the model in `MODEL_NAME`. Provider errors are retried twice, a claim stops after 30 model calls, and whatever goes wrong, the run fails the claim and reports back in one line instead of raising.
 - `dashboard/`: React in UnderCover's brand, light and dark.
   - `#/`: the queue, with a count of claims in each state, "Run the queue" and "Watch live".
   - `#/claims/CLM-1001`: a claim in full, with its decision, the agent's steps as they arrive, "Run the agent" and sign-off.
@@ -28,5 +28,6 @@ npm run dev
 Then open http://localhost:5173. The backend is on port 8000. `OPENROUTER_API_KEY` must be in `.env` for the agent.
 
 - One claim: "Run the agent" on the claim's page, or `uv run -m agent CLM-1001` while the backend is running.
+- A queue run from the command line: `uv run -m agent --cap 5` while the backend is running.
 - The whole queue: "Run the queue" on the queue page. A full run with `gpt-6-luna` took 6.5 minutes and costs about a cent.
 - `npm run check` runs every check.

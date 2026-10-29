@@ -37,6 +37,22 @@ CREATE TABLE IF NOT EXISTS payments (
     signed_off_by TEXT,
     paid_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS runs (
+    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cap INTEGER NOT NULL,
+    total INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    todos TEXT NOT NULL,
+    summary TEXT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT
+);
+CREATE TABLE IF NOT EXISTS run_claims (
+    run_id INTEGER NOT NULL,
+    claim_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    PRIMARY KEY (run_id, claim_id)
+);
 CREATE TABLE IF NOT EXISTS steps (
     step_id INTEGER PRIMARY KEY AUTOINCREMENT,
     claim_id TEXT NOT NULL,

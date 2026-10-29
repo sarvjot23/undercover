@@ -37,3 +37,29 @@ class Failure(BaseModel):
     """Why the agent's run on a claim failed."""
 
     reason: str
+
+
+class RunStart(BaseModel):
+    """How many claims a queue run may work."""
+
+    cap: int = Field(ge=1)
+
+
+class Todo(BaseModel):
+    """One item on the agent's to-do list for a run."""
+
+    claim_id: str
+    note: str
+    status: Literal["to_do", "in_progress", "done", "left_for_handler"]
+
+
+class Todos(BaseModel):
+    """The agent's whole to-do list for a run."""
+
+    todos: list[Todo]
+
+
+class Summary(BaseModel):
+    """The agent's summary of a run for the handlers."""
+
+    summary: str = Field(min_length=1)

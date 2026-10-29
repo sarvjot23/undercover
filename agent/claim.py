@@ -47,7 +47,7 @@ def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
         started = backend.post(f"/api/claims/{claim_id}/start")
         if not started.is_success:
             return f"{claim_id}: not started, {client.reply(started)}"
-        instructions = backend.get("/api/instructions").json()["text"]
+        instructions = backend.get("/api/instructions").json()["claim"]
         middleware: list[AgentMiddleware[Any, Any, Any]] = [
             ModelRetryMiddleware(
                 max_retries=RETRIES, on_failure="error", initial_delay=RETRY_DELAY

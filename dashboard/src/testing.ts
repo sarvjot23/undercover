@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Claim, ClaimSummary } from "./api";
+import type { Claim, ClaimSummary, Run } from "./api";
 
 export function pathOf(input: RequestInfo | URL): string {
   return input instanceof Request ? input.url : input.toString();
@@ -29,6 +29,7 @@ export function summary(overrides: Partial<ClaimSummary> = {}): ClaimSummary {
     amount_claimed: 420,
     submitted_on: "2026-06-24",
     status: "waiting",
+    attempts: 0,
     agent_working: false,
     decision: null,
     payout: null,
@@ -63,6 +64,7 @@ export function claim(overrides: Partial<Claim> = {}): Claim {
       },
     ],
     status: "waiting",
+    attempts: 0,
     agent_working: false,
     policy: {
       policy_id: "POL-2001",
@@ -94,6 +96,21 @@ export function claim(overrides: Partial<Claim> = {}): Claim {
     },
     decision: null,
     payment: null,
+    ...overrides,
+  };
+}
+
+export function runRecord(overrides: Partial<Run> = {}): Run {
+  return {
+    run_id: 1,
+    cap: 25,
+    total: 0,
+    status: "running",
+    todos: [],
+    summary: null,
+    claim_ids: [],
+    started_at: "2026-10-29T10:00:00+00:00",
+    finished_at: null,
     ...overrides,
   };
 }

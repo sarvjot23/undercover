@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { stubBackend, summary } from "./testing";
+import { runRecord, stubBackend, summary } from "./testing";
 
 afterEach(() => {
   cleanup();
@@ -57,6 +57,7 @@ it("counts the claims in each state", async () => {
     "0In progress",
     "1Waiting for sign-off",
     "1Decided",
+    "0Left for a handler",
   ]);
 });
 
@@ -103,13 +104,8 @@ it("says when the instructions can't load", async () => {
 it("runs the queue full screen in the live view", async () => {
   const fetchMock = stubBackend({
     "/api/claims": queue,
-    "POST /api/queue/run": {
-      running: true,
-      claim_ids: [],
-      done: 0,
-      current: null,
-    },
-    "/api/queue/run": { running: true, claim_ids: [], done: 0, current: null },
+    "POST /api/runs": runRecord({ total: 2 }),
+    "/api/runs/current": runRecord({ total: 2 }),
   });
   const fullscreen = vi.fn().mockResolvedValue(undefined);
   document.documentElement.requestFullscreen = fullscreen;
@@ -120,9 +116,9 @@ it("runs the queue full screen in the live view", async () => {
   await waitFor(() => {
     expect(window.location.hash).toBe("#/live");
   });
-  expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
-    true,
-  );
+  const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+  expect(post?.[0]).toBe("/api/runs");
+  expect(post?.[1]?.body).toBe(JSON.stringify({ cap: 1 }));
   expect(
     await screen.findByRole("button", { name: "Leave (Esc)" }),
   ).toBeDefined();
@@ -132,12 +128,7 @@ it("leaves the live view and full screen", async () => {
   window.location.hash = "#/live";
   stubBackend({
     "/api/claims": queue,
-    "/api/queue/run": {
-      running: false,
-      claim_ids: [],
-      done: 0,
-      current: null,
-    },
+    "/api/runs/current": null,
   });
   const exitFullscreen = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(document, "fullscreenElement", {
@@ -153,4 +144,84 @@ it("leaves the live view and full screen", async () => {
     configurable: true,
     value: null,
   });
+});
+
+it("starts a trial run on the number of claims chosen", async () => {
+  const many = ["CLM-1001", "CLM-1002", "CLM-1003", "CLM-1004"].map((claimId) =>
+    summary({ claim_id: claimId }),
+  );
+  const fetchMock = stubBackend({
+    "/api/claims": many,
+    "POST /api/runs": runRecord({ total: 2, cap: 2 }),
+  });
+  document.documentElement.requestFullscreen = vi
+    .fn()
+    .mockResolvedValue(undefined);
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  render(<App />);
+  const cap = await screen.findByRole("spinbutton", {
+    name: "Claims in this run",
+  });
+  expect((cap as HTMLInputElement).value).toBe("4");
+  fireEvent.change(cap, { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Run the queue" }));
+  const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+  expect(post?.[1]?.body).toBe(JSON.stringify({ cap: 2 }));
+});
+
+it("shows the agent's to-do list, ticked off as it goes", async () => {
+  stubBackend({
+    "/api/claims": queue,
+    "/api/runs/current": runRecord({
+      total: 3,
+      claim_ids: ["CLM-1003", "CLM-1001"],
+      todos: [
+        { claim_id: "CLM-1003", note: "Passport, $243", status: "done" },
+        { claim_id: "CLM-1001", note: "Trip delay", status: "in_progress" },
+        { claim_id: "CLM-1002", note: "Baggage", status: "to_do" },
+      ],
+    }),
+  });
+  render(<App />);
+  const list = await screen.findByRole("region", {
+    name: "The agent’s to-do list",
+  });
+  const items = within(list).getAllByRole("listitem");
+  expect(items.map((item) => item.textContent)).toEqual([
+    "CLM-1003Passport, $243Done",
+    "CLM-1001Trip delayIn progress",
+    "CLM-1002BaggageTo do",
+  ]);
+  expect(list.textContent).toContain("2 of 3 claims taken");
+});
+
+it("shows the agent's summary when the run ends", async () => {
+  stubBackend({
+    "/api/claims": queue,
+    "/api/runs/current": runRecord({
+      status: "finished",
+      summary: "Two approved, one left for a handler.",
+      todos: [
+        {
+          claim_id: "CLM-1002",
+          note: "Baggage",
+          status: "left_for_handler",
+        },
+      ],
+    }),
+  });
+  render(<App />);
+  expect(
+    await screen.findByText("Two approved, one left for a handler."),
+  ).toBeDefined();
+  expect(screen.getByText("The agent's summary")).toBeDefined();
+  expect(screen.getAllByText("Left for a handler").length).toBeGreaterThan(0);
+});
+
+it("says the agent is planning before the list is written", async () => {
+  stubBackend({ "/api/claims": queue, "/api/runs/current": runRecord() });
+  render(<App />);
+  expect(
+    await screen.findByText("The agent is planning the run."),
+  ).toBeDefined();
 });

@@ -199,7 +199,7 @@ Success criteria:
 
 Success criteria:
 
-- [ ] `npm run check:ts` passes with coverage of at least 80%, with vitest tests for:
+- [x] `npm run check:ts` passes with coverage of at least 80%, with vitest tests for:
   - the to-do list and its states
   - the cap input and the request it sends
   - the summary
@@ -207,9 +207,9 @@ Success criteria:
   - the new badge
   - the two sets of instructions
   - in the live view, using fake timers: "Claim 2 of 5" from the run record, the Left for a handler stamp, a failed claim leaving without a stamp, and the agent's summary
-- [ ] In the browser, with a run recorded through the API, the queue page shows the to-do list ticking off and then the summary. Light and dark screenshots.
-- [ ] In the browser, a claim page shows "What the agent read" with the sections in order.
-- [ ] The new colors and states match `docs/BRAND.md`: no outlines, no one-edge borders, no gradients.
+- [x] In the browser, with a run recorded through the API, the queue page shows the to-do list ticking off and then the summary. Light and dark screenshots.
+- [x] In the browser, a claim page shows "What the agent read" with the sections in order.
+- [x] The new colors and states match `docs/BRAND.md`: no outlines, no one-edge borders, no gradients.
 
 ## Phase 6: end-to-end, the live run and the handover
 

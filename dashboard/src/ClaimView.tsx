@@ -40,6 +40,12 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
           <span className="mono">{claim.claim_id}</span> {claim.summary}
         </h2>
         <StatusBadge status={claim.status} />
+        {claim.attempts > 0 && (
+          <span className="muted">
+            <span className="mono">{claim.attempts}</span> failed{" "}
+            {claim.attempts === 1 ? "attempt" : "attempts"}
+          </span>
+        )}
         {claim.status === "waiting" && (
           <button type="button" onClick={run} disabled={starting}>
             Run the agent
@@ -57,9 +63,26 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
         </div>
         <div className="claim-side">
           <DecisionPanel claim={claim} onSignedOff={reload} />
+          <Reads steps={steps.data ?? []} />
           <PolicyPanel claim={claim} />
         </div>
       </div>
+    </section>
+  );
+}
+
+/** The sections of the wording and the manual the agent opened, in order. */
+function Reads({ steps }: Readonly<{ steps: Step[] }>) {
+  const reads = steps.filter((step) => step.kind === "read");
+  if (reads.length === 0) return null;
+  return (
+    <section className="panel" aria-labelledby="reads-heading">
+      <h3 id="reads-heading">What the agent read</h3>
+      <ol className="reads">
+        {reads.map((step) => (
+          <li key={step.step_id}>{step.text}</li>
+        ))}
+      </ol>
     </section>
   );
 }

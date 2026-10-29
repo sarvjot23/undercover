@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getJson } from "./api";
+import { getJson, postJson } from "./api";
 
 export type Route =
   | { view: "queue" }
@@ -106,6 +106,16 @@ export function useCountUp(target: number, ms = 900): number {
 
 export function enterFullscreen(): void {
   document.documentElement.requestFullscreen().catch(() => undefined);
+}
+
+/** Start a queue run on up to `cap` claims and watch it in the live view. */
+export function runQueue(cap: number): void {
+  enterFullscreen();
+  postJson("/api/runs", { cap })
+    .catch(() => undefined)
+    .finally(() => {
+      window.location.hash = "#/live";
+    });
 }
 
 export function leaveLiveView(): void {

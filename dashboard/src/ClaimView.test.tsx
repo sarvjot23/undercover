@@ -186,3 +186,46 @@ it("shows a decline and a policy with add-ons and no history", async () => {
   expect(screen.getByText("Electronics plus")).toBeDefined();
   expect(screen.getByText("None.")).toBeDefined();
 });
+
+it("lists the sections the agent read, and its failed attempts", async () => {
+  const read = (step_id: number, text: string): Step => ({
+    step_id,
+    kind: "read",
+    text,
+    at: "2026-10-29T12:00:00+00:00",
+  });
+  stubBackend({
+    "/api/claims/CLM-1005": claim({
+      claim_id: "CLM-1005",
+      status: "needs_handler",
+      attempts: 2,
+    }),
+    "/api/claims/CLM-1005/steps": [
+      step,
+      read(2, "Policy wording · 6. Passport and Travel Documents"),
+      read(3, "Claims manual · 7. Interpretation notes"),
+      {
+        step_id: 4,
+        kind: "error",
+        text: "The agent's run failed: timed out",
+        at: "",
+      },
+    ],
+    "/api/handlers": handlers,
+  });
+  render(<ClaimView claimId="CLM-1005" />);
+  const reads = await screen.findByRole("region", {
+    name: "What the agent read",
+  });
+  expect(
+    Array.from(reads.querySelectorAll("li")).map((item) => item.textContent),
+  ).toEqual([
+    "Policy wording · 6. Passport and Travel Documents",
+    "Claims manual · 7. Interpretation notes",
+  ]);
+  expect(screen.getByText("Left for a handler")).toBeDefined();
+  expect(screen.getByText(/failed attempts/).textContent).toBe(
+    "2 failed attempts",
+  );
+  expect(screen.getAllByText("Read")).toHaveLength(2);
+});

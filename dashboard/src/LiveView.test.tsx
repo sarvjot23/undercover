@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ClaimSummary } from "./api";
 import { LiveView } from "./LiveView";
-import { claim, stubBackend, summary } from "./testing";
+import { claim, runRecord, stubBackend, summary } from "./testing";
 
 let reducedMotion = false;
 
@@ -48,10 +48,21 @@ function stamp() {
   return screen.getByRole("status");
 }
 
-function backend(claims: ClaimSummary[], running = true, run: string[] = []) {
+function backend(
+  claims: ClaimSummary[],
+  running = true,
+  run: string[] = [],
+  total = run.length,
+  agentSummary: string | null = null,
+) {
   const routes: Record<string, unknown> = {
     "/api/claims": claims,
-    "/api/queue/run": { running, claim_ids: run, done: 0, current: null },
+    "/api/runs/current": runRecord({
+      status: running ? "running" : "finished",
+      claim_ids: run,
+      total,
+      summary: agentSummary,
+    }),
     "/api/claims/CLM-1001/steps": [
       { step_id: 1, kind: "tool_call", text: "get_claim CLM-1001", at: "" },
     ],
@@ -137,12 +148,7 @@ it("shows each claim full screen, stamps it and moves on to a summary", async ()
       payout: 1200,
     }),
   ];
-  routes["/api/queue/run"] = {
-    running: false,
-    claim_ids: [],
-    done: 0,
-    current: null,
-  };
+  routes["/api/runs/current"] = runRecord({ status: "finished" });
   await until(() => {
     expect(stamp().textContent).toContain("Waiting for sign-off");
   });
@@ -240,4 +246,57 @@ it("leaves on Esc", async () => {
   await wait(100);
   fireEvent.keyDown(window, { key: "Escape" });
   expect(window.location.hash).toBe("#/");
+});
+
+it("counts from the run record: the agent's order, out of the run's total", async () => {
+  backend(
+    [
+      summary({ status: "decided", decision: "refer", payout: 0 }),
+      summary({ claim_id: "CLM-1002", status: "in_progress" }),
+    ],
+    true,
+    ["CLM-1001", "CLM-1002"],
+    5,
+  );
+  render(<LiveView />);
+  await wait(100);
+  expect(screen.getByText("Claim 2 of 5")).toBeDefined();
+});
+
+it("stamps a claim left for a handler", async () => {
+  backend([summary({ status: "in_progress" })], true, ["CLM-1001"]);
+  render(<LiveView />);
+  await wait(100);
+  backend([summary({ status: "needs_handler" })], true, ["CLM-1001"]);
+  await until(() => {
+    expect(stamp().textContent).toBe("Left for a handler");
+  });
+});
+
+it("lets a claim sent back to the queue leave without a stamp", async () => {
+  backend([summary({ status: "in_progress" })], true, ["CLM-1001"]);
+  render(<LiveView />);
+  await wait(100);
+  backend([summary({ attempts: 1 })], true, ["CLM-1001"]);
+  await until(() => {
+    expect(
+      screen.getByText("The agent is picking up the next claim"),
+    ).toBeDefined();
+  });
+  expect(screen.queryByRole("status")).toBeNull();
+});
+
+it("ends on the agent's own summary", async () => {
+  backend(
+    [summary({ status: "decided", decision: "refer", payout: 0 })],
+    false,
+    ["CLM-1001"],
+    1,
+    "One claim referred for a third claim in twelve months.",
+  );
+  render(<LiveView />);
+  await wait(100);
+  expect(
+    screen.getByText("One claim referred for a third claim in twelve months."),
+  ).toBeDefined();
 });

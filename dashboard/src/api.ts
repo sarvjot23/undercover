@@ -1,5 +1,5 @@
 export type Status =
-  "waiting" | "in_progress" | "awaiting_sign_off" | "decided";
+  "waiting" | "in_progress" | "awaiting_sign_off" | "decided" | "needs_handler";
 export type Outcome = "approve" | "decline" | "refer";
 
 export interface ClaimSummary {
@@ -10,6 +10,7 @@ export interface ClaimSummary {
   amount_claimed: number;
   submitted_on: string;
   status: Status;
+  attempts: number;
   agent_working: boolean;
   decision: Outcome | null;
   payout: number | null;
@@ -69,6 +70,7 @@ export interface Claim {
   amount_claimed: number;
   documents: Document[];
   status: Status;
+  attempts: number;
   agent_working: boolean;
   policy: {
     policy_id: string;
@@ -96,12 +98,26 @@ export interface Step {
   at: string;
 }
 
-/** The agent's run through the queue: the claims in it, and how far it has got. */
-export interface QueueRun {
-  running: boolean;
+export type TodoStatus = "to_do" | "in_progress" | "done" | "left_for_handler";
+
+/** One item on the agent's to-do list for a run. */
+export interface Todo {
+  claim_id: string;
+  note: string;
+  status: TodoStatus;
+}
+
+/** A queue run: its cap, the claims it took, its to-do list and its summary. */
+export interface Run {
+  run_id: number;
+  cap: number;
+  total: number;
+  status: "running" | "finished" | "failed";
+  todos: Todo[];
+  summary: string | null;
   claim_ids: string[];
-  done: number;
-  current: string | null;
+  started_at: string;
+  finished_at: string | null;
 }
 
 export interface Handler {

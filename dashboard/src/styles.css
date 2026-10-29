@@ -195,6 +195,10 @@ td.summary {
   color: #ffffff;
 }
 
+.badge-needs_handler {
+  background: var(--burnished);
+}
+
 .instructions {
   white-space: pre-wrap;
   font-family: var(--mono);
@@ -380,6 +384,15 @@ select {
   font-weight: 600;
 }
 
+.step-read .step-kind {
+  color: var(--accent-text);
+}
+
+.step-read .step-text {
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
 .step-error .step-kind {
   color: var(--burnished);
 }
@@ -479,6 +492,10 @@ button.quiet {
 
 .chip-refer {
   background: var(--antique);
+}
+
+.chip-handler {
+  background: var(--champagne);
 }
 
 .chip-sign_off {
@@ -604,6 +621,10 @@ button.quiet {
   --stamp: var(--burnished);
 }
 
+.stamp-handler .stamp {
+  --stamp: var(--champagne);
+}
+
 .stamp-word {
   font-size: clamp(2.6rem, 6vw, 5.5rem);
   font-weight: 700;
@@ -612,7 +633,8 @@ button.quiet {
   line-height: 1.05;
 }
 
-.stamp-sign_off .stamp-word {
+.stamp-sign_off .stamp-word,
+.stamp-handler .stamp-word {
   font-size: clamp(1.8rem, 3.8vw, 3.4rem);
   white-space: nowrap;
 }
@@ -776,4 +798,107 @@ button.quiet {
   .live-progress-fill {
     transition: none;
   }
+}
+
+.cap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.cap input {
+  width: 4.5em;
+  font: inherit;
+  font-family: var(--mono);
+  color: var(--ink);
+  background: var(--panel);
+  border: none;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.run-panel {
+  margin: 20px 0;
+}
+
+.run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.run-head h3 {
+  margin: 0;
+}
+
+.todos {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.todo {
+  display: grid;
+  grid-template-columns: 7em 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.todo-done .todo-note {
+  color: var(--muted);
+}
+
+.todo-badge-to_do {
+  background: var(--gold);
+}
+
+.todo-badge-in_progress {
+  background: var(--champagne);
+}
+
+.todo-badge-done {
+  background: var(--steel);
+  color: #ffffff;
+}
+
+.todo-badge-left_for_handler {
+  background: var(--burnished);
+}
+
+.run-summary {
+  margin-top: 16px;
+}
+
+.run-summary h4 {
+  margin: 0 0 4px;
+  color: var(--accent-text);
+}
+
+.run-summary p {
+  margin: 0;
+  max-width: 80ch;
+}
+
+.reads {
+  margin: 0;
+  padding-left: 1.4em;
+  display: grid;
+  gap: 4px;
+}
+
+.agent-summary {
+  margin: 0 auto 20px;
+  max-width: 70ch;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  color: var(--muted);
 }

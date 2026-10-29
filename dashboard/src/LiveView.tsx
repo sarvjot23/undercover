@@ -1,8 +1,8 @@
 import { useEffect, useReducer } from "react";
-import type { Claim, ClaimSummary, Decision, QueueRun, Step } from "./api";
-import { getJson, postJson } from "./api";
+import type { Claim, ClaimSummary, Decision, Run, Step } from "./api";
+import { getJson } from "./api";
 import { label, money } from "./format";
-import { enterFullscreen, leaveLiveView, useCountUp, useJson } from "./hooks";
+import { leaveLiveView, runQueue, useCountUp, useJson } from "./hooks";
 import type { LiveOutcome, LiveState } from "./live";
 import {
   HOLD_MS,
@@ -25,15 +25,17 @@ export function LiveView() {
     const poll = () => {
       Promise.all([
         getJson<ClaimSummary[]>("/api/claims"),
-        getJson<QueueRun>("/api/queue/run"),
+        getJson<Run | null>("/api/runs/current"),
       ]).then(
         ([claims, run]) => {
           if (live) {
             dispatch({
               type: "poll",
               claims,
-              running: run.running,
-              run: run.claim_ids,
+              running: run?.status === "running",
+              run: run?.claim_ids ?? [],
+              total: run?.total ?? 0,
+              summary: run?.summary ?? null,
             });
           }
         },
@@ -260,6 +262,9 @@ function LiveSummary({ state }: Readonly<{ state: LiveState }>) {
         Payouts approved: <span className="mono">{money(paid)}</span>, and{" "}
         <span className="mono">{money(awaiting)}</span> waiting for sign-off
       </p>
+      {state.summary && (
+        <blockquote className="agent-summary">{state.summary}</blockquote>
+      )}
       <a href="#/" onClick={leaveLiveView}>
         Back to the queue
       </a>
@@ -268,11 +273,9 @@ function LiveSummary({ state }: Readonly<{ state: LiveState }>) {
 }
 
 function LiveIdle({ state }: Readonly<{ state: LiveState }>) {
-  const waiting = state.claims.some((claim) => claim.status === "waiting");
-  const start = () => {
-    enterFullscreen();
-    postJson("/api/queue/run").catch(() => undefined);
-  };
+  const waiting = state.claims.filter(
+    (claim) => claim.status === "waiting",
+  ).length;
   return (
     <section className="live-idle">
       <div className="pulse" aria-hidden="true" />
@@ -281,8 +284,13 @@ function LiveIdle({ state }: Readonly<{ state: LiveState }>) {
           ? "The agent is picking up the next claim"
           : "Waiting for the agent to pick up a claim"}
       </p>
-      {!state.running && waiting && (
-        <button type="button" onClick={start}>
+      {!state.running && waiting > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            runQueue(waiting);
+          }}
+        >
           Run the queue
         </button>
       )}

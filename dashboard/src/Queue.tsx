@@ -1,39 +1,51 @@
+import { useState } from "react";
 import type { ClaimSummary, Status } from "./api";
-import { postJson } from "./api";
 import { date, label, money, STATUS_LABELS } from "./format";
-import { enterFullscreen, useJson } from "./hooks";
+import { runQueue, useJson } from "./hooks";
+import { RunPanel } from "./RunPanel";
 import { StatusBadge } from "./StatusBadge";
 
 const STATUSES = Object.keys(STATUS_LABELS) as Status[];
 
-function runQueue() {
-  enterFullscreen();
-  postJson("/api/queue/run")
-    .catch(() => undefined)
-    .finally(() => {
-      window.location.hash = "#/live";
-    });
-}
-
 export function Queue() {
   const { data: claims, error } = useJson<ClaimSummary[]>("/api/claims", 3000);
+  const [cap, setCap] = useState<number | null>(null);
 
   if (error) return <p role="alert">The backend is not responding.</p>;
   if (!claims) return <p>Loading the queue</p>;
+
+  const waiting = claims.filter((claim) => claim.status === "waiting").length;
+  const chosen = Math.min(cap ?? waiting, waiting);
 
   return (
     <section aria-labelledby="queue-heading">
       <div className="queue-head">
         <h2 id="queue-heading">The claims queue</h2>
         <a href="#/live">Watch live</a>
+        <label className="cap">
+          Claims in this run
+          <input
+            type="number"
+            min={1}
+            max={Math.max(waiting, 1)}
+            value={chosen}
+            onChange={(event) => {
+              setCap(Number(event.target.value));
+            }}
+            disabled={waiting === 0}
+          />
+        </label>
         <button
           type="button"
-          onClick={runQueue}
-          disabled={!claims.some((claim) => claim.status === "waiting")}
+          onClick={() => {
+            runQueue(chosen);
+          }}
+          disabled={chosen < 1}
         >
           Run the queue
         </button>
       </div>
+      <RunPanel />
       <ul className="tiles">
         {STATUSES.map((status) => (
           <li key={status} className="panel tile">

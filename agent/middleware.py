@@ -34,7 +34,10 @@ class StepRecorder(AgentMiddleware):
         if not message.tool_calls:
             self.record("answer", message.text)
         for call in message.tool_calls:
-            self.record("tool_call", f"{call['name']} {json.dumps(call['args'])}")
+            self.record(
+                "tool_call",
+                f"{call['name']} {json.dumps(call['args'], ensure_ascii=False)}",
+            )
 
     def wrap_tool_call(
         self,

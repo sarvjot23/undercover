@@ -1,12 +1,14 @@
 import type { ClaimSummary } from "./api";
 
-export type LiveOutcome = "approve" | "decline" | "refer" | "sign_off";
+export type LiveOutcome =
+  "approve" | "decline" | "refer" | "sign_off" | "handler";
 
 export const LIVE_OUTCOMES: Record<LiveOutcome, string> = {
   approve: "Approved",
   decline: "Declined",
   refer: "Referred",
   sign_off: "Waiting for sign-off",
+  handler: "Left for a handler",
 };
 
 export const HOLD_MS = 3000;
@@ -15,8 +17,12 @@ export const LEAVE_MS = 450;
 export interface LiveState {
   claims: ClaimSummary[];
   running: boolean;
-  /** The claims in the queue run, in order, as the backend has them. */
+  /** The claims the queue run has taken, in the order the agent took them. */
   run: string[];
+  /** How many claims the queue run will work. */
+  total: number;
+  /** The agent's summary when the run ends. */
+  summary: string | null;
   focus: string | null;
   stage: "working" | "stamped" | "leaving";
   held: boolean;
@@ -24,7 +30,14 @@ export interface LiveState {
 }
 
 export type LiveEvent =
-  | { type: "poll"; claims: ClaimSummary[]; running: boolean; run: string[] }
+  | {
+      type: "poll";
+      claims: ClaimSummary[];
+      running: boolean;
+      run: string[];
+      total: number;
+      summary: string | null;
+    }
   | { type: "held" }
   | { type: "left" };
 
@@ -32,6 +45,8 @@ export const START: LiveState = {
   claims: [],
   running: false,
   run: [],
+  total: 0,
+  summary: null,
   focus: null,
   stage: "working",
   held: false,
@@ -40,6 +55,7 @@ export const START: LiveState = {
 
 export function outcomeOf(claim: ClaimSummary): LiveOutcome | null {
   if (claim.status === "awaiting_sign_off") return "sign_off";
+  if (claim.status === "needs_handler") return "handler";
   return claim.status === "decided" ? claim.decision : null;
 }
 
@@ -88,6 +104,8 @@ export function reduce(state: LiveState, event: LiveEvent): LiveState {
         claims: event.claims,
         running: event.running,
         run: event.run,
+        total: event.total,
+        summary: event.summary,
       });
     case "held":
       return settle({ ...state, held: true });
@@ -122,6 +140,7 @@ export function tally(state: LiveState): Tally {
     decline: 0,
     refer: 0,
     sign_off: 0,
+    handler: 0,
   };
   let paid = 0;
   let awaiting = 0;
@@ -134,8 +153,9 @@ export function tally(state: LiveState): Tally {
 }
 
 /**
- * Where the live view is: "Claim 4 of 25". In a queue run this comes from the
- * run itself, so it is the same however long the view has been open.
+ * Where the live view is: "Claim 4 of 5". In a queue run this comes from the
+ * run record: the claim's place in the order the agent took the claims, out of
+ * the number the run will work. It is the same however long the view has been open.
  */
 export function progress(state: LiveState): {
   position: number;
@@ -146,7 +166,7 @@ export function progress(state: LiveState): {
   const index = state.focus === null ? -1 : state.run.indexOf(state.focus);
   if (index >= 0 || (state.focus === null && state.run.length > 0)) {
     const position = index >= 0 ? index + 1 : done;
-    return { position, total: state.run.length, done };
+    return { position, total: Math.max(state.total, state.run.length), done };
   }
   const remaining = state.claims.filter(
     (claim) =>

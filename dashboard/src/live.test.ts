@@ -9,8 +9,16 @@ function poll(
   claims: ClaimSummary[],
   running = true,
   run: string[] = [],
+  total = run.length,
 ) {
-  return reduce(state, { type: "poll", claims, running, run });
+  return reduce(state, {
+    type: "poll",
+    claims,
+    running,
+    run,
+    total,
+    summary: null,
+  });
 }
 
 const second = summary({ claim_id: "CLM-1002" });
@@ -30,6 +38,7 @@ it("names the outcome of each kind of decision", () => {
   expect(
     outcomeOf(summary({ status: "decided", decision: "refer", payout: 0 })),
   ).toBe("refer");
+  expect(outcomeOf(summary({ status: "needs_handler" }))).toBe("handler");
   expect(outcomeOf(summary({ status: "in_progress" }))).toBeNull();
 });
 
@@ -77,7 +86,7 @@ it("leaves the last stamp once the queue run has ended", () => {
   state = reduce(state, { type: "left" });
   expect(state.focus).toBeNull();
   expect(tally(state)).toEqual({
-    counts: { approve: 1, decline: 0, refer: 0, sign_off: 0 },
+    counts: { approve: 1, decline: 0, refer: 0, sign_off: 0, handler: 0 },
     paid: 420,
     awaiting: 0,
   });
@@ -133,4 +142,21 @@ it("counts from the queue run, however late the view opens", () => {
 
   state = poll(START, [declined], false, ["CLM-1001"]);
   expect(progress(state)).toEqual({ position: 1, total: 1, done: 1 });
+});
+
+it("takes the total from the run, before the agent has taken every claim", () => {
+  const claims = [
+    summary({ status: "decided", decision: "refer", payout: 0 }),
+    summary({ claim_id: "CLM-1002", status: "in_progress" }),
+    summary({ claim_id: "CLM-1003" }),
+  ];
+  const state = poll(START, claims, true, ["CLM-1001", "CLM-1002"], 5);
+  expect(progress(state)).toEqual({ position: 2, total: 5, done: 1 });
+});
+
+it("counts a claim left for a handler", () => {
+  const state = poll(START, [summary({ status: "needs_handler" })], false, [
+    "CLM-1001",
+  ]);
+  expect(tally(state).counts.handler).toBe(1);
 });

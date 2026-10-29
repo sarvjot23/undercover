@@ -6,7 +6,9 @@ import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
+
+from fastapi import Depends
 
 DATA = Path(__file__).parent.parent / "data"
 
@@ -98,6 +100,21 @@ def seed(conn: sqlite3.Connection) -> None:
     )
 
 
+def reseed() -> None:
+    """Drop every table and seed the database again from data/."""
+    conn = connect()
+    tables = [
+        row["name"]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        if not row["name"].startswith("sqlite_")
+    ]
+    with conn:
+        for table in tables:
+            conn.execute(f"DROP TABLE {table}")
+    conn.close()
+    init()
+
+
 def rows(name: str, key: str) -> list[tuple[str, str]]:
     """Return a data file's records as (id, JSON) pairs."""
     return [(row[key], json.dumps(row)) for row in load(name)]
@@ -110,3 +127,6 @@ def get_db() -> Iterator[sqlite3.Connection]:
         yield conn
     finally:
         conn.close()
+
+
+Db = Annotated[sqlite3.Connection, Depends(get_db)]

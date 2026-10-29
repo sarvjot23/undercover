@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.api import app
 
 
 @pytest.fixture

@@ -1,12 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import main
+from backend.routes import runs as run_routes
 
 
 @pytest.fixture(autouse=True)
 def idle_queue():
-    main.queue_run.update(running=False, claim_ids=[], done=0, current=None)
+    run_routes.queue_run.update(running=False, claim_ids=[], done=0, current=None)
 
 
 def stub_agent(client: TestClient, runs: list[str], fail: str = ""):
@@ -33,7 +33,7 @@ def stub_agent(client: TestClient, runs: list[str], fail: str = ""):
 
 def test_queue_run_decides_every_waiting_claim_in_order(client, monkeypatch):
     runs: list[str] = []
-    monkeypatch.setattr(main.agent, "run", stub_agent(client, runs))
+    monkeypatch.setattr(run_routes.agent, "run", stub_agent(client, runs))
     started = client.post("/api/queue/run").json()
     assert started["running"] is True
     assert len(started["claim_ids"]) == 25
@@ -58,16 +58,18 @@ def test_queue_run_decides_every_waiting_claim_in_order(client, monkeypatch):
 
 def test_queue_run_skips_claims_no_longer_waiting(client, monkeypatch):
     runs: list[str] = []
-    monkeypatch.setattr(main.agent, "run", stub_agent(client, runs))
+    monkeypatch.setattr(run_routes.agent, "run", stub_agent(client, runs))
     client.post("/api/claims/CLM-1001/start")
-    main.work_through(["CLM-1001", "CLM-1002"])
+    run_routes.work_through(["CLM-1001", "CLM-1002"])
     assert runs == ["CLM-1002"]
 
 
 def test_queue_run_carries_on_after_a_failed_run(client, monkeypatch):
     runs: list[str] = []
-    monkeypatch.setattr(main.agent, "run", stub_agent(client, runs, fail="CLM-1001"))
-    main.work_through(["CLM-1001", "CLM-1002"])
+    monkeypatch.setattr(
+        run_routes.agent, "run", stub_agent(client, runs, fail="CLM-1001")
+    )
+    run_routes.work_through(["CLM-1001", "CLM-1002"])
     assert runs == ["CLM-1001", "CLM-1002"]
     statuses = {c["claim_id"]: c["status"] for c in client.get("/api/claims").json()}
     assert statuses["CLM-1001"] == "waiting"
@@ -75,5 +77,5 @@ def test_queue_run_carries_on_after_a_failed_run(client, monkeypatch):
 
 
 def test_only_one_queue_run_at_a_time(client):
-    main.queue_run.update(running=True)
+    run_routes.queue_run.update(running=True)
     assert client.post("/api/queue/run").status_code == 409

@@ -3,8 +3,9 @@ from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
-from agent import main
-from backend.main import app
+from agent import claim as claim_agent
+from agent import client, model
+from backend.api import app
 
 
 class StubModel(GenericFakeChatModel):
@@ -34,7 +35,7 @@ def requests(tmp_path, monkeypatch) -> list[str]:
         }
         return client
 
-    monkeypatch.setattr(main, "backend", backend)
+    monkeypatch.setattr(client, "backend", backend)
     return paths
 
 
@@ -54,7 +55,7 @@ def decision(decision, payout):
 
 
 def run(*replies):
-    return main.run("CLM-1001", "thread-1", StubModel(messages=iter(replies)))
+    return claim_agent.run("CLM-1001", "thread-1", StubModel(messages=iter(replies)))
 
 
 def claim():
@@ -114,12 +115,12 @@ def test_steps_are_recorded_in_order(requests):
     ]
     assert steps()[0]["text"] == 'get_claim {"claim_id": "CLM-1001"}'
     assert steps()[1]["text"].startswith('get_claim: {"claim_id":"CLM-1001"')
-    assert len(steps()[1]["text"]) <= len("get_claim: ") + main.STEP_LENGTH
+    assert len(steps()[1]["text"]) <= len("get_claim: ") + claim_agent.STEP_LENGTH
 
 
 def test_failed_run_goes_back_to_waiting(requests):
     with pytest.raises(RuntimeError, match="model down"):
-        main.run("CLM-1001", "thread-1", BrokenModel(messages=iter([])))
+        claim_agent.run("CLM-1001", "thread-1", BrokenModel(messages=iter([])))
     assert claim()["status"] == "waiting"
     assert steps()[-1] == {**steps()[-1], "kind": "error"}
     assert "model down" in steps()[-1]["text"]
@@ -146,10 +147,10 @@ def test_agent_reaches_only_the_backend_api(requests):
 def test_model_name(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)
-    assert main.model().model_name == "openai/gpt-6-luna"
+    assert model.model().model_name == "openai/gpt-6-luna"
     monkeypatch.setenv("MODEL_NAME", "openrouter/free")
-    assert main.model().model_name == "openrouter/free"
+    assert model.model().model_name == "openrouter/free"
 
 
 def test_backend_url():
-    assert str(main.backend().base_url) == "http://localhost:8000"
+    assert str(client.backend().base_url) == "http://localhost:8000"

@@ -82,11 +82,11 @@ No new behavior. The same API at the same paths.
 
 Success criteria:
 
-- [ ] `npm run check` passes in full with the pilot's tests, moved but otherwise unchanged in what they check, and Python coverage of at least 80%.
-- [ ] `backend/main.py` and `agent/main.py` are gone, and no module in `backend/` or `agent/` is over 200 lines.
-- [ ] A test shows the limit comes from `data/company.json`: approvals of $800.00 and $800.01 land on either side of it, as before.
-- [ ] `uv run -m backend.seed` on a database with decisions leaves 25 waiting claims and no decisions, payments or steps (checked through `GET /api/claims`).
-- [ ] `npm run dev` starts, and http://localhost:5173 shows the queue (screenshot).
+- [x] `npm run check` passes in full with the pilot's tests, moved but otherwise unchanged in what they check, and Python coverage of at least 80%.
+- [x] `backend/main.py` and `agent/main.py` are gone, and no module in `backend/` or `agent/` is over 200 lines.
+- [x] A test shows the limit comes from `data/company.json`: approvals of $800.00 and $800.01 land on either side of it, as before.
+- [x] `uv run -m backend.seed` on a database with decisions leaves 25 waiting claims and no decisions, payments or steps (checked through `GET /api/claims`).
+- [x] `npm run dev` starts, and http://localhost:5173 shows the queue (screenshot).
 
 ## Phase 2: the manual and the wording, by section
 

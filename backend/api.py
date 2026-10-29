@@ -1,0 +1,28 @@
+"""The UnderCover backend: uv run -m uvicorn backend.api:app."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from backend import db
+from backend.routes import claims, library, runs
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Create and seed the database when the backend starts."""
+    db.init()
+    yield
+
+
+app = FastAPI(title="UnderCover", lifespan=lifespan)
+app.include_router(claims.router)
+app.include_router(library.router)
+app.include_router(runs.router)
+
+
+@app.get("/api/health", operation_id="health")
+def health() -> dict[str, str]:
+    """Check that the backend is running."""
+    return {"status": "ok"}

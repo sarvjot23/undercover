@@ -3,7 +3,7 @@
 import sys
 import uuid
 
-from agent.main import run
+from agent.claim import run
 
 claim_id = sys.argv[1]
 print(run(claim_id, f"{claim_id}-{uuid.uuid4().hex[:8]}"))

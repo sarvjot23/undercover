@@ -1,6 +1,7 @@
 import pytest
 
-from backend import main
+from backend import db, rules
+from backend.routes import runs as run_routes
 
 
 def decide(client, claim_id, decision="approve", payout=650.0):
@@ -150,14 +151,14 @@ def test_fail_sends_the_claim_back_to_waiting(client):
 
 def test_run_starts_the_agent(client, monkeypatch):
     runs = []
-    monkeypatch.setattr(main.agent, "run", lambda *args: runs.append(args))
+    monkeypatch.setattr(run_routes.agent, "run", lambda *args: runs.append(args))
     started = client.post("/api/claims/CLM-1001/run").json()
     assert started["thread_id"].startswith("CLM-1001-")
     assert runs == [("CLM-1001", started["thread_id"])]
 
 
 def test_run_needs_a_waiting_claim(client, monkeypatch):
-    monkeypatch.setattr(main.agent, "run", lambda *args: None)
+    monkeypatch.setattr(run_routes.agent, "run", lambda *args: None)
     client.post("/api/claims/CLM-1001/start")
     assert client.post("/api/claims/CLM-1001/run").status_code == 409
 
@@ -176,3 +177,8 @@ def test_agent_working_until_its_answer(client):
     assert working()
     client.post("/api/claims/CLM-1001/steps", json={"kind": "answer", "text": "Done"})
     assert not working()
+
+
+def test_the_limit_comes_from_our_settings():
+    assert db.load("company.json")["payout_approval_limit"] == rules.APPROVAL_LIMIT
+    assert rules.APPROVAL_LIMIT == 800.0

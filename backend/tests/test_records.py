@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from backend import db
-from backend.main import app
+from backend.api import app
 
 
 def test_queue_is_seeded_waiting(client):
@@ -99,3 +99,21 @@ def test_every_operation_is_documented_with_no_optional_inputs():
         if model["title"] in {"HTTPValidationError", "ValidationError"}:
             continue
         assert set(model["properties"]) == set(model.get("required", []))
+
+
+def test_reseed_starts_again_from_the_data(client):
+    client.post("/api/claims/CLM-1001/start")
+    client.post(
+        "/api/claims/CLM-1001/decision",
+        json={
+            "decision": "refer",
+            "payout": 0,
+            "reasons": "Needs a handler.",
+            "policy_section": "11. How to claim",
+        },
+    )
+    db.reseed()
+    claims = client.get("/api/claims").json()
+    assert {claim["status"] for claim in claims} == {"waiting"}
+    assert client.get("/api/claims/CLM-1001/steps").json() == []
+    assert client.get("/api/claims/CLM-1001").json()["decision"] is None

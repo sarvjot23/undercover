@@ -1,7 +1,7 @@
 {
   "name": "UnderCover Travel Insurance",
   "currency": "USD",
-  "payout_approval_limit": 1000.00,
+  "payout_approval_limit": 800.00,
   "claim_filing_window_days": 90,
   "pre_existing_look_back_days": 60,
   "repeat_claim_review": {

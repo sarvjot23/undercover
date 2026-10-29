@@ -1,10 +1,12 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import client, model
+from agent import client, middleware, model, tools
 from backend.api import app
 
 
@@ -71,7 +73,7 @@ def steps():
 def test_approval_under_the_limit_is_paid(requests):
     answer = run(
         call("get_claim", claim_id="CLM-1001"),
-        call("get_policy_wording"),
+        call("list_sections", document="policy_wording"),
         decision("approve", 420.0),
         call("pay_claim", claim_id="CLM-1001", amount=420.0),
         AIMessage(content="Approved, paying $420.00."),
@@ -115,7 +117,7 @@ def test_steps_are_recorded_in_order(requests):
     ]
     assert steps()[0]["text"] == 'get_claim {"claim_id": "CLM-1001"}'
     assert steps()[1]["text"].startswith('get_claim: {"claim_id":"CLM-1001"')
-    assert len(steps()[1]["text"]) <= len("get_claim: ") + claim_agent.STEP_LENGTH
+    assert len(steps()[1]["text"]) <= len("get_claim: ") + middleware.STEP_LENGTH
 
 
 def test_failed_run_goes_back_to_waiting(requests):
@@ -135,22 +137,63 @@ def test_run_without_a_decision_goes_back_to_waiting(requests):
 def test_agent_reaches_only_the_backend_api(requests):
     run(
         call("get_claim", claim_id="CLM-1001"),
-        call("get_policy_wording"),
+        call("list_sections", document="policy_wording"),
         decision("refer", 0),
         AIMessage(content="Referred."),
     )
     assert "/api/instructions" in requests
-    assert "/api/policy-wording" in requests
+    assert "/api/documents/policy_wording/sections" in requests
     assert all(path.startswith("/api/") for path in requests)
 
 
 def test_model_name(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)
-    assert model.model().model_name == "openai/gpt-6-luna"
+    assert model.model().model_name == "deepseek/deepseek-v4.1-flash"
+    assert model.model().reasoning_effort == "low"
     monkeypatch.setenv("MODEL_NAME", "openrouter/free")
     assert model.model().model_name == "openrouter/free"
 
 
 def test_backend_url():
     assert str(client.backend().base_url) == "http://localhost:8000"
+
+
+def test_reads_the_manual_a_section_at_a_time(requests):
+    run(
+        call("list_sections", document="claims_manual"),
+        call("read_section", document="claims_manual", number=7),
+        decision("approve", 243.0),
+        AIMessage(content="Approved."),
+    )
+    kinds = [step["kind"] for step in steps()]
+    assert kinds[:4] == ["tool_call", "tool_result", "tool_call", "read"]
+    assert steps()[3]["text"] == "Claims manual · 7. Interpretation notes"
+    assert "/api/documents/claims_manual/sections/7" in requests
+
+
+def test_a_missing_section_is_a_refusal_not_a_read(requests):
+    run(
+        call("read_section", document="claims_manual", number=99),
+        decision("refer", 0),
+        AIMessage(content="Referred."),
+    )
+    assert steps()[1]["kind"] == "tool_result"
+    assert "Refused (404)" in steps()[1]["text"]
+
+
+def test_no_tool_hands_over_a_whole_document(requests):
+    names = {t.name for t in tools.TOOLS}
+    assert "get_policy_wording" not in names
+    whole = Path("data/claims_manual.md").read_text(encoding="utf-8")
+    section = tools.read_section.invoke({"document": "claims_manual", "number": 7})
+    assert len(section) < len(whole) / 2
+    listing = tools.list_sections.invoke({"document": "policy_wording"})
+    assert listing.splitlines()[0] == "Policy wording"
+    assert len(listing.splitlines()) == 13
+
+
+def test_search_finds_the_sections_that_mention_a_word(requests):
+    found = tools.search_documents.invoke({"query": "giraffes"})
+    assert found.startswith("Claims manual · 7. Interpretation notes")
+    assert "Nothing" in tools.search_documents.invoke({"query": "zeppelin"})

@@ -91,7 +91,7 @@ export interface Claim {
 
 export interface Step {
   step_id: number;
-  kind: "tool_call" | "tool_result" | "answer" | "error";
+  kind: "tool_call" | "tool_result" | "read" | "answer" | "error";
   text: string;
   at: string;
 }

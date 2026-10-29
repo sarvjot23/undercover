@@ -39,7 +39,7 @@ def agent_working(conn: sqlite3.Connection, row: sqlite3.Row) -> bool:
         (row["claim_id"],),
     ).fetchone()
     return row["status"] == "in_progress" or (
-        last is not None and last["kind"] in ("tool_call", "tool_result")
+        last is not None and last["kind"] in ("tool_call", "tool_result", "read")
     )
 
 

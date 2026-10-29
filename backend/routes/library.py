@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from backend import db
 from backend.db import Db
 
-INSTRUCTIONS = Path(__file__).parent.parent / "instructions.md"
+INSTRUCTIONS = Path(__file__).parent.parent / "instructions" / "claim.md"
 
 router = APIRouter(prefix="/api")
 

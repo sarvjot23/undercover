@@ -1,14 +1,14 @@
 # Status
 
-The claims pilot from `docs/PLAN.md` is built: all 7 phases are done. The harness from `docs/HARNESS.md` is being built to `docs/PLAN_HARNESS.md`: phase 1 (the codebase split) is done.
+The claims pilot from `docs/PLAN.md` is built: all 7 phases are done. The harness from `docs/HARNESS.md` is being built to `docs/PLAN_HARNESS.md`: phases 1 (the codebase split) and 2 (the manual and the wording by section) are done.
 
 ## What's built
 
 - `backend/`: FastAPI on SQLite. `backend/api.py` builds the app from the routers in `backend/routes/` (claims, runs, and the library of wording, instructions and handlers); `backend/rules.py` holds the claim states and the approval limit, and `backend/db.py` the schema and the seed. On first start it creates `undercover.db` and seeds it from `data/` (never `data/evals/`). Set `UNDERCOVER_DB` to use another file. `uv run -m backend.seed` starts again from `data/`.
-  - Read: the queue, a claim in full (its policy, plan, the customer's name and claim history, the decision and the payment), the agent's steps, the policy wording, the agent's instructions (`backend/instructions.md`) and the handlers.
+  - Read: the queue, a claim in full (its policy, plan, the customer's name and claim history, the decision and the payment), the agent's steps, the policy wording, the sections of the wording and the claims manual and a search across them (`/api/documents/...`), the agent's instructions (`backend/instructions/claim.md`) and the handlers.
   - The rules: start a claim, record the decision, pay it and sign it off. An approval over $800 (`payout_approval_limit` in `data/company.json`) waits for a handler's sign-off, and the backend refuses the payment until then, whatever the agent does.
   - Running the agent: `POST /api/claims/{id}/run` on one claim, or `POST /api/queue/run` on every waiting claim in the order submitted, one at a time.
-- `agent/`: the UnderCover Agent, `run(claim_id, thread_id)` in `agent/claim.py`, on LangChain's `create_agent`, with its backend client, model and tools in their own modules. Its four tools call the backend: `get_claim`, `get_policy_wording`, `record_decision` and `pay_claim`. Its instructions come from the backend, and it posts each step as it works. It uses `openai/gpt-6-luna` with low effort, or the model in `MODEL_NAME`.
+- `agent/`: the UnderCover Agent, `run(claim_id, thread_id)` in `agent/claim.py`, on LangChain's `create_agent`, with its backend client, model and tools in their own modules. Its tools call the backend: `get_claim`, `list_sections`, `read_section` and `search_documents` (the policy wording and the claims manual a section at a time), `record_decision` and `pay_claim`. Its instructions (`backend/instructions/claim.md`) come from the backend, and its middleware (`agent/middleware.py`) records each step on the claim, with each section it reads as a `read` step. It uses `deepseek/deepseek-v4.1-flash` with low effort, or the model in `MODEL_NAME`.
 - `dashboard/`: React in UnderCover's brand, light and dark.
   - `#/`: the queue, with a count of claims in each state, "Run the queue" and "Watch live".
   - `#/claims/CLM-1001`: a claim in full, with its decision, the agent's steps as they arrive, "Run the agent" and sign-off.

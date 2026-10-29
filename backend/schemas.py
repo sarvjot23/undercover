@@ -29,7 +29,7 @@ class SignOff(BaseModel):
 class Step(BaseModel):
     """One step of the agent's work on a claim."""
 
-    kind: Literal["tool_call", "tool_result", "answer", "error"]
+    kind: Literal["tool_call", "tool_result", "read", "answer", "error"]
     text: str
 
 

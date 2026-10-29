@@ -9,7 +9,7 @@ from pydantic import SecretStr
 load_dotenv(override=True)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "openai/gpt-6-luna"
+DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
 
 
 def model() -> ChatOpenAI:

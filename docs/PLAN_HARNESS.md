@@ -109,11 +109,11 @@ Success criteria:
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes, with tests for each documents route: the wording's 12 sections and the manual's 14, section 7 of the manual containing "Wild animals", a search for "giraffe" finding it, and 404s for an unknown document or section.
-- [ ] A stub-model test: the claim agent lists the manual's sections, reads section 7 and records a decision. The claim's steps include a `read` step naming the manual and section 7, in order.
-- [ ] A test shows that no tool returns a whole document, and that nothing the agent can reach mentions `data/evals/` or its fields.
-- [ ] A test shows the default model is DeepSeek V4.1 Flash with low effort, and that `MODEL_NAME` overrides it.
-- [ ] `npm run check:python` passes with coverage of at least 80%.
+- [x] `uv run pytest -q` passes, with tests for each documents route: the wording's 12 sections and the manual's 14, section 7 of the manual containing "Wild animals", a search for "giraffe" finding it, and 404s for an unknown document or section.
+- [x] A stub-model test: the claim agent lists the manual's sections, reads section 7 and records a decision. The claim's steps include a `read` step naming the manual and section 7, in order.
+- [x] A test shows that no tool returns a whole document, and that nothing the agent can reach mentions `data/evals/` or its fields.
+- [x] A test shows the default model is DeepSeek V4.1 Flash with low effort, and that `MODEL_NAME` overrides it.
+- [x] `npm run check:python` passes with coverage of at least 80%.
 
 ## Phase 3: failures put right, claim by claim
 

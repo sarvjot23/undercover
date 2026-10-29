@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 // The end-to-end run has its own ports and a fresh database each time.
-const database = join(tmpdir(), `undercover-e2e-${String(Date.now())}.db`);
+// Workers load this file again, so they take the path the main process chose.
+const database =
+  process.env.UNDERCOVER_E2E_DB ??
+  join(tmpdir(), `undercover-e2e-${String(Date.now())}.db`);
+// The tests open a run in this database themselves, so no agent (and no model) starts.
+process.env.UNDERCOVER_E2E_DB = database;
 
 export default defineConfig({
   testDir: "e2e",

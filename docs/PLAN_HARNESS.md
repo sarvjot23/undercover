@@ -223,12 +223,12 @@ Success criteria:
 
 Success criteria:
 
-- [ ] `npm run e2e` passes, with the tests above and the pilot's, updated for the run routes.
-- [ ] After `uv run -m backend.seed`, `uv run -m agent --cap 5` works 5 claims on its own. Each is decided, waiting for sign-off or left for a handler, the other 20 stay waiting, and the run ends with a summary. The cost and time go in `docs/STATUS.md`.
-- [ ] During that run, screenshots of the dashboard show the to-do list filling in and being ticked off, and each claim's steps with the sections it read.
-- [ ] The live view plays the run through and ends on the summary with the agent's own summary.
-- [ ] `npm run check` passes in full: ruff, pyright, pytest, ESLint, Prettier, tsc, vitest and Playwright.
-- [ ] Every checkbox in this plan is ticked, and each phase has its own commit, made with the pre-commit hook.
+- [x] `npm run e2e` passes, with the tests above and the pilot's, updated for the run routes.
+- [x] After `uv run -m backend.seed`, `uv run -m agent --cap 5` works 5 claims on its own. Each is decided, waiting for sign-off or left for a handler, the other 20 stay waiting, and the run ends with a summary. The cost and time go in `docs/STATUS.md`. (4 minutes; the cost wasn't measured, see `docs/STATUS.md`.)
+- [x] During that run, screenshots of the dashboard show the to-do list filling in and being ticked off, and each claim's steps with the sections it read.
+- [x] The live view plays the run through and ends on the summary with the agent's own summary.
+- [x] `npm run check` passes in full: ruff, pyright, pytest, ESLint, Prettier, tsc, vitest and Playwright.
+- [x] Every checkbox in this plan is ticked, and each phase has its own commit, made with the pre-commit hook.
 
 ## Notes
 

@@ -132,15 +132,15 @@ Success criteria:
 
 Success criteria:
 
-- [ ] `uv run pytest -q` passes, with stub-model tests for:
+- [x] `uv run pytest -q` passes, with stub-model tests for:
   - a model that raises: the claim goes back to `waiting` with `attempts` 1 and an `error` step
   - a second failure: the claim is `needs_handler` with `attempts` 2
   - a stub that never records a decision: failed with "finished without recording a decision"
   - a model that fails once and then answers: decided, with no failed attempt
   - more than 30 model calls: stopped, and the claim failed
-- [ ] A test shows a claim left `in_progress` is back to `waiting`, with one attempt, after the backend starts again.
-- [ ] Tests show a second `record_decision` and a second `pay_claim` on the same claim are refused, and the claim has one decision and at most one payment.
-- [ ] `npm run check:python` passes with coverage of at least 80%.
+- [x] A test shows a claim left `in_progress` is back to `waiting`, with one attempt, after the backend starts again.
+- [x] Tests show a second `record_decision` and a second `pay_claim` on the same claim are refused, and the claim has one decision and at most one payment.
+- [x] `npm run check:python` passes with coverage of at least 80%.
 
 ## Phase 4: one run works the queue
 

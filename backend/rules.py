@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from backend import db
 
 APPROVAL_LIMIT = float(db.load("company.json")["payout_approval_limit"])
+MAX_ATTEMPTS = 2
 
 LOOKUPS = {
     "policy": "SELECT body FROM policies WHERE policy_id = ?",
@@ -68,3 +69,26 @@ def add(conn: sqlite3.Connection, claim_id: str, kind: str, text: str) -> None:
         "INSERT INTO steps (claim_id, kind, text, at) VALUES (?, ?, ?, ?)",
         (claim_id, kind, text, db.now()),
     )
+
+
+def fail(conn: sqlite3.Connection, claim_id: str, reason: str) -> str:
+    """Count a failed attempt on a claim in progress and say where it goes next.
+
+    The first failure sends it back to the queue; the second leaves it for a handler.
+    """
+    attempts = find_claim(conn, claim_id)["attempts"] + 1
+    after = "waiting" if attempts < MAX_ATTEMPTS else "needs_handler"
+    move(conn, claim_id, "in_progress", after)
+    conn.execute(
+        "UPDATE claims SET attempts = ? WHERE claim_id = ?", (attempts, claim_id)
+    )
+    add(conn, claim_id, "error", reason)
+    return after
+
+
+def recover(conn: sqlite3.Connection) -> None:
+    """Fail every claim a crash left in progress, so none stays stuck."""
+    rows = conn.execute("SELECT claim_id FROM claims WHERE status = 'in_progress'")
+    with conn:
+        for row in rows.fetchall():
+            fail(conn, row["claim_id"], "The agent stopped partway")

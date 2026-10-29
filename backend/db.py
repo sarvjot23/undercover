@@ -16,7 +16,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS claims (
     claim_id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
-    body TEXT NOT NULL
+    body TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS policies (policy_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS customers (customer_id TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -73,6 +74,11 @@ def init() -> None:
     conn = connect()
     with conn:
         conn.executescript(SCHEMA)
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(claims)")]
+        if "attempts" not in columns:
+            conn.execute(
+                "ALTER TABLE claims ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0"
+            )
         if conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0] == 0:
             seed(conn)
     conn.close()
@@ -82,7 +88,7 @@ def seed(conn: sqlite3.Connection) -> None:
     """Fill the tables from the claims queue and the insurer's records."""
     for claim in load("claims.json"):
         conn.execute(
-            "INSERT INTO claims VALUES (?, 'waiting', ?)",
+            "INSERT INTO claims (claim_id, status, body) VALUES (?, 'waiting', ?)",
             (claim["claim_id"], json.dumps(claim)),
         )
     conn.executemany(

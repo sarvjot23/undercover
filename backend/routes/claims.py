@@ -12,6 +12,7 @@ from backend.rules import (
     add,
     agent_working,
     decision_of,
+    fail,
     find_claim,
     move,
     record,
@@ -41,6 +42,7 @@ def list_claims(conn: Db) -> list[dict[str, Any]]:
                 "amount_claimed": claim["amount_claimed"],
                 "submitted_on": claim["submitted_on"],
                 "status": row["status"],
+                "attempts": row["attempts"],
                 "agent_working": agent_working(conn, row),
                 "decision": decision["decision"] if decision else None,
                 "payout": decision["payout"] if decision else None,
@@ -62,6 +64,7 @@ def get_claim(claim_id: str, conn: Db) -> dict[str, Any]:
     return {
         **claim,
         "status": row["status"],
+        "attempts": row["attempts"],
         "agent_working": agent_working(conn, row),
         "policy": policy,
         "plan": record(conn, "plan", policy["plan"]),
@@ -178,8 +181,7 @@ def sign_off(claim_id: str, sign_off: SignOff, conn: Db) -> dict[str, Any]:
 
 @router.post("/{claim_id}/fail", operation_id="fail_claim")
 def fail_claim(claim_id: str, failure: Failure, conn: Db) -> dict[str, str]:
-    """Send a claim back to waiting after the agent's run failed."""
+    """Count a failed attempt: back to the queue, or to a handler the second time."""
     with conn:
-        move(conn, claim_id, "in_progress", "waiting")
-        add(conn, claim_id, "error", failure.reason)
-    return {"claim_id": claim_id, "status": "waiting"}
+        status = fail(conn, claim_id, failure.reason)
+    return {"claim_id": claim_id, "status": status}

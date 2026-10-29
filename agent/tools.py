@@ -14,8 +14,7 @@ def get_claim(claim_id: str) -> str:
     """Get a claim with its policy, plan limits and the customer's claim history."""
     with client.backend() as backend:
         response = backend.get(f"/api/claims/{claim_id}")
-    response.raise_for_status()
-    return response.text
+    return client.reply(response)
 
 
 @tool

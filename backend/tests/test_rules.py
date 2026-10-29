@@ -1,6 +1,8 @@
 import pytest
+from fastapi.testclient import TestClient
 
 from backend import db, rules
+from backend.api import app
 from backend.routes import runs as run_routes
 
 
@@ -182,3 +184,47 @@ def test_agent_working_until_its_answer(client):
 def test_the_limit_comes_from_our_settings():
     assert db.load("company.json")["payout_approval_limit"] == rules.APPROVAL_LIMIT
     assert rules.APPROVAL_LIMIT == 800.0
+
+
+def fail(client, claim_id="CLM-1001"):
+    client.post(f"/api/claims/{claim_id}/start")
+    return client.post(f"/api/claims/{claim_id}/fail", json={"reason": "Timed out"})
+
+
+def test_a_second_failure_leaves_the_claim_for_a_handler(client):
+    assert fail(client).json()["status"] == "waiting"
+    assert fail(client).json()["status"] == "needs_handler"
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["attempts"] == 2
+    assert client.post("/api/claims/CLM-1001/start").status_code == 409
+
+
+def test_a_claim_left_in_progress_is_recovered_on_startup(client):
+    client.post("/api/claims/CLM-1001/start")
+    with TestClient(app):
+        claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "waiting"
+    assert claim["attempts"] == 1
+    steps = client.get("/api/claims/CLM-1001/steps").json()
+    assert steps[-1]["text"] == "The agent stopped partway"
+
+
+def test_never_decided_or_paid_twice(client):
+    decide(client, "CLM-1001", payout=420.0)
+    again = client.post(
+        "/api/claims/CLM-1001/decision",
+        json={
+            "decision": "decline",
+            "payout": 0,
+            "reasons": "Changed my mind.",
+            "policy_section": "9. General exclusions",
+        },
+    )
+    assert again.status_code == 409
+    paid = client.post("/api/claims/CLM-1001/payment", json={"amount": 420.0})
+    assert paid.status_code == 200
+    twice = client.post("/api/claims/CLM-1001/payment", json={"amount": 420.0})
+    assert twice.status_code == 409
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["decision"]["decision"] == "approve"
+    assert claim["payment"]["amount"] == 420.0

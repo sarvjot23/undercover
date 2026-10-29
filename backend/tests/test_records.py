@@ -16,6 +16,7 @@ def test_queue_is_seeded_waiting(client):
         "amount_claimed": 420.0,
         "submitted_on": "2026-06-24",
         "status": "waiting",
+        "attempts": 0,
         "agent_working": False,
         "decision": None,
         "payout": None,

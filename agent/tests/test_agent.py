@@ -24,20 +24,45 @@ class BrokenModel(StubModel):
         raise RuntimeError("model down")
 
 
+class FlakyModel(StubModel):
+    """A chat model whose provider fails once, then answers."""
+
+    failed: bool = False
+
+    def _generate(self, *args, **kwargs):
+        if not self.failed:
+            self.failed = True
+            raise RuntimeError("provider hiccup")
+        return super()._generate(*args, **kwargs)
+
+
+class Backend(TestClient):
+    """The backend as the agent sees it: already running, so no startup per call."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
 @pytest.fixture
 def requests(tmp_path, monkeypatch) -> list[str]:
     """Point the agent at the backend with a fresh database; collect its requests."""
     monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "test.db"))
+    with TestClient(app):
+        pass
     paths: list[str] = []
 
     def backend():
-        client = TestClient(app)
+        client = Backend(app)
         client.event_hooks = {
             "request": [lambda request: paths.append(request.url.path)]
         }
         return client
 
     monkeypatch.setattr(client, "backend", backend)
+    monkeypatch.setattr(claim_agent, "RETRY_DELAY", 0.0)
     return paths
 
 
@@ -78,7 +103,7 @@ def test_approval_under_the_limit_is_paid(requests):
         call("pay_claim", claim_id="CLM-1001", amount=420.0),
         AIMessage(content="Approved, paying $420.00."),
     )
-    assert answer == "Approved, paying $420.00."
+    assert answer == "CLM-1001: approve $420.00"
     assert claim()["status"] == "decided"
     assert claim()["payment"]["amount"] == 420.0
 
@@ -120,12 +145,54 @@ def test_steps_are_recorded_in_order(requests):
     assert len(steps()[1]["text"]) <= len("get_claim: ") + middleware.STEP_LENGTH
 
 
+def broken():
+    return claim_agent.run("CLM-1001", "thread-1", BrokenModel(messages=iter([])))
+
+
 def test_failed_run_goes_back_to_waiting(requests):
-    with pytest.raises(RuntimeError, match="model down"):
-        claim_agent.run("CLM-1001", "thread-1", BrokenModel(messages=iter([])))
+    assert broken() == (
+        "CLM-1001: failed (The agent's run failed: model down), back in the queue"
+    )
     assert claim()["status"] == "waiting"
+    assert claim()["attempts"] == 1
     assert steps()[-1] == {**steps()[-1], "kind": "error"}
     assert "model down" in steps()[-1]["text"]
+
+
+def test_a_second_failure_leaves_the_claim_for_a_handler(requests):
+    broken()
+    assert broken().endswith("left for a handler")
+    assert claim()["status"] == "needs_handler"
+    assert claim()["attempts"] == 2
+
+
+def test_a_provider_error_is_retried(requests):
+    replies = iter([decision("refer", 0), AIMessage(content="Referred.")])
+    answer = claim_agent.run("CLM-1001", "thread-1", FlakyModel(messages=replies))
+    assert answer == "CLM-1001: refer $0.00"
+    assert claim()["status"] == "decided"
+    assert claim()["attempts"] == 0
+
+
+def test_a_claim_stops_after_thirty_model_calls(requests):
+    looping = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {"name": "get_claim", "args": {"claim_id": "CLM-1001"}, "id": f"c{i}"}
+            ],
+        )
+        for i in range(31)
+    ]
+    answer = run(*looping)
+    assert "failed" in answer
+    assert claim()["status"] == "waiting"
+    assert len([s for s in steps() if s["kind"] == "tool_call"]) == 30
+
+
+def test_a_claim_that_is_not_waiting_is_not_started(requests):
+    run(decision("refer", 0), AIMessage(content="Referred."))
+    assert run().startswith("CLM-1001: not started, Refused (409)")
 
 
 def test_run_without_a_decision_goes_back_to_waiting(requests):

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { start } from "./api";
 
 test("the live view follows two claims through to their stamps", async ({
   page,
@@ -21,7 +22,7 @@ test("the live view follows two claims through to their stamps", async ({
     });
   };
 
-  await request.post("/api/claims/CLM-1020/start");
+  await start(request, "CLM-1020");
   const first = page.getByRole("article", { name: "Claim CLM-1020" });
   await expect(first).toBeVisible();
   await expect(first.getByRole("heading", { level: 1 })).toHaveText(
@@ -30,7 +31,7 @@ test("the live view follows two claims through to their stamps", async ({
   await decide("CLM-1020", "decline");
   await expect(page.getByRole("status")).toContainText("Declined");
 
-  await request.post("/api/claims/CLM-1021/start");
+  await start(request, "CLM-1021");
   await expect(
     page.getByRole("article", { name: "Claim CLM-1021" }),
   ).toBeVisible();

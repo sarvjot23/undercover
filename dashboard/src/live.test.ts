@@ -160,3 +160,32 @@ it("counts a claim left for a handler", () => {
   ]);
   expect(tally(state).counts.handler).toBe(1);
 });
+
+it("doesn't follow a signed-off claim that goes back to in progress", () => {
+  const held = {
+    status: "awaiting_sign_off" as const,
+    decision: "approve" as const,
+    payout: 1200,
+  };
+  let state = poll(START, [summary({ status: "in_progress" })]);
+  state = poll(state, [summary(held)]);
+  expect(state.stage).toBe("stamped");
+  state = reduce(state, { type: "held" });
+  state = reduce(state, { type: "left" });
+  state = poll(state, [summary({ ...held, status: "in_progress" })]);
+  expect(state.focus).toBeNull();
+  expect(tally(state).counts.sign_off).toBe(0);
+  state = poll(state, [summary({ ...held, status: "decided" })]);
+  expect(state.focus).toBeNull();
+  expect(tally(state).counts.approve).toBe(1);
+  expect(tally(state).paid).toBe(1200);
+});
+
+it("waits for the payment before stamping an approval", () => {
+  const approved = { decision: "approve" as const, payout: 420 };
+  let state = poll(START, [summary({ status: "in_progress" })]);
+  state = poll(state, [summary({ status: "in_progress", ...approved })]);
+  expect(state.stage).toBe("working");
+  state = poll(state, [summary({ status: "decided", ...approved })]);
+  expect(state.stage).toBe("stamped");
+});

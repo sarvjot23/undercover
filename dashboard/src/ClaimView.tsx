@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Claim, Handler, Step } from "./api";
 import { postJson } from "./api";
-import { date, label, money, OUTCOME_LABELS } from "./format";
+import { date, dateTime, label, money, OUTCOME_LABELS } from "./format";
 import { useJson } from "./hooks";
 import { StatusBadge } from "./StatusBadge";
 import { Steps } from "./Steps";
@@ -149,11 +149,28 @@ function DecisionPanel({
       </p>
       <p>{decision.reasons}</p>
       <p className="muted">Policy: {decision.policy_section}</p>
-      {payment && <PaymentLine claim={claim} />}
+      {payment ? <PaymentLine claim={claim} /> : <SignedOff claim={claim} />}
       {claim.status === "awaiting_sign_off" && (
         <SignOff claimId={claim.claim_id} onSignedOff={onSignedOff} />
       )}
     </div>
+  );
+}
+
+/** A sign-off the agent hasn't paid yet: it's picking the claim back up. */
+function SignedOff({ claim }: Readonly<{ claim: Claim }>) {
+  const handlers = useJson<Handler[]>("/api/handlers");
+  const signOff = claim.sign_off;
+  if (!signOff) return null;
+  const signer = handlers.data?.find(
+    (handler) => handler.handler_id === signOff.handler_id,
+  );
+  return (
+    <p className="muted">
+      Signed off by {signer?.name} on{" "}
+      <span className="mono">{dateTime(signOff.signed_off_at)}</span>. The agent
+      is paying it.
+    </p>
   );
 }
 
@@ -167,8 +184,13 @@ function PaymentLine({ claim }: Readonly<{ claim: Claim }>) {
   return (
     <p className="paid">
       Paid <span className="mono">{money(payment.amount)}</span> on{" "}
-      <span className="mono">{date(payment.paid_at)}</span>
-      {signer && `, signed off by ${signer.name}`}
+      <span className="mono">{dateTime(payment.paid_at)}</span>
+      {signer && payment.signed_off_at && (
+        <>
+          , signed off by {signer.name} on{" "}
+          <span className="mono">{dateTime(payment.signed_off_at)}</span>
+        </>
+      )}
     </p>
   );
 }

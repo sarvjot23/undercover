@@ -7,7 +7,7 @@ import { defineConfig } from "@playwright/test";
 const database =
   process.env.UNDERCOVER_E2E_DB ??
   join(tmpdir(), `undercover-e2e-${String(Date.now())}.db`);
-// The tests open a run in this database themselves, so no agent (and no model) starts.
+// The tests play the agent's part, against a stand-in for its service on its own port.
 process.env.UNDERCOVER_E2E_DB = database;
 
 export default defineConfig({
@@ -18,9 +18,17 @@ export default defineConfig({
   use: { baseURL: "http://localhost:5174" },
   webServer: [
     {
+      command: "node e2e/agent-standin.ts",
+      url: "http://127.0.0.1:8003/health",
+    },
+    {
       command: "uv run -m uvicorn backend.api:app --port 8001",
       url: "http://127.0.0.1:8001/api/health",
-      env: { UNDERCOVER_DB: database },
+      env: {
+        UNDERCOVER_DB: database,
+        UNDERCOVER_AGENT: "http://127.0.0.1:8003",
+        DATABASE_URL: "",
+      },
     },
     {
       command: "npx vite dashboard --port 5174 --strictPort",

@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { finishRun, openRun, work, writeTodos } from "./api";
+import { finishRun, openRun, pay, start, work, writeTodos } from "./api";
 
 test("the run panel ticks off the to-do list, then shows the summary", async ({
   page,
   request,
 }) => {
-  const runId = openRun(2);
+  const runId = await openRun(request, 2);
   await page.goto("/");
   await expect(page.getByText("The agent is planning the run.")).toBeVisible();
 
@@ -28,6 +28,7 @@ test("the run panel ticks off the to-do list, then shows the summary", async ({
   await expect(panel).toContainText("1 of 2 claims taken");
 
   await work(request, runId, "CLM-1004", "approve", 74);
+  await pay(request, "CLM-1004", 74);
   await writeTodos(request, runId, [
     { claim_id: "CLM-1003", note: "Emergency medical", status: "done" },
     { claim_id: "CLM-1004", note: "Baggage delay", status: "done" },
@@ -44,7 +45,7 @@ test("a claim that fails twice is left for a handler", async ({
   request,
 }) => {
   for (let attempt = 0; attempt < 2; attempt++) {
-    await request.post("/api/claims/CLM-1005/start");
+    await start(request, "CLM-1005");
     await request.post("/api/claims/CLM-1005/fail", {
       data: { reason: "The agent's run failed: timed out" },
     });
@@ -72,7 +73,7 @@ test("a claim page lists the sections the agent read", async ({
     "Claims manual · 7. Interpretation notes",
   ]) {
     await request.post("/api/claims/CLM-1006/steps", {
-      data: { kind: "read", text },
+      data: { kind: "read", text, key: text },
     });
   }
   await page.goto("/#/claims/CLM-1006");
@@ -88,11 +89,11 @@ test("the live view follows a capped run to its summary", async ({
   request,
 }) => {
   test.setTimeout(60_000);
-  const runId = openRun(2);
+  const runId = await openRun(request, 2);
   await page.goto("/#/live");
 
   await request.post(`/api/runs/${String(runId)}/claims/CLM-1007`);
-  await request.post("/api/claims/CLM-1007/start");
+  await start(request, "CLM-1007");
   await expect(
     page.getByRole("article", { name: "Claim CLM-1007" }),
   ).toBeVisible();
@@ -105,11 +106,12 @@ test("the live view follows a capped run to its summary", async ({
       policy_section: "5. Baggage and Personal Effects",
     },
   });
+  await pay(request, "CLM-1007", 50);
   await expect(page.getByRole("status")).toContainText("Approved");
 
   await request.post(`/api/runs/${String(runId)}/claims/CLM-1009`);
   for (let attempt = 0; attempt < 2; attempt++) {
-    await request.post("/api/claims/CLM-1009/start");
+    await start(request, "CLM-1009");
     await request.post("/api/claims/CLM-1009/fail", {
       data: { reason: "The agent's run failed: timed out" },
     });
@@ -124,4 +126,24 @@ test("the live view follows a capped run to its summary", async ({
   await expect(
     page.getByRole("list", { name: "Outcomes so far" }),
   ).toContainText("1 Left for a handler");
+});
+
+test("the queue can't be run while a run is in progress", async ({
+  page,
+  request,
+}) => {
+  const runId = await openRun(request, 1);
+  await page.goto("/");
+  await expect(page.getByText("A run is already in progress")).toBeVisible();
+  const button = page.getByRole("button", { name: "Run the queue" });
+  await expect(button).toBeDisabled();
+  expect((await request.post("/api/runs", { data: { cap: 1 } })).status()).toBe(
+    409,
+  );
+
+  await request.post(`/api/runs/${String(runId)}/fail`, {
+    data: { reason: "Ended by the end-to-end test." },
+  });
+  await expect(button).toBeEnabled();
+  await expect(page.getByText("A run is already in progress")).toHaveCount(0);
 });

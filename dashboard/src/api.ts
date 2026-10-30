@@ -14,6 +14,8 @@ export interface ClaimSummary {
   agent_working: boolean;
   decision: Outcome | null;
   payout: number | null;
+  thread_id: string | null;
+  signed_off: boolean;
 }
 
 export interface Item {
@@ -48,7 +50,13 @@ export interface Decision {
 export interface Payment {
   amount: number;
   signed_off_by: string | null;
+  signed_off_at: string | null;
   paid_at: string;
+}
+
+export interface SignOff {
+  handler_id: string;
+  signed_off_at: string;
 }
 
 export interface Plan {
@@ -88,6 +96,7 @@ export interface Claim {
     previous_claims: PreviousClaim[];
   };
   decision: Decision | null;
+  sign_off: SignOff | null;
   payment: Payment | null;
 }
 
@@ -113,6 +122,8 @@ export interface Run {
   cap: number;
   total: number;
   status: "running" | "finished" | "failed";
+  /** Whether a worker holds the run now; a run still running but not active has stopped. */
+  active: boolean;
   todos: Todo[];
   summary: string | null;
   claim_ids: string[];

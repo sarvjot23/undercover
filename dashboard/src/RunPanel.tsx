@@ -1,6 +1,5 @@
 import type { Run } from "./api";
 import { TODO_LABELS } from "./format";
-import { useJson } from "./hooks";
 
 const RUN_LABELS: Record<Run["status"], string> = {
   running: "The agent is working through the queue",
@@ -9,9 +8,7 @@ const RUN_LABELS: Record<Run["status"], string> = {
 };
 
 /** The current queue run: the agent's to-do list, ticked off as it goes, then its summary. */
-export function RunPanel() {
-  const { data: run } = useJson<Run | null>("/api/runs/current", 1500);
-
+export function RunPanel({ run }: Readonly<{ run: Run | null | undefined }>) {
   if (!run) return null;
 
   return (
@@ -19,8 +16,10 @@ export function RunPanel() {
       <div className="run-head">
         <h3 id="run-heading">The agent&rsquo;s to-do list</h3>
         <span className="muted">
-          {RUN_LABELS[run.status]} &middot;{" "}
-          <span className="mono">{run.claim_ids.length}</span> of{" "}
+          {run.status === "running" && !run.active
+            ? "The last run stopped partway"
+            : RUN_LABELS[run.status]}{" "}
+          &middot; <span className="mono">{run.claim_ids.length}</span> of{" "}
           <span className="mono">{run.total}</span> claims taken
         </span>
       </div>

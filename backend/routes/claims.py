@@ -3,10 +3,10 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import select
 
-from backend import db, leases
+from backend import agent_link, db, leases
 from backend.db import Db, customers, decisions, handlers, payments, sign_offs, steps
 from backend.db import claims as claim_table
 from backend.payout import Payout, work_out_payout
@@ -229,7 +229,9 @@ def pay_claim(claim_id: str, payment: Payment, conn: Db) -> dict[str, Any]:
 
 
 @router.post("/{claim_id}/sign-off", operation_id="sign_off")
-def sign_off(claim_id: str, sign_off: SignOff, conn: Db) -> dict[str, Any]:
+def sign_off(
+    claim_id: str, sign_off: SignOff, background_tasks: BackgroundTasks, conn: Db
+) -> dict[str, Any]:
     """Record a handler's sign-off on a payout over the limit; the agent pays it."""
     query = select(handlers.c.handler_id).where(
         handlers.c.handler_id == sign_off.handler_id
@@ -245,6 +247,7 @@ def sign_off(claim_id: str, sign_off: SignOff, conn: Db) -> dict[str, Any]:
         signed_off_at=db.now(),
     )
     conn.commit()
+    background_tasks.add_task(agent_link.resume, claim_id)
     return standing(conn, claim_id)
 
 

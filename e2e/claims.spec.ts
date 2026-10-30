@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { decide } from "./api";
+import { decide, pay } from "./api";
 
 test("a claim in full", async ({ page }) => {
   await page.goto("/");
@@ -23,10 +23,7 @@ test("an approval under $800 is decided and paid", async ({
   request,
 }) => {
   await decide(request, "CLM-1013", "approve", 123);
-  const paid = await request.post("/api/claims/CLM-1013/payment", {
-    data: { amount: 123 },
-  });
-  expect(paid.ok()).toBe(true);
+  await pay(request, "CLM-1013", 123);
   await page.goto("/#/claims/CLM-1013");
   await expect(page.locator(".claim-head .badge")).toHaveText("Decided");
   await expect(page.locator(".outcome")).toHaveText(/Approved\s*\$123\.00/);
@@ -50,6 +47,15 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
   await expect(page.locator(".paid")).toHaveCount(0);
   await page.getByRole("combobox").selectOption({ label: "Dana Whitfield" });
   await page.getByRole("button", { name: "Sign off" }).click();
+  await expect(page.locator(".claim-head .badge")).toHaveText("In progress");
+  await expect(page.getByText(/The agent\s+is paying it/)).toBeVisible();
+
+  await expect(async () => {
+    const received = await request.get("http://127.0.0.1:8003/received");
+    expect(await received.json()).toContain("/claims/CLM-1014/resume");
+  }).toPass();
+
+  await pay(request, "CLM-1014", 805);
   await expect(page.locator(".claim-head .badge")).toHaveText("Decided");
   await expect(page.locator(".paid")).toContainText("Paid $805.00 on");
   await expect(page.locator(".paid")).toContainText(

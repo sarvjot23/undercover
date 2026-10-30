@@ -33,6 +33,8 @@ export function summary(overrides: Partial<ClaimSummary> = {}): ClaimSummary {
     agent_working: false,
     decision: null,
     payout: null,
+    thread_id: null,
+    signed_off: false,
     ...overrides,
   };
 }
@@ -95,6 +97,7 @@ export function claim(overrides: Partial<Claim> = {}): Claim {
       ],
     },
     decision: null,
+    sign_off: null,
     payment: null,
     ...overrides,
   };
@@ -106,6 +109,7 @@ export function runRecord(overrides: Partial<Run> = {}): Run {
     cap: 25,
     total: 0,
     status: "running",
+    active: true,
     todos: [],
     summary: null,
     claim_ids: [],

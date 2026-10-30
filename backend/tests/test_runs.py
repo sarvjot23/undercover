@@ -1,13 +1,12 @@
 import pytest
 
-from backend import db
-from backend.routes import runs as run_routes
+from backend import agent_link, db
 
 
 @pytest.fixture(autouse=True)
 def no_agent(monkeypatch):
-    """Start runs without the queue agent; the tests play its part."""
-    monkeypatch.setattr(run_routes.queue_agent, "run", lambda run_id: None)
+    """Start runs without the agent's service; the tests play its part."""
+    monkeypatch.setattr(agent_link, "tell", lambda path, body: True)
 
 
 def start(client, cap=2):
@@ -162,3 +161,32 @@ def test_a_failed_run_sends_its_claims_back_to_the_queue(client):
 def test_an_unknown_run(client):
     assert client.get("/api/runs/99").status_code == 404
     assert client.post("/api/runs/99/claims/CLM-1001").status_code == 404
+
+
+def test_a_run_is_handed_to_the_agents_service(client, monkeypatch):
+    told = []
+    monkeypatch.setattr(
+        agent_link, "tell", lambda path, body: told.append(path) or True
+    )
+    run_id = start(client)["run_id"]
+    assert told == [f"/runs/{run_id}"]
+
+
+def test_an_opened_run_is_left_to_its_own_worker(client, monkeypatch):
+    told = []
+    monkeypatch.setattr(
+        agent_link, "tell", lambda path, body: told.append(path) or True
+    )
+    run = client.post("/api/runs/open", json={"cap": 2}).json()
+    assert run["status"] == "running"
+    assert run["resumed"] is False
+    assert told == []
+    refused = client.post("/api/runs/open", json={"cap": 2})
+    assert refused.status_code == 409
+
+
+def test_a_run_fails_cleanly_when_the_service_cannot_be_reached(client, monkeypatch):
+    monkeypatch.setattr(agent_link, "tell", lambda path, body: False)
+    refused = client.post("/api/runs", json={"cap": 2})
+    assert refused.status_code == 503
+    assert client.get("/api/runs/current").json()["status"] == "failed"

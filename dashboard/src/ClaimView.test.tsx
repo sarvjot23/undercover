@@ -125,7 +125,7 @@ it("signs off a payout over the limit", async () => {
     }),
     "/api/claims/CLM-1001/steps": [step],
     "/api/handlers": handlers,
-    "POST /api/claims/CLM-1001/sign-off": { status: "decided" },
+    "POST /api/claims/CLM-1001/sign-off": { status: "in_progress" },
   };
   const fetchMock = stubBackend(routes);
   render(<ClaimView claimId="CLM-1001" />);
@@ -133,18 +133,35 @@ it("signs off a payout over the limit", async () => {
   await screen.findByRole("option", { name: "Marcus Oyelaran" });
   fireEvent.change(select, { target: { value: "HND-02" } });
 
+  const signed = {
+    handler_id: "HND-02",
+    signed_off_at: "2026-10-21T12:04:00+00:00",
+  };
+  routes["/api/claims/CLM-1001"] = claim({
+    status: "in_progress",
+    agent_working: true,
+    decision: approval,
+    sign_off: signed,
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Sign off" }));
+  expect(await screen.findByText(/The agent\s+is paying it/)).toBeDefined();
+  expect(screen.getByText("In progress")).toBeDefined();
+
   routes["/api/claims/CLM-1001"] = claim({
     status: "decided",
     decision: approval,
+    sign_off: signed,
     payment: {
       amount: 1200,
       signed_off_by: "HND-02",
+      signed_off_at: signed.signed_off_at,
       paid_at: "2026-10-21T12:05:00+00:00",
     },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Sign off" }));
   expect(
-    await screen.findByText(/signed off by Marcus Oyelaran/),
+    await screen.findByText(/signed off by Marcus Oyelaran/, undefined, {
+      timeout: 3000,
+    }),
   ).toBeDefined();
   const signOff = fetchMock.mock.calls.find(
     ([input]) => pathOf(input) === "/api/claims/CLM-1001/sign-off",

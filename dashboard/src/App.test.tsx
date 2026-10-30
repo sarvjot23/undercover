@@ -105,7 +105,7 @@ it("runs the queue full screen in the live view", async () => {
   const fetchMock = stubBackend({
     "/api/claims": queue,
     "POST /api/runs": runRecord({ total: 2 }),
-    "/api/runs/current": runRecord({ total: 2 }),
+    "/api/runs/current": runRecord({ status: "finished", active: false }),
   });
   const fullscreen = vi.fn().mockResolvedValue(undefined);
   document.documentElement.requestFullscreen = fullscreen;
@@ -224,4 +224,53 @@ it("says the agent is planning before the list is written", async () => {
   expect(
     await screen.findByText("The agent is planning the run."),
   ).toBeDefined();
+});
+
+it("won't start a second run while one is in progress", async () => {
+  stubBackend({
+    "/api/claims": queue,
+    "/api/runs/current": runRecord({ active: true }),
+  });
+  render(<App />);
+  expect(await screen.findByText("A run is already in progress")).toBeDefined();
+  const button = screen.getByRole("button", { name: "Run the queue" });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("offers to finish a run that stopped partway", async () => {
+  const fetchMock = stubBackend({
+    "/api/claims": queue,
+    "/api/runs/current": runRecord({ active: false, cap: 3 }),
+    "POST /api/runs": runRecord({ active: true, cap: 3 }),
+  });
+  document.documentElement.requestFullscreen = vi
+    .fn()
+    .mockResolvedValue(undefined);
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  render(<App />);
+  expect(
+    await screen.findByText(
+      "The last run stopped partway. Running the queue finishes it",
+    ),
+  ).toBeDefined();
+  const button = screen.getByRole("button", { name: "Run the queue" });
+  expect((button as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(button);
+  await waitFor(() => {
+    expect(
+      fetchMock.mock.calls.some(([, init]) => init?.method === "POST"),
+    ).toBe(true);
+  });
+});
+
+it("lets a new run start after the last one finished", async () => {
+  stubBackend({
+    "/api/claims": queue,
+    "/api/runs/current": runRecord({ status: "finished", active: false }),
+  });
+  render(<App />);
+  await screen.findByRole("region", { name: "The agent’s to-do list" });
+  const button = screen.getByRole("button", { name: "Run the queue" });
+  expect((button as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.queryByText("A run is already in progress")).toBeNull();
 });

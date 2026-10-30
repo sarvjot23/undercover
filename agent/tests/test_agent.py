@@ -149,7 +149,7 @@ def test_model_name(monkeypatch):
 
 
 def test_backend_url():
-    assert str(client.backend().base_url) == "http://localhost:8000"
+    assert str(client.backend().base_url) == "http://127.0.0.1:8000"
 
 
 def test_reads_the_manual_a_section_at_a_time(requests):

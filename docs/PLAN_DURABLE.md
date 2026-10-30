@@ -218,16 +218,16 @@ Success criteria, all on a stub model:
 
 Success criteria:
 
-- [ ] Tests check the service: resume, run, one worker per claim, and signed-off claims picked up at startup.
-- [ ] A test shows a sign-off stands when the service can't be reached, and that the call comes only after the save.
-- [ ] Vitest checks the claim page after a sign-off (in progress, then paid with the handler and the time).
-- [ ] Vitest checks the live view with a claim that returns to in progress.
-- [ ] Vitest checks "Run the queue" in all three states of that table.
-- [ ] An end-to-end test opens a run and sees "Run the queue" disabled with "A run is already in progress", then finishes the run and sees it enabled.
-- [ ] An end-to-end test signs off on the dashboard and sees the claim in progress, with the stand-in on 8003 having received the resume call.
-- [ ] The end-to-end tests have no way of reaching port 8002 (`UNDERCOVER_AGENT` is set to 8003 in `playwright.config.ts`).
-- [ ] `npm run dev` starts all three on Windows, with `GET /health` answering on 8002.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] Tests check the service: resume, run, one worker per claim, and signed-off claims picked up at startup.
+- [x] A test shows a sign-off stands when the service can't be reached, and that the call comes only after the save.
+- [x] Vitest checks the claim page after a sign-off (in progress, then paid with the handler and the time).
+- [x] Vitest checks the live view with a claim that returns to in progress.
+- [x] Vitest checks "Run the queue" in all three states of that table.
+- [x] An end-to-end test opens a run and sees "Run the queue" disabled with "A run is already in progress", then finishes the run and sees it enabled.
+- [x] An end-to-end test signs off on the dashboard and sees the claim in progress, with the stand-in on 8003 having received the resume call.
+- [x] The end-to-end tests have no way of reaching port 8002 (`UNDERCOVER_AGENT` is set to 8003 in `playwright.config.ts`).
+- [x] `npm run dev` starts all three on Windows, with `GET /health` answering on 8002.
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 6: the live run, and the handover
 

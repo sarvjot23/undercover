@@ -4,18 +4,18 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from agent import claim as agent
-from agent import queue as queue_agent
-from backend import leases, runs
+from backend import agent_link, leases, runs
 from backend.db import Db
 from backend.db import runs as run_table
 from backend.rules import find_claim
 from backend.schemas import Failure, Lease, RunStart, Summary, Todos
 
 router = APIRouter(prefix="/api")
+
+SERVICE_AWAY = "The agent's service can't be reached"
 
 
 def thread_id_for(claim_id: str) -> str:
@@ -24,26 +24,33 @@ def thread_id_for(claim_id: str) -> str:
 
 
 @router.post("/claims/{claim_id}/run", operation_id="run_claim")
-def run_claim(
-    claim_id: str, background_tasks: BackgroundTasks, conn: Db
-) -> dict[str, str]:
-    """Start the UnderCover Agent on a waiting claim."""
+def run_claim(claim_id: str, conn: Db) -> dict[str, str]:
+    """Ask the agent's service to start on a waiting claim."""
     if find_claim(conn, claim_id)["status"] != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is not waiting")
     thread_id = thread_id_for(claim_id)
-    background_tasks.add_task(agent.run, claim_id, thread_id)
+    if not agent_link.tell(f"/claims/{claim_id}/run", {"thread_id": thread_id}):
+        raise HTTPException(503, SERVICE_AWAY)
     return {"claim_id": claim_id, "thread_id": thread_id}
 
 
-@router.post("/runs", operation_id="start_run")
-def start_run(
-    start: RunStart, background_tasks: BackgroundTasks, conn: Db
-) -> dict[str, Any]:
-    """Start the UnderCover Agent on the queue, working up to cap claims."""
+@router.post("/runs/open", operation_id="open_run")
+def open_run(start: RunStart, conn: Db) -> dict[str, Any]:
+    """Open a run for a worker of its own, or reopen one that stopped."""
     run_id, resumed = runs.start(conn, start.cap)
     conn.commit()
-    background_tasks.add_task(queue_agent.run, run_id)
     return {**get_run(run_id, conn), "resumed": resumed}
+
+
+@router.post("/runs", operation_id="start_run")
+def start_run(start: RunStart, conn: Db) -> dict[str, Any]:
+    """Open a run and ask the agent's service to work it."""
+    run = open_run(start, conn)
+    if not agent_link.tell(f"/runs/{run['run_id']}", {}):
+        runs.end(conn, run["run_id"], "failed", SERVICE_AWAY)
+        conn.commit()
+        raise HTTPException(503, SERVICE_AWAY)
+    return run
 
 
 @router.get("/runs/current", operation_id="get_current_run")

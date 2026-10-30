@@ -1,9 +1,9 @@
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import db, rules
+from backend import agent_link, db, rules
 from backend.api import app
-from backend.routes import runs as run_routes
 
 
 def decide(client, claim_id, decision="approve", payout=650.0):
@@ -267,18 +267,57 @@ def test_fail_sends_the_claim_back_to_waiting(client):
     assert steps[-1]["text"] == "Timed out"
 
 
-def test_run_starts_the_agent(client, monkeypatch):
-    runs = []
-    monkeypatch.setattr(run_routes.agent, "run", lambda *args: runs.append(args))
+def test_run_asks_the_agents_service(client, monkeypatch):
+    told = []
+    monkeypatch.setattr(agent_link, "tell", lambda *args: told.append(args) or True)
     started = client.post("/api/claims/CLM-1001/run").json()
     assert started["thread_id"].startswith("CLM-1001-")
-    assert runs == [("CLM-1001", started["thread_id"])]
+    assert told == [("/claims/CLM-1001/run", {"thread_id": started["thread_id"]})]
 
 
-def test_run_needs_a_waiting_claim(client, monkeypatch):
-    monkeypatch.setattr(run_routes.agent, "run", lambda *args: None)
+def test_run_needs_the_agents_service(client):
+    assert client.post("/api/claims/CLM-1001/run").status_code == 503
+
+
+def test_run_needs_a_waiting_claim(client):
     client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     assert client.post("/api/claims/CLM-1001/run").status_code == 409
+
+
+def test_a_sign_off_reaches_the_agent_only_once_it_is_saved(client, monkeypatch):
+    decide(client, "CLM-1002", payout=1200.0)
+    seen = []
+
+    def resume(claim_id):
+        with db.engine().connect() as conn:
+            seen.append((claim_id, rules.standing(conn, claim_id)["sign_off"]))
+
+    monkeypatch.setattr(agent_link, "resume", resume)
+    client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    assert seen[0][0] == "CLM-1002"
+    assert seen[0][1]["handler_id"] == "HND-01"
+
+
+def test_a_sign_off_stands_when_the_agent_cannot_be_reached(client):
+    decide(client, "CLM-1002", payout=1200.0)
+    signed = client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    assert signed.status_code == 200
+    claim = client.get("/api/claims/CLM-1002").json()
+    assert claim["status"] == "in_progress"
+    assert claim["sign_off"]["handler_id"] == "HND-01"
+
+
+def test_the_link_to_the_agents_service(monkeypatch):
+    calls = []
+
+    def post(url, json, timeout):
+        calls.append((url, json))
+        return httpx.Response(200)
+
+    monkeypatch.setattr(agent_link.httpx, "post", post)
+    monkeypatch.setenv("UNDERCOVER_AGENT", "http://127.0.0.1:8003")
+    assert agent_link.tell("/runs/1", {})
+    assert calls == [("http://127.0.0.1:8003/runs/1", {})]
 
 
 def test_agent_working_until_its_answer(client):

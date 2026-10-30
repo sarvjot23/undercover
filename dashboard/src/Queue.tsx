@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ClaimSummary, Status } from "./api";
+import type { ClaimSummary, Run, Status } from "./api";
 import { date, label, money, STATUS_LABELS } from "./format";
 import { runQueue, useJson } from "./hooks";
 import { RunPanel } from "./RunPanel";
@@ -9,6 +9,7 @@ const STATUSES = Object.keys(STATUS_LABELS) as Status[];
 
 export function Queue() {
   const { data: claims, error } = useJson<ClaimSummary[]>("/api/claims", 3000);
+  const { data: run } = useJson<Run | null>("/api/runs/current", 1500);
   const [cap, setCap] = useState<number | null>(null);
 
   if (error) return <p role="alert">The backend is not responding.</p>;
@@ -16,6 +17,8 @@ export function Queue() {
 
   const waiting = claims.filter((claim) => claim.status === "waiting").length;
   const chosen = Math.min(cap ?? waiting, waiting);
+  const inProgress = run?.status === "running" && run.active;
+  const stopped = run?.status === "running" && !run.active;
 
   return (
     <section aria-labelledby="queue-heading">
@@ -38,14 +41,20 @@ export function Queue() {
         <button
           type="button"
           onClick={() => {
-            runQueue(chosen);
+            runQueue(Math.max(chosen, 1));
           }}
-          disabled={chosen < 1}
+          disabled={inProgress || (chosen < 1 && !stopped)}
         >
           Run the queue
         </button>
       </div>
-      <RunPanel />
+      {inProgress && <p role="status">A run is already in progress</p>}
+      {stopped && (
+        <p role="status">
+          The last run stopped partway. Running the queue finishes it
+        </p>
+      )}
+      <RunPanel run={run} />
       <ul className="tiles">
         {STATUSES.map((status) => (
           <li key={status} className="panel tile">

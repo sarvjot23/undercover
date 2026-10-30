@@ -8,6 +8,7 @@ import { Steps } from "./Steps";
 
 /** Follow a claim while the agent may still pick it up or is working on it. */
 function pollClaim(claim: Claim): number {
+  if (claim.sign_off && !claim.payment) return 300;
   return claim.status === "waiting" || claim.agent_working ? 1000 : 0;
 }
 
@@ -132,6 +133,7 @@ function DecisionPanel({
   onSignedOff,
 }: Readonly<{ claim: Claim; onSignedOff: () => void }>) {
   const { decision, payment } = claim;
+  const { data: handlers } = useJson<Handler[]>("/api/handlers");
   if (!decision) {
     return (
       <div className="panel">
@@ -149,20 +151,30 @@ function DecisionPanel({
       </p>
       <p>{decision.reasons}</p>
       <p className="muted">Policy: {decision.policy_section}</p>
-      {payment ? <PaymentLine claim={claim} /> : <SignedOff claim={claim} />}
+      {payment ? (
+        <PaymentLine claim={claim} handlers={handlers} />
+      ) : (
+        <SignedOff claim={claim} handlers={handlers} />
+      )}
       {claim.status === "awaiting_sign_off" && (
-        <SignOff claimId={claim.claim_id} onSignedOff={onSignedOff} />
+        <SignOff
+          claimId={claim.claim_id}
+          handlers={handlers}
+          onSignedOff={onSignedOff}
+        />
       )}
     </div>
   );
 }
 
 /** A sign-off the agent hasn't paid yet: it's picking the claim back up. */
-function SignedOff({ claim }: Readonly<{ claim: Claim }>) {
-  const handlers = useJson<Handler[]>("/api/handlers");
+function SignedOff({
+  claim,
+  handlers,
+}: Readonly<{ claim: Claim; handlers: Handler[] | undefined }>) {
   const signOff = claim.sign_off;
   if (!signOff) return null;
-  const signer = handlers.data?.find(
+  const signer = handlers?.find(
     (handler) => handler.handler_id === signOff.handler_id,
   );
   return (
@@ -174,11 +186,13 @@ function SignedOff({ claim }: Readonly<{ claim: Claim }>) {
   );
 }
 
-function PaymentLine({ claim }: Readonly<{ claim: Claim }>) {
-  const handlers = useJson<Handler[]>("/api/handlers");
+function PaymentLine({
+  claim,
+  handlers,
+}: Readonly<{ claim: Claim; handlers: Handler[] | undefined }>) {
   const payment = claim.payment;
   if (!payment) return null;
-  const signer = handlers.data?.find(
+  const signer = handlers?.find(
     (handler) => handler.handler_id === payment.signed_off_by,
   );
   return (
@@ -197,13 +211,17 @@ function PaymentLine({ claim }: Readonly<{ claim: Claim }>) {
 
 function SignOff({
   claimId,
+  handlers,
   onSignedOff,
-}: Readonly<{ claimId: string; onSignedOff: () => void }>) {
-  const handlers = useJson<Handler[]>("/api/handlers");
+}: Readonly<{
+  claimId: string;
+  handlers: Handler[] | undefined;
+  onSignedOff: () => void;
+}>) {
   const [handlerId, setHandlerId] = useState("");
   const [problem, setProblem] = useState("");
   const chosen =
-    handlerId === "" ? (handlers.data?.[0]?.handler_id ?? "") : handlerId;
+    handlerId === "" ? (handlers?.[0]?.handler_id ?? "") : handlerId;
 
   const signOff = () => {
     postJson(`/api/claims/${claimId}/sign-off`, { handler_id: chosen }).then(
@@ -228,7 +246,7 @@ function SignOff({
             setHandlerId(event.target.value);
           }}
         >
-          {handlers.data?.map((handler) => (
+          {handlers?.map((handler) => (
             <option key={handler.handler_id} value={handler.handler_id}>
               {handler.name}
             </option>

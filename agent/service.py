@@ -10,7 +10,7 @@ import httpx
 from fastapi import BackgroundTasks, FastAPI
 from pydantic import BaseModel
 
-from agent import claim, client, queue
+from agent import claim, client, graph, queue, tracing
 
 BACKEND_WAIT_TRIES = 30
 BACKEND_WAIT_SECONDS = 1.0
@@ -40,8 +40,11 @@ def signed_off_claims() -> list[str]:
 
 
 def pick_up_signed_off() -> None:
-    """Pay what was signed off while the agent was away."""
-    for claim_id in signed_off_claims():
+    """Pay what was signed off while the agent was away, and warm up for the next."""
+    claims = signed_off_claims()
+    config = tracing.config("warm-up", graph.RECURSION_LIMIT)
+    claim.build(None).get_state(config)
+    for claim_id in claims:
         claim.carry_on(claim_id)
 
 

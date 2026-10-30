@@ -25,10 +25,9 @@ def postgres_saver(url: str) -> PostgresSaver:
     }
     pool = ConnectionPool(
         url,
-        min_size=1,
+        min_size=2,
         max_size=MAX_CONNECTIONS,
         kwargs=settings,
-        check=ConnectionPool.check_connection,
         open=True,
     )
     atexit.register(pool.close)

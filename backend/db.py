@@ -31,8 +31,7 @@ from sqlalchemy.pool import NullPool
 
 DATA = Path(__file__).parent.parent / "data"
 SCHEMA = "undercover"
-POOL_SIZE = 2
-POOL_OVERFLOW = 2
+MAX_CONNECTIONS = 4
 CHECKPOINT_TABLES = ("checkpoint_writes", "checkpoint_blobs", "checkpoints")
 
 metadata = MetaData()
@@ -139,9 +138,9 @@ def postgres_engine(url: str) -> Engine:
     """Connect to Postgres with at most 4 connections, in our own schema."""
     engine = create_engine(
         url.replace("postgresql://", "postgresql+psycopg://", 1),
-        pool_size=POOL_SIZE,
-        max_overflow=POOL_OVERFLOW,
-        pool_recycle=300,
+        pool_size=MAX_CONNECTIONS,
+        max_overflow=0,
+        pool_recycle=1800,
         connect_args={"options": f"-c search_path={SCHEMA}", "prepare_threshold": 0},
     )
 
@@ -238,10 +237,29 @@ def rows(name: str, key: str) -> list[dict[str, str]]:
     return [{key: row[key], "body": json.dumps(row)} for row in load(name)]
 
 
+def warm_up() -> None:
+    """Open all of Supabase's connections now: each new one takes seconds to open."""
+    if database_url():
+        opened = [engine().connect() for _ in range(MAX_CONNECTIONS)]
+        for conn in opened:
+            conn.execute(select(1))
+            conn.close()
+
+
 def get_db() -> Iterator[Connection]:
     """Give each request its own connection; what it doesn't commit is rolled back."""
     with engine().connect() as conn:
         yield conn
 
 
+def get_single_statement_db() -> Iterator[Connection]:
+    """Give a request that reads, or writes one statement, a connection in autocommit.
+
+    Supabase is a round trip away: this saves the BEGIN and the ROLLBACK around it.
+    """
+    with engine().connect() as conn:
+        yield conn.execution_options(isolation_level="AUTOCOMMIT")
+
+
 Db = Annotated[Connection, Depends(get_db)]
+SingleStatementDb = Annotated[Connection, Depends(get_single_statement_db)]

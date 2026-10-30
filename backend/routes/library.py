@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from sqlalchemy import select
 
 from backend import db
-from backend.db import Db, handlers
+from backend.db import SingleStatementDb, handlers
 
 INSTRUCTIONS = Path(__file__).parent.parent / "instructions"
 
@@ -31,7 +31,7 @@ def get_instructions() -> dict[str, str]:
 
 
 @router.get("/handlers", operation_id="list_handlers")
-def list_handlers(conn: Db) -> list[dict[str, Any]]:
+def list_handlers(conn: SingleStatementDb) -> list[dict[str, Any]]:
     """List the claims handlers."""
     return [
         json.loads(body) for body in conn.execute(select(handlers.c.body)).scalars()

@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Callable
+from functools import cache
 from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.language_models import BaseChatModel
@@ -135,17 +136,19 @@ def pay(state: ClaimState) -> dict[str, Any]:
     """Pay the approved payout. The backend refuses it without a sign-off."""
     claim_id = state["claim_id"]
     amount = standing(claim_id)["decision"]["payout"]
-    prefix = f"{state['thread_id']}:pay"
-    call = f"pay_claim {json.dumps({'amount': amount})}"
-    record_step(claim_id, "tool_call", call, f"{prefix}:call")
     with client.backend() as backend:
         response = backend.post(
             f"/api/claims/{claim_id}/payment", json={"amount": amount}
         )
     if not response.is_success:
         raise RuntimeError(client.reply(response))
-    result = f"pay_claim: Paid ${amount:,.2f}"
-    record_step(claim_id, "tool_result", result, f"{prefix}:result")
+    prefix = f"{state['thread_id']}:pay"
+    record_step(
+        claim_id,
+        "tool_result",
+        f"pay_claim: Paid ${amount:,.2f}",
+        f"{prefix}:result",
+    )
     return {}
 
 
@@ -156,23 +159,31 @@ def close(state: ClaimState) -> dict[str, Any]:
     return {}
 
 
-def agent_node(llm: BaseChatModel, instructions: str) -> Any:
-    """Make the node that calls the model with the conversation so far."""
-    bound = llm.bind_tools(TOOLS)
+def agent_node(make_llm: Callable[[], BaseChatModel], instructions: str) -> Any:
+    """Make the node that calls the model with the conversation so far.
+
+    The model is made on first use: paying a signed-off claim doesn't need one.
+    """
     system = SystemMessage(instructions)
+
+    @cache
+    def bound() -> Any:
+        return make_llm().bind_tools(TOOLS)
 
     def agent(state: ClaimState) -> dict[str, Any]:
         calls = state["model_calls"]
         if calls >= MODEL_CALLS:
             raise TooManyModelCalls(f"Stopped after {MODEL_CALLS} model calls")
-        reply = bound.invoke([system, *state["messages"]])
+        reply = bound().invoke([system, *state["messages"]])
         return {"messages": [reply], "model_calls": calls + 1}
 
     return agent
 
 
 def build(
-    llm: BaseChatModel, instructions: str, saver: BaseCheckpointSaver[Any]
+    make_llm: Callable[[], BaseChatModel],
+    instructions: str,
+    saver: BaseCheckpointSaver[Any],
 ) -> Any:
     """Build the claim graph on this model and checkpointer."""
     retry = RetryPolicy(
@@ -182,7 +193,7 @@ def build(
         retry_on=retry_model,
     )
     builder = StateGraph(ClaimState)
-    builder.add_node("agent", agent_node(llm, instructions), retry_policy=retry)
+    builder.add_node("agent", agent_node(make_llm, instructions), retry_policy=retry)
     builder.add_node("record", record)
     builder.add_node("tools", ToolNode(TOOLS, wrap_tool_call=record_tool_result))
     builder.add_node("sign_off", sign_off)

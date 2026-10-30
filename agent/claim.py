@@ -1,5 +1,6 @@
 """The claim agent: works one claim on its graph and reports back in a line."""
 
+from contextvars import Context
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -26,7 +27,7 @@ def build(llm: BaseChatModel | None) -> Any:
     """Build the claim graph with the instructions the backend holds."""
     with client.backend() as backend:
         instructions = backend.get("/api/instructions").json()["claim"]
-    return graph.build(llm or model(), instructions, checkpoints.saver())
+    return graph.build(lambda: llm or model(), instructions, checkpoints.saver())
 
 
 def first_input(claim_id: str, thread_id: str) -> dict[str, Any]:
@@ -43,7 +44,9 @@ def work(claim_graph: Any, claim_id: str, thread_id: str, start: Any) -> str:
     """Run the graph and report; an error sends back only a claim with no decision."""
     config = tracing.config(thread_id, graph.RECURSION_LIMIT)
     try:
-        claim_graph.invoke(start, config, durability="sync")
+        # A clean context: inside the queue agent's tool, the graph would otherwise be
+        # traced as a child of the queue run, and not as a session of its own.
+        Context().run(claim_graph.invoke, start, config, durability="sync")
     except Exception as error:
         if graph.standing(claim_id)["decision"] is None:
             return fail(claim_id, f"The agent's run failed: {error}")

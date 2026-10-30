@@ -5,10 +5,10 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from sqlalchemy import Connection, select
 
 from backend import agent_link, leases, runs
-from backend.db import Db
+from backend.db import Db, SingleStatementDb
 from backend.db import runs as run_table
 from backend.rules import find_claim
 from backend.schemas import Failure, Lease, RunStart, Summary, Todos
@@ -39,7 +39,7 @@ def open_run(start: RunStart, conn: Db) -> dict[str, Any]:
     """Open a run for a worker of its own, or reopen one that stopped."""
     run_id, resumed = runs.start(conn, start.cap)
     conn.commit()
-    return {**get_run(run_id, conn), "resumed": resumed}
+    return {**describe_run(run_id, conn), "resumed": resumed}
 
 
 @router.post("/runs", operation_id="start_run")
@@ -54,7 +54,7 @@ def start_run(start: RunStart, conn: Db) -> dict[str, Any]:
 
 
 @router.get("/runs/current", operation_id="get_current_run")
-def get_current_run(conn: Db) -> dict[str, Any] | None:
+def get_current_run(conn: SingleStatementDb) -> dict[str, Any] | None:
     """Get the latest queue run: its claims, its to-do list and its summary."""
     query = select(run_table).order_by(run_table.c.run_id.desc()).limit(1)
     row = conn.execute(query).mappings().first()
@@ -62,8 +62,13 @@ def get_current_run(conn: Db) -> dict[str, Any] | None:
 
 
 @router.get("/runs/{run_id}", operation_id="get_run")
-def get_run(run_id: int, conn: Db) -> dict[str, Any]:
+def get_run(run_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """Get a queue run: its claims, its to-do list and its summary."""
+    return describe_run(run_id, conn)
+
+
+def describe_run(run_id: int, conn: Connection) -> dict[str, Any]:
+    """Return a queue run, or raise 404."""
     query = select(run_table).where(run_table.c.run_id == run_id)
     row = conn.execute(query).mappings().first()
     if row is None:
@@ -119,7 +124,7 @@ def finish_run(run_id: int, summary: Summary, conn: Db) -> dict[str, Any]:
         )
     runs.end(conn, run_id, "finished", summary.summary)
     conn.commit()
-    return get_run(run_id, conn)
+    return describe_run(run_id, conn)
 
 
 @router.post("/runs/{run_id}/fail", operation_id="fail_run")
@@ -127,4 +132,4 @@ def fail_run(run_id: int, failure: Failure, conn: Db) -> dict[str, Any]:
     """End a run that broke, sending its unfinished claims back to the queue."""
     runs.end(conn, run_id, "failed", failure.reason)
     conn.commit()
-    return get_run(run_id, conn)
+    return describe_run(run_id, conn)

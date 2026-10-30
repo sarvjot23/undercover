@@ -1,5 +1,7 @@
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
@@ -157,3 +159,22 @@ def test_reseed_leaves_the_checkpointers_tables_in_place_but_empty(client):
     with db.engine().connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM checkpoints")).scalar()
     assert count == 0
+
+
+def test_warming_up_is_for_supabase_only(monkeypatch):
+    monkeypatch.setattr(db, "engine", lambda: pytest.fail("Should not connect"))
+    db.warm_up()
+
+
+def test_warming_up_opens_every_connection(monkeypatch):
+    opened = []
+
+    class Engine:
+        def connect(self):
+            opened.append(1)
+            return SimpleNamespace(execute=lambda query: None, close=lambda: None)
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example.invalid/app")
+    monkeypatch.setattr(db, "engine", Engine)
+    db.warm_up()
+    assert len(opened) == db.MAX_CONNECTIONS

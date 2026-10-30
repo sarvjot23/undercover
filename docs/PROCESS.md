@@ -1,12 +1,14 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend and the dashboard.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard, and passes them `.env`.
 
 `npm run check` runs every check:
 
 - Python: ruff (lint and format), pyright, and pytest with 80% coverage
 - TypeScript: ESLint, Prettier, tsc, and vitest with 80% coverage
-- Playwright end-to-end tests
+- Playwright end-to-end tests, with a stand-in for the agent's service on port 8003
+
+`npm run check` needs no Supabase, Langfuse or OpenRouter, and passes with `.env` moved out of the way. The tests run on SQLite.
 
 The pre-commit hook runs the format, lint, type and unit test checks on every commit.
 
@@ -32,6 +34,7 @@ When the last phase is done, run `npm run check` and report the results.
 ## Rules
 
 - Add tests with each change. Tests never call a model; use a stub model.
+- For any live run with the real model, reseed first and cap the run at five claims.
 - Outside a plan, commit each change once you have checked it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.

@@ -1,9 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import graph, lease, queue
+from agent import graph, lease, queue, tracing
 from agent.tests.stubs import BrokenModel, Stopped, StoppedModel, call, script
 from backend import db, runs
 from backend.api import app
@@ -124,18 +125,18 @@ def test_a_claim_stopped_partway_carries_on_from_its_last_step(requests):
     assert len([m for m in messages if m.type == "ai"]) == 2
 
 
-def stop_on(monkeypatch, kind, *, after):
+def stop_on(monkeypatch, kind, *, after, text=""):
     """Kill the process the first time a step of this kind is recorded."""
     original = graph.record_step
     stopped = []
 
-    def stopping(claim_id, step_kind, text, key):
-        if step_kind == kind and not stopped:
+    def stopping(claim_id, step_kind, step_text, key):
+        if step_kind == kind and step_text.startswith(text) and not stopped:
             stopped.append(key)
             if after:
-                original(claim_id, step_kind, text, key)
+                original(claim_id, step_kind, step_text, key)
             raise Stopped
-        original(claim_id, step_kind, text, key)
+        original(claim_id, step_kind, step_text, key)
 
     monkeypatch.setattr(graph, "record_step", stopping)
 
@@ -168,17 +169,10 @@ def test_a_reply_lost_in_a_crash_never_appears(requests):
 
 
 def test_a_stop_between_the_decision_and_the_payment_pays_once(requests, monkeypatch):
-    original = graph.record_step
-
-    def stopping(claim_id, kind, text, key):
-        if text.startswith("pay_claim {"):
-            monkeypatch.setattr(graph, "record_step", original)
-            raise Stopped
-        original(claim_id, kind, text, key)
-
-    monkeypatch.setattr(graph, "record_step", stopping)
-    with pytest.raises(Stopped):
-        claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+    with monkeypatch.context() as patch:
+        patch.setattr(graph, "pay", lambda state: stop())
+        with pytest.raises(Stopped):
+            claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
     assert claim()["status"] == "in_progress"
     assert claim()["payment"] is None
 
@@ -186,6 +180,19 @@ def test_a_stop_between_the_decision_and_the_payment_pays_once(requests, monkeyp
     assert claim()["status"] == "decided"
     assert claim()["payment"]["amount"] == 420.0
     assert claim()["attempts"] == 0
+
+
+def test_a_stop_after_the_payment_pays_once_and_repeats_no_step(requests, monkeypatch):
+    stop_on(monkeypatch, "tool_result", after=False, text="pay_claim:")
+    with pytest.raises(Stopped):
+        claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+    paid = claim()["payment"]
+    assert paid["amount"] == 420.0
+
+    claim_agent.carry_on(CLAIM, script())
+    assert claim()["payment"] == paid
+    keys = [step["key"] for step in steps()]
+    assert len(keys) == len(set(keys))
 
 
 def test_a_claim_that_fails_with_an_error_starts_afresh(requests):
@@ -202,16 +209,12 @@ def test_a_claim_that_fails_with_an_error_starts_afresh(requests):
 def test_an_error_after_the_decision_does_not_send_the_claim_back(
     requests, monkeypatch
 ):
-    original = graph.record_step
+    def broken(state):
+        raise RuntimeError("backend hiccup")
 
-    def breaking(claim_id, kind, text, key):
-        if text.startswith("pay_claim {"):
-            monkeypatch.setattr(graph, "record_step", original)
-            raise RuntimeError("backend hiccup")
-        original(claim_id, kind, text, key)
-
-    monkeypatch.setattr(graph, "record_step", breaking)
-    answer = claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+    with monkeypatch.context() as patch:
+        patch.setattr(graph, "pay", broken)
+        answer = claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
     assert "carries on next time" in answer
     assert claim()["status"] == "in_progress"
     assert claim()["attempts"] == 0
@@ -364,3 +367,28 @@ def test_a_finished_run_leaves_a_signed_off_claim_to_be_paid(requests):
     api().post(f"/api/runs/{run_id}/fail", json={"reason": "Broke"})
     assert claim()["status"] == "in_progress"
     assert claim()["attempts"] == 0
+
+
+def test_a_claim_in_a_queue_run_is_traced_as_a_session_of_its_own(
+    requests, monkeypatch
+):
+    class Spy(BaseCallbackHandler):
+        parents: list[object | None] = []  # noqa: RUF012
+
+        def on_chain_start(self, serialized, inputs, *, parent_run_id=None, **kwargs):
+            self.parents.append(parent_run_id)
+
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-test")
+    monkeypatch.setattr(tracing, "CallbackHandler", Spy)
+    monkeypatch.setattr(tracing, "flush", lambda: None)
+    run_id = new_run(cap=1)
+    queue.run(
+        run_id,
+        script(
+            call("work_claim", claim_id=CLAIM),
+            call("finish_run", summary="One referred."),
+            AIMessage(content="Done."),
+        ),
+        lambda claim_id: script(decision("refer", 0)),
+    )
+    assert Spy.parents[0] is None

@@ -5,7 +5,7 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import Connection, RowMapping, Select, Table, select
+from sqlalchemy import Connection, RowMapping, Select, Table, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
 from backend import db
@@ -13,12 +13,14 @@ from backend.db import claims, decisions, payments, sign_offs, steps
 
 APPROVAL_LIMIT = float(db.load("company.json")["payout_approval_limit"])
 MAX_ATTEMPTS = 2
+HANDLER_IDS = {handler["handler_id"] for handler in db.load("handlers.json")}
 
 LOOKUPS: dict[str, tuple[Table, str]] = {
     "policy": (db.policies, "policy_id"),
     "customer": (db.customers, "customer_id"),
     "plan": (db.plans, "plan"),
 }
+RECORDS: dict[tuple[str, str], Any] = {}
 PARTS: dict[str, Table] = {
     "decision": decisions,
     "payment": payments,
@@ -27,10 +29,12 @@ PARTS: dict[str, Table] = {
 
 
 def record(conn: Connection, kind: str, key: str) -> Any:
-    """Return one stored policy, customer or plan."""
-    table, column = LOOKUPS[kind]
-    query = select(table.c.body).where(table.c[column] == key)
-    return json.loads(conn.execute(query).scalar_one())
+    """Return a stored policy, customer or plan, reading each only once."""
+    if (kind, key) not in RECORDS:
+        table, column = LOOKUPS[kind]
+        query = select(table.c.body).where(table.c[column] == key)
+        RECORDS[kind, key] = json.loads(conn.execute(query).scalar_one())
+    return RECORDS[kind, key]
 
 
 def standing_query() -> Select[Any]:
@@ -127,11 +131,24 @@ def insert_once(conn: Connection, table: Table, **values: Any) -> bool:
     return conn.execute(statement).rowcount > 0
 
 
-def add(conn: Connection, claim_id: str, kind: str, text: str, key: str) -> None:
-    """Record one step of the agent's work; a step with the same key is a repeat."""
-    insert_once(
-        conn, steps, claim_id=claim_id, kind=kind, text=text, key=key, at=db.now()
+def add(conn: Connection, claim_id: str, kind: str, text: str, key: str) -> bool:
+    """Record a step on a claim that exists, in one statement; a repeat key is ignored.
+
+    Say whether a step was written.
+    """
+    values = select(
+        claims.c.claim_id,
+        literal(kind),
+        literal(text),
+        literal(key),
+        literal(db.now()),
+    ).where(claims.c.claim_id == claim_id)
+    statement = (
+        insert(steps)
+        .from_select(["claim_id", "kind", "text", "key", "at"], values)
+        .on_conflict_do_nothing()
     )
+    return conn.execute(statement).rowcount > 0
 
 
 def fail(conn: Connection, claim_id: str, reason: str) -> str:

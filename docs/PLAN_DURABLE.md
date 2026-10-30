@@ -111,6 +111,20 @@ Reviewed by the student on 30 October 2026:
 3. **No repeated steps.** Changed: steps have stable keys, so a restart can't show one twice.
 4. **Local databases.** Accepted: `undercover.db` needs a reseed, and `undercover-pilot.db` stays on disk but the dashboard can no longer read it.
 
+## What changed during the build
+
+The live run showed Supabase is about 160 ms away, which put the five-second sign-off out of reach at first (21.8 seconds). So:
+
+- Reads and single-statement writes run in autocommit (`SingleStatementDb`): one round trip in place of three.
+- `GET /api/claims/{id}/standing` answers where a claim stands in one query.
+- A sign-off and a payment are two statements each, ordered so that a stop between them is put right by trying again, in place of a transaction.
+- The backend keeps its 4 connections open (`pool_size=4, max_overflow=0`) and opens them at startup. The checkpointer keeps 2 open and can grow to 4, because holding 4 in every process took the count to 13.
+- The service warms up when it starts: the checkpointer, the graph and the Langfuse client. The model is made only when a claim needs one.
+- Policies, customers and plans are read once per process.
+- `pay` records only its result, after the payment. `close` writes the agent's closing line.
+- Each claim's graph runs in a clean context. Inside the queue agent's tool it was traced as a child of the queue run, and Langfuse dropped its session.
+- The stand-in is `e2e/agent-standin.ts`, so ESLint and `tsc` cover it.
+
 ## Phases
 
 Each phase ends with its criteria ticked here, `docs/STATUS.md` updated and a commit.
@@ -235,16 +249,16 @@ Each live run starts with a reseed and is capped at five claims, on the default 
 
 Success criteria:
 
-- [ ] After reseeding Supabase, `uv run -m agent --cap 5` works five claims.
-- [ ] A claim over the limit waits for a sign-off, with its graph paused.
-- [ ] Signed off on the dashboard with the Playwright MCP server, it shows as paid within five seconds, with the handler and the time, checked with a screenshot.
-- [ ] During a command-line run, checked with the Playwright MCP server, "Run the queue" is disabled with "A run is already in progress", and a second `uv run -m agent --cap 5` is refused.
-- [ ] A second run, killed from the command line after a claim's first steps, carries on with the same thread the next time, with the attempts unchanged, one decision and no repeated steps.
-- [ ] Within 20 seconds of that kill a new run is refused. After that, the dashboard offers to finish the stopped run.
-- [ ] Through the Supabase MCP server, during the live run with all three processes up, `pg_stat_activity` shows no more than 12 connections whose user is postgres.
-- [ ] Through Langfuse's API, the held claim's session has traces from before and after the sign-off.
-- [ ] A signed-off claim with the service stopped stays in progress, and is paid when the service starts again.
-- [ ] `docs/SPEC.md` (only its section on working the queue), `docs/TECH_STACK.md`, `docs/PROCESS.md` and `docs/STATUS.md` describe the product as it now is.
-- [ ] `npm run check` passes with `.env` moved out of the way, and the results are reported.
+- [x] After reseeding Supabase, `uv run -m agent --cap 5` works five claims.
+- [x] A claim over the limit waits for a sign-off, with its graph paused.
+- [x] Signed off on the dashboard with the Playwright MCP server, it shows as paid within five seconds, with the handler and the time, checked with a screenshot.
+- [x] During a command-line run, checked with the Playwright MCP server, "Run the queue" is disabled with "A run is already in progress", and a second `uv run -m agent --cap 5` is refused.
+- [x] A second run, killed from the command line after a claim's first steps, carries on with the same thread the next time, with the attempts unchanged, one decision and no repeated steps.
+- [x] Within 20 seconds of that kill a new run is refused. After that, the dashboard offers to finish the stopped run.
+- [x] Through the Supabase MCP server, during the live run with all three processes up, `pg_stat_activity` shows no more than 12 connections whose user is postgres.
+- [x] Through Langfuse's API, the held claim's session has traces from before and after the sign-off.
+- [x] A signed-off claim with the service stopped stays in progress, and is paid when the service starts again.
+- [x] `docs/SPEC.md` (only its section on working the queue), `docs/TECH_STACK.md`, `docs/PROCESS.md` and `docs/STATUS.md` describe the product as it now is.
+- [x] `npm run check` passes with `.env` moved out of the way, and the results are reported.
 
 Moving `.env` out of the way is a rename and back, and nothing reads it. Throughout, the keys stay in the environment of the processes that need them and are never printed.

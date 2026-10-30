@@ -1,5 +1,6 @@
 """The UnderCover backend: uv run -m uvicorn backend.api:app."""
 
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,7 @@ from backend.routes import claims, documents, library, runs
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Create and seed the database."""
     db.init()
+    threading.Thread(target=db.warm_up, daemon=True).start()
     yield
 
 

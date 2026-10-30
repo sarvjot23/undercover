@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from agent import claim, client
+from agent import checkpoints, client, graph
 from agent.tests.stubs import Backend
 from backend.api import app
 
@@ -20,5 +20,6 @@ def requests(tmp_path, monkeypatch) -> list[str]:
         return api
 
     monkeypatch.setattr(client, "backend", backend)
-    monkeypatch.setattr(claim, "RETRY_DELAY", 0.0)
+    monkeypatch.setattr(graph, "RETRY_DELAY", 0.0)
+    checkpoints.saver.cache_clear()
     return paths

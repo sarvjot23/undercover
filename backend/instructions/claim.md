@@ -32,7 +32,6 @@ Always use calculate_payout to work out the payout on an approval, and record th
 
 ## Recording it
 
-1. Record the decision with record_decision: the decision, the payout, your reasons in two or three plain sentences, and the section that settles it, such as "5. Baggage and Personal Effects" or "Claims manual 9. Repeat claims".
-2. When you approve, pay the payout with pay_claim. A large payout waits for a handler's sign-off, so the payment is refused; that is expected, so do not try again.
+Record the decision with record_decision: the decision, the payout, your reasons in two or three plain sentences, and the section that settles it, such as "5. Baggage and Personal Effects" or "Claims manual 9. Repeat claims".
 
-Then reply with the decision and the payout in one sentence.
+That is the last thing you do. The system pays an approved payout itself, after a handler's sign-off when the payout needs one.

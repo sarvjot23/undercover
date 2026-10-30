@@ -189,23 +189,23 @@ Success criteria:
 
 Success criteria, all on a stub model:
 
-- [ ] A test shows every step is recorded in order, including the section reads.
-- [ ] A test shows a refusal goes back to the model as text.
-- [ ] A test shows a claim stops at 30 model calls.
-- [ ] A test shows a provider error is retried, and a run that goes on failing still fails the claim.
-- [ ] A test shows an approval up to the limit is paid straight after the decision, with the model given no `pay_claim` tool.
-- [ ] A test shows an approval over the limit stops at `sign_off`, with `next` naming that node and nothing paid.
-- [ ] A test shows a sign-off resumes the claim and pays it once, with no further model call.
-- [ ] A test stops a claim partway with an exception at the model. Carrying on uses the same thread and makes no repeat of its earlier calls, with the same attempts and one decision.
-- [ ] A test stops a claim between the decision and the payment. Carrying on pays it once.
-- [ ] A test shows a claim that fails with an error starts afresh on a new thread, with one more attempt.
-- [ ] A test shows the second failure still leaves the claim for a handler.
-- [ ] A test shows a stopped run is finished by the next, within its cap.
-- [ ] A test stops a claim straight after a model reply and straight after a tool, then carries on. The claim's steps have no repeats, and no step from a reply that was lost.
-- [ ] A test shows a claim with another worker's live lease isn't picked up, and that the same claim is picked up once the lease expires.
-- [ ] A test shows the lease is renewed during a long step and given up at the end, with the interval shortened in the test.
-- [ ] Every test in `agent/tests/test_agent.py` and `test_queue.py` that still applies passes, changed only where the brief changes the behavior.
-- [ ] `npm run check:python` passes, with coverage at 80% or more.
+- [x] A test shows every step is recorded in order, including the section reads.
+- [x] A test shows a refusal goes back to the model as text.
+- [x] A test shows a claim stops at 30 model calls.
+- [x] A test shows a provider error is retried, and a run that goes on failing still fails the claim.
+- [x] A test shows an approval up to the limit is paid straight after the decision, with the model given no `pay_claim` tool.
+- [x] A test shows an approval over the limit stops at `sign_off`, with `next` naming that node and nothing paid.
+- [x] A test shows a sign-off resumes the claim and pays it once, with no further model call.
+- [x] A test stops a claim partway with an exception at the model. Carrying on uses the same thread and makes no repeat of its earlier calls, with the same attempts and one decision.
+- [x] A test stops a claim between the decision and the payment. Carrying on pays it once.
+- [x] A test shows a claim that fails with an error starts afresh on a new thread, with one more attempt.
+- [x] A test shows the second failure still leaves the claim for a handler.
+- [x] A test shows a stopped run is finished by the next, within its cap.
+- [x] A test stops a claim straight after a model reply and straight after a tool, then carries on. The claim's steps have no repeats, and no step from a reply that was lost.
+- [x] A test shows a claim with another worker's live lease isn't picked up, and that the same claim is picked up once the lease expires.
+- [x] A test shows the lease is renewed during a long step and given up at the end, with the interval shortened in the test.
+- [x] Every test in `agent/tests/test_agent.py` and `test_queue.py` that still applies passes, changed only where the brief changes the behavior.
+- [x] `npm run check:python` passes, with coverage at 80% or more.
 
 ### Phase 5: the agent's service, and the dashboard
 

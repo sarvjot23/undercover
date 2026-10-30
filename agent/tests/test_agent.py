@@ -1,13 +1,14 @@
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import client, middleware, model, tools, tracing
+from agent import client, graph, model, tools, tracing
 from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
 
@@ -42,8 +43,6 @@ def test_approval_under_the_limit_is_paid(requests):
         call("get_claim", claim_id="CLM-1001"),
         call("list_sections", document="policy_wording"),
         decision("approve", 420.0),
-        call("pay_claim", claim_id="CLM-1001", amount=420.0),
-        AIMessage(content="Approved, paying $420.00."),
     )
     assert answer == "CLM-1001: approve $420.00"
     assert claim()["status"] == "decided"
@@ -57,16 +56,8 @@ def test_decline(requests):
     assert claim()["payment"] is None
 
 
-def test_payment_over_the_limit_is_refused(requests):
-    run(
-        decision("approve", 1200.0),
-        call("pay_claim", claim_id="CLM-1001", amount=1200.0),
-        AIMessage(content="Approved; the payment waits for sign-off."),
-    )
-    assert claim()["status"] == "awaiting_sign_off"
-    assert claim()["payment"] is None
-    results = [step["text"] for step in steps() if step["kind"] == "tool_result"]
-    assert results[-1].startswith("pay_claim: Refused (409)")
+def test_the_model_has_no_pay_tool():
+    assert "pay_claim" not in {t.name for t in tools.TOOLS}
 
 
 def test_steps_are_recorded_in_order(requests):
@@ -84,11 +75,12 @@ def test_steps_are_recorded_in_order(requests):
     ]
     assert steps()[0]["text"] == 'get_claim {"claim_id": "CLM-1001"}'
     assert steps()[1]["text"].startswith('get_claim: {"claim_id":"CLM-1001"')
-    assert len(steps()[1]["text"]) <= len("get_claim: ") + middleware.STEP_LENGTH
+    assert len(steps()[1]["text"]) <= len("get_claim: ") + graph.STEP_LENGTH
 
 
 def broken():
-    return claim_agent.run("CLM-1001", "thread-1", BrokenModel(messages=iter([])))
+    thread = f"thread-{uuid.uuid4().hex}"
+    return claim_agent.run("CLM-1001", thread, BrokenModel(messages=iter([])))
 
 
 def test_failed_run_goes_back_to_waiting(requests):

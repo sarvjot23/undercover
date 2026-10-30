@@ -35,6 +35,20 @@ class FlakyModel(StubModel):
         return super()._generate(*args, **kwargs)
 
 
+class Stopped(BaseException):
+    """The process being killed: nothing in the agent catches this."""
+
+
+class StoppedModel(StubModel):
+    """A chat model that plays its replies; the process is killed on the next call."""
+
+    def _generate(self, *args, **kwargs):
+        try:
+            return super()._generate(*args, **kwargs)
+        except StopIteration:
+            raise Stopped from None
+
+
 class Backend(TestClient):
     """The backend as the agent sees it: already running, so no startup per call."""
 

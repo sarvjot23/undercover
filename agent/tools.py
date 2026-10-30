@@ -140,16 +140,6 @@ def record_decision(
     return client.reply(response)
 
 
-@tool
-def pay_claim(claim_id: str, amount: float) -> str:
-    """Pay an approved claim's payout."""
-    with client.backend() as backend:
-        response = backend.post(
-            f"/api/claims/{claim_id}/payment", json={"amount": amount}
-        )
-    return client.reply(response)
-
-
 TOOLS = [
     get_claim,
     list_sections,
@@ -157,5 +147,4 @@ TOOLS = [
     search_documents,
     calculate_payout,
     record_decision,
-    pay_claim,
 ]

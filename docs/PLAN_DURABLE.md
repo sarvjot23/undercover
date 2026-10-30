@@ -126,13 +126,13 @@ The brief asks for these first. Both work on the current agent, so they carry no
 
 Success criteria:
 
-- [ ] Tests check the payout operation: per-item limits, electronics with the add-on, cash, hotel, meals without receipts, what others paid, the deductible and the benefit maximum.
-- [ ] A test shows `needs_sign_off` is true at $800.01 and false at $800.00.
-- [ ] A test on a stub model shows the agent using `calculate_payout`, with the request going through the backend.
-- [ ] A test shows the agent's config carries the session id when keys are set, and no callbacks when they aren't.
-- [ ] A test shows importing the agent doesn't put `.env` values in the environment.
-- [ ] The operation has an `operation_id`, a one-line docstring and no optional inputs (checked in `/openapi.json`).
-- [ ] `npm run check:python` passes.
+- [x] Tests check the payout operation: per-item limits, electronics with the add-on, cash, hotel, meals without receipts, what others paid, the deductible and the benefit maximum.
+- [x] A test shows `needs_sign_off` is true at $800.01 and false at $800.00.
+- [x] A test on a stub model shows the agent using `calculate_payout`, with the request going through the backend.
+- [x] A test shows the agent's config carries the session id when keys are set, and no callbacks when they aren't.
+- [x] A test shows importing the agent doesn't put `.env` values in the environment.
+- [x] The operation has an `operation_id`, a one-line docstring and no optional inputs (checked in `/openapi.json`).
+- [x] `npm run check:python` passes.
 
 ### Phase 2: our records on Supabase
 
@@ -143,12 +143,12 @@ Success criteria:
 
 Success criteria:
 
-- [ ] All existing backend tests pass on SQLite, with no network.
-- [ ] A test shows no query uses SQLite-only syntax, by compiling each table's statements for Postgres.
-- [ ] `uv run -m backend.seed` runs against Supabase, twice in a row without error.
-- [ ] Through the Supabase MCP server: the tables are in schema `undercover`, with 25 rows in `claims`, and nothing new in `public`.
-- [ ] `npm run dev` on Supabase: `GET /api/claims` returns 25 claims and the queue page shows them, checked with the Playwright MCP server.
-- [ ] `npm run check:python` passes with `.env` moved out of the way.
+- [x] All existing backend tests pass on SQLite, with no network.
+- [x] A test shows no query uses SQLite-only syntax, by compiling each table's statements for Postgres.
+- [x] `uv run -m backend.seed` runs against Supabase, twice in a row without error.
+- [x] Through the Supabase MCP server: the tables are in schema `undercover`, with 25 rows in `claims`, and nothing new in `public`.
+- [x] `npm run dev` on Supabase: `GET /api/claims` returns 25 claims and the queue page shows them, checked with the Playwright MCP server.
+- [x] `npm run check:python` passes with `.env` moved out of the way.
 
 ### Phase 3: the backend's rules for sign-offs and repeats
 

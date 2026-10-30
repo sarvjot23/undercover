@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from sqlalchemy import text
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.schema import CreateTable
+
 from backend import db
 from backend.api import app
 
@@ -120,3 +124,34 @@ def test_reseed_starts_again_from_the_data(client):
     assert {claim["status"] for claim in claims} == {"waiting"}
     assert client.get("/api/claims/CLM-1001/steps").json() == []
     assert client.get("/api/claims/CLM-1001").json()["decision"] is None
+
+
+def test_a_real_database_comes_only_from_the_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "local.db"))
+    assert db.engine().dialect.name == "sqlite"
+    monkeypatch.setenv("DATABASE_URL", "")
+    assert db.engine().dialect.name == "sqlite"
+
+
+def test_postgres_keeps_to_its_schema_and_four_connections():
+    engine = db.postgres_engine("postgresql://user:secret@example.invalid:5432/app")
+    assert engine.dialect.name == "postgresql"
+    assert engine.dialect.driver == "psycopg"
+    assert engine.pool.size() + engine.pool._max_overflow == 4  # type: ignore[attr-defined]
+
+
+def test_every_table_compiles_for_postgres():
+    for table in db.metadata.sorted_tables:
+        created = str(CreateTable(table).compile(dialect=postgresql.dialect()))
+        assert f"CREATE TABLE {table.name}" in created
+        assert "undercover." not in created
+
+
+def test_reseed_leaves_the_checkpointers_tables_in_place_but_empty(client):
+    with db.engine().begin() as conn:
+        conn.execute(text("CREATE TABLE checkpoints (thread_id TEXT)"))
+        conn.execute(text("INSERT INTO checkpoints VALUES ('CLM-1001-a')"))
+    db.reseed()
+    with db.engine().connect() as conn:
+        count = conn.execute(text("SELECT COUNT(*) FROM checkpoints")).scalar()
+    assert count == 0

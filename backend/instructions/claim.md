@@ -28,6 +28,8 @@ A claim that is clearly covered is approved and a claim that is clearly excluded
 
 Work it out as the manual's section 6 and the wording's section 10 describe: the eligible amount of each item (the lower of the amount claimed and any per-item limit, leaving out excluded lines), less anything a carrier or another party paid, less the deductible where the benefit has one, capped at the benefit's maximum. A decline or a referral pays $0. Amounts are in US dollars.
 
+Always use calculate_payout to work out the payout on an approval, and record the payout it gives. It applies our payout rules, so don't work the figure out yourself. List each covered line separately, with the excluded ones left out.
+
 ## Recording it
 
 1. Record the decision with record_decision: the decision, the payout, your reasons in two or three plain sentences, and the section that settles it, such as "5. Baggage and Personal Effects" or "Claims manual 9. Repeat claims".

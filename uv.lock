@@ -3460,6 +3460,7 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "sqlalchemy" },
     { name = "tqdm" },
     { name = "uvicorn" },
 ]
@@ -3507,6 +3508,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "requests", specifier = ">=2.34.2" },
+    { name = "sqlalchemy", specifier = ">=2.1.3" },
     { name = "tqdm", specifier = ">=4.70.1" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]

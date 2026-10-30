@@ -11,7 +11,7 @@ from langchain.agents.middleware import (
 )
 from langchain_core.language_models import BaseChatModel
 
-from agent import client
+from agent import client, tracing
 from agent.middleware import StepRecorder
 from agent.model import model
 from agent.tools import TOOLS
@@ -19,6 +19,7 @@ from agent.tools import TOOLS
 MODEL_CALLS = 30
 RETRIES = 2
 RETRY_DELAY = 1.0
+RECURSION_LIMIT = 300
 
 
 def report(claim: dict[str, Any]) -> str:
@@ -68,10 +69,12 @@ def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
                         {"role": "user", "content": f"Decide claim {claim_id}."}
                     ]
                 },
-                config={"configurable": {"thread_id": thread_id}},
+                config=tracing.config(thread_id, RECURSION_LIMIT),
             )
         except Exception as error:
             return fail(backend, claim_id, f"The agent's run failed: {error}")
+        finally:
+            tracing.flush()
         claim = backend.get(f"/api/claims/{claim_id}").json()
         if claim["status"] == "in_progress":
             return fail(

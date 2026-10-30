@@ -2,6 +2,8 @@
 
 The claims pilot from `docs/PLAN.md` is built (7 phases), and the harness from `docs/HARNESS.md` is built to `docs/PLAN_HARNESS.md` (6 phases). The agent organizes its own work: one run works the queue up to a cap, with a to-do list, a subagent per claim, the claims manual and the wording read a section at a time, and failures put right.
 
+The durable build from `docs/DURABLE.md` is in progress on `docs/PLAN_DURABLE.md`: the payout rules, Langfuse tracing and Supabase are in.
+
 ## What's built
 
 - `backend/`: FastAPI on SQLite. `backend/api.py` builds the app from the routers in `backend/routes/` (claims, runs, documents, and the library of wording, instructions and handlers); `backend/runs.py` holds the rules for a run; `backend/rules.py` holds the claim states and the approval limit, and `backend/db.py` the schema and the seed. On first start it creates `undercover.db` and seeds it from `data/` (never `data/evals/`). Set `UNDERCOVER_DB` to use another file. `uv run -m backend.seed` starts again from `data/`.

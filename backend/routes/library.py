@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
+from sqlalchemy import select
 
 from backend import db
-from backend.db import Db
+from backend.db import Db, handlers
 
 INSTRUCTIONS = Path(__file__).parent.parent / "instructions"
 
@@ -33,5 +34,5 @@ def get_instructions() -> dict[str, str]:
 def list_handlers(conn: Db) -> list[dict[str, Any]]:
     """List the claims handlers."""
     return [
-        json.loads(row["body"]) for row in conn.execute("SELECT body FROM handlers")
+        json.loads(body) for body in conn.execute(select(handlers.c.body)).scalars()
     ]

@@ -3,10 +3,52 @@
 from typing import Literal
 
 from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 
 from agent import client
 
 Document = Literal["policy_wording", "claims_manual"]
+Benefit = Literal[
+    "trip_cancellation",
+    "trip_interruption",
+    "trip_delay",
+    "baggage_delay",
+    "baggage",
+    "passport",
+    "emergency_medical",
+]
+
+
+class Line(BaseModel):
+    """One covered item or expense on a claim."""
+
+    description: str = Field(description="What the item or expense is")
+    amount: float = Field(
+        description="The total claimed for the line in US dollars, before any limits. "
+        "For several items, the total for all of them"
+    )
+    quantity: int = Field(
+        ge=1,
+        description="How many separate items the line holds, such as 3 for three "
+        "shirts. A pair or a set is one item",
+    )
+    kind: Literal[
+        "item", "electronics", "cash", "expense", "hotel", "meals_without_receipts"
+    ] = Field(
+        description="item: a belonging, or a pair or set that counts as one item. "
+        "electronics: only a phone, tablet, laptop, camera or its lens, e-reader or "
+        "smartwatch; any other device is an item. "
+        "cash: cash that was lost or stolen. "
+        "expense: any other cost with a receipt, such as a medical bill, a meal, a "
+        "taxi, a fee or a prepaid trip cost. "
+        "hotel: a hotel during a trip delay. "
+        "meals_without_receipts: meals during a trip delay with no receipts."
+    )
+    nights: int = Field(description="For a hotel, the number of nights; otherwise 0")
+    hours: float = Field(
+        description="For meals without receipts, the length of the delay in hours; "
+        "otherwise 0"
+    )
 
 
 @tool
@@ -56,6 +98,27 @@ def search_documents(query: str) -> str:
 
 
 @tool
+def calculate_payout(
+    claim_id: str, benefit: Benefit, lines: list[Line], paid_by_others: float
+) -> str:
+    """Work out the payout on an approved claim with UnderCover's payout rules.
+
+    List each covered line, leaving out excluded ones. paid_by_others is anything a
+    carrier, hotel or other party has paid or refunded for the same loss, or 0.
+    """
+    with client.backend() as backend:
+        response = backend.post(
+            f"/api/claims/{claim_id}/payout",
+            json={
+                "benefit": benefit,
+                "lines": [line.model_dump() for line in lines],
+                "paid_by_others": paid_by_others,
+            },
+        )
+    return client.reply(response)
+
+
+@tool
 def record_decision(
     claim_id: str,
     decision: Literal["approve", "decline", "refer"],
@@ -92,6 +155,7 @@ TOOLS = [
     list_sections,
     read_section,
     search_documents,
+    calculate_payout,
     record_decision,
     pay_claim,
 ]

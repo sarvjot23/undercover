@@ -8,11 +8,8 @@ from backend.api import app
 
 
 def new_run(cap):
-    conn = db.connect()
-    with conn:
-        run_id = runs.start(conn, cap)
-    conn.close()
-    return run_id
+    with db.engine().begin() as conn:
+        return runs.start(conn, cap)
 
 
 def api():

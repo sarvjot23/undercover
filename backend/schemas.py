@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from backend.payout import Benefit, Line
+
 
 class Decision(BaseModel):
     """The agent's decision on a claim."""
@@ -18,6 +20,14 @@ class Payment(BaseModel):
     """A payment of a claim's approved payout."""
 
     amount: float
+
+
+class PayoutRequest(BaseModel):
+    """What the payout rules need: the benefit, the covered lines, what others paid."""
+
+    benefit: Benefit
+    lines: list[Line]
+    paid_by_others: float = Field(ge=0)
 
 
 class SignOff(BaseModel):

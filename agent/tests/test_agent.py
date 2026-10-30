@@ -1,10 +1,13 @@
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import client, middleware, model, tools
+from agent import client, middleware, model, tools, tracing
 from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
 
@@ -195,3 +198,58 @@ def test_search_finds_the_sections_that_mention_a_word(requests):
     found = tools.search_documents.invoke({"query": "giraffes"})
     assert found.startswith("Claims manual · 7. Interpretation notes")
     assert "Nothing" in tools.search_documents.invoke({"query": "zeppelin"})
+
+
+def test_the_payout_tool_goes_through_the_backend(requests):
+    run(
+        call(
+            "calculate_payout",
+            claim_id="CLM-1001",
+            benefit="baggage",
+            lines=[
+                {
+                    "description": "Suit",
+                    "amount": 480,
+                    "quantity": 1,
+                    "kind": "item",
+                    "nights": 0,
+                    "hours": 0,
+                }
+            ],
+            paid_by_others=0,
+        ),
+        decision("refer", 0),
+        AIMessage(content="Referred."),
+    )
+    assert "/api/claims/CLM-1001/payout" in requests
+    result = next(
+        s["text"] for s in steps() if s["text"].startswith("calculate_payout:")
+    )
+    assert '"payout":250.0' in result
+
+
+def test_a_claim_is_a_langfuse_session_named_by_its_thread(monkeypatch):
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-test")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-test")
+    monkeypatch.setattr(tracing, "CallbackHandler", lambda: "handler")
+    config = tracing.config("CLM-1001-ab12cd34", 10)
+    assert config.get("metadata") == {"langfuse_session_id": "CLM-1001-ab12cd34"}
+    assert config.get("callbacks") == ["handler"]
+
+
+def test_no_tracing_without_the_keys():
+    assert tracing.config("thread-1", 10).get("callbacks") == []
+    tracing.flush()
+
+
+def test_importing_the_product_leaves_dotenv_alone():
+    code = "import os, agent.claim, backend.api; print('DATABASE_URL' in os.environ)"
+    env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+    found = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    assert found.stdout.strip() == "False"

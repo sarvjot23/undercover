@@ -8,7 +8,11 @@ import sys
 import time
 import uuid
 
+from dotenv import load_dotenv
+
 from agent import claim, client
+
+load_dotenv(override=True)
 
 if sys.argv[1] == "--cap":
     with client.backend() as backend:

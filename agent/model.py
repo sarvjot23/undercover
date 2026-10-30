@@ -2,11 +2,8 @@
 
 import os
 
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
-
-load_dotenv(override=True)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"

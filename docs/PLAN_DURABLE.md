@@ -167,16 +167,16 @@ Between this phase and the next, the old agent still has `pay_claim`, and a sign
 
 Success criteria:
 
-- [ ] Tests check a sign-off records the handler and the time, moves the claim to in progress and creates no payment.
-- [ ] Tests check a payment over the limit is refused before the sign-off and accepted after, and that the payment carries the handler and the time.
-- [ ] Tests check a repeated decision and a repeated payment each return the claim, leaving one row.
-- [ ] Tests check a different decision and a different amount are each refused with a 409.
-- [ ] Tests check a restart of the backend leaves a claim in progress, with its attempts unchanged.
-- [ ] A test checks the sign-off stays saved when the claim then fails to pay.
-- [ ] Tests check a lease: a second worker is refused while it's live, and allowed once it has expired, with the time moved on in the test and no waiting.
-- [ ] Tests check a second run is refused with a 409 while one is active, and that a stopped run shows `active: false` once its lease has expired.
-- [ ] A test checks a repeated step key leaves one row, and that the same key on another claim is a separate step.
-- [ ] `npm run check:python` passes.
+- [x] Tests check a sign-off records the handler and the time, moves the claim to in progress and creates no payment.
+- [x] Tests check a payment over the limit is refused before the sign-off and accepted after, and that the payment carries the handler and the time.
+- [x] Tests check a repeated decision and a repeated payment each return the claim, leaving one row.
+- [x] Tests check a different decision and a different amount are each refused with a 409.
+- [x] Tests check a restart of the backend leaves a claim in progress, with its attempts unchanged.
+- [x] A test checks the sign-off stays saved when the claim then fails to pay.
+- [x] Tests check a lease: a second worker is refused while it's live, and allowed once it has expired, with the time moved on in the test and no waiting.
+- [x] Tests check a second run is refused with a 409 while one is active, and that a stopped run shows `active: false` once its lease has expired.
+- [x] A test checks a repeated step key leaves one row, and that the same key on another claim is a separate step.
+- [x] `npm run check:python` passes.
 
 ### Phase 4: the claim agent as a graph
 

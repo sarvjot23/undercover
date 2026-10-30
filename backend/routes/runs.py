@@ -9,11 +9,11 @@ from sqlalchemy import select
 
 from agent import claim as agent
 from agent import queue as queue_agent
-from backend import runs
+from backend import leases, runs
 from backend.db import Db
 from backend.db import runs as run_table
 from backend.rules import find_claim
-from backend.schemas import Failure, RunStart, Summary, Todos
+from backend.schemas import Failure, Lease, RunStart, Summary, Todos
 
 router = APIRouter(prefix="/api")
 
@@ -40,10 +40,10 @@ def start_run(
     start: RunStart, background_tasks: BackgroundTasks, conn: Db
 ) -> dict[str, Any]:
     """Start the UnderCover Agent on the queue, working up to cap claims."""
-    run_id = runs.start(conn, start.cap)
+    run_id, resumed = runs.start(conn, start.cap)
     conn.commit()
     background_tasks.add_task(queue_agent.run, run_id)
-    return get_run(run_id, conn)
+    return {**get_run(run_id, conn), "resumed": resumed}
 
 
 @router.get("/runs/current", operation_id="get_current_run")
@@ -82,6 +82,24 @@ def take_claim(run_id: int, claim_id: str, conn: Db) -> dict[str, Any]:
     position = runs.take(conn, run_id, claim_id)
     conn.commit()
     return {"run_id": run_id, "claim_id": claim_id, "position": position}
+
+
+@router.post("/runs/{run_id}/lease", operation_id="take_run_lease")
+def take_run_lease(run_id: int, lease: Lease, conn: Db) -> dict[str, Any]:
+    """Take or renew the lease on a run, unless another worker holds it."""
+    runs.find_run(conn, run_id)
+    if not leases.take(conn, run_table, run_id, lease.worker):
+        raise HTTPException(409, runs.IN_PROGRESS)
+    conn.commit()
+    return {"run_id": run_id, "worker": lease.worker}
+
+
+@router.post("/runs/{run_id}/lease/release", operation_id="release_run_lease")
+def release_run_lease(run_id: int, lease: Lease, conn: Db) -> dict[str, Any]:
+    """Give up the lease on a run."""
+    leases.release(conn, run_table, run_id, lease.worker)
+    conn.commit()
+    return {"run_id": run_id}
 
 
 @router.post("/runs/{run_id}/finish", operation_id="finish_run")

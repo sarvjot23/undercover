@@ -3,7 +3,7 @@
 import json
 import os
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
@@ -14,10 +14,12 @@ from sqlalchemy import (
     Connection,
     Engine,
     Float,
+    Index,
     Integer,
     MetaData,
     Table,
     Text,
+    UniqueConstraint,
     create_engine,
     event,
     func,
@@ -53,6 +55,9 @@ claims = Table(
     Column("status", Text, nullable=False),
     Column("body", Text, nullable=False),
     Column("attempts", Integer, nullable=False, default=0),
+    Column("thread_id", Text),
+    Column("lease_owner", Text),
+    Column("lease_until", Text),
 )
 policies = body_table("policies", "policy_id")
 customers = body_table("customers", "customer_id")
@@ -68,12 +73,20 @@ decisions = Table(
     Column("policy_section", Text, nullable=False),
     Column("decided_at", Text, nullable=False),
 )
+sign_offs = Table(
+    "sign_offs",
+    metadata,
+    Column("claim_id", Text, primary_key=True),
+    Column("handler_id", Text, nullable=False),
+    Column("signed_off_at", Text, nullable=False),
+)
 payments = Table(
     "payments",
     metadata,
     Column("claim_id", Text, primary_key=True),
     Column("amount", Float, nullable=False),
     Column("signed_off_by", Text),
+    Column("signed_off_at", Text),
     Column("paid_at", Text, nullable=False),
 )
 runs = Table(
@@ -87,6 +100,15 @@ runs = Table(
     Column("summary", Text),
     Column("started_at", Text, nullable=False),
     Column("finished_at", Text),
+    Column("lease_owner", Text),
+    Column("lease_until", Text),
+    Index(
+        "one_run_at_a_time",
+        "status",
+        unique=True,
+        sqlite_where=text("status = 'running'"),
+        postgresql_where=text("status = 'running'"),
+    ),
 )
 run_claims = Table(
     "run_claims",
@@ -102,7 +124,9 @@ steps = Table(
     Column("claim_id", Text, nullable=False),
     Column("kind", Text, nullable=False),
     Column("text", Text, nullable=False),
+    Column("key", Text, nullable=False),
     Column("at", Text, nullable=False),
+    UniqueConstraint("claim_id", "key"),
 )
 
 
@@ -152,6 +176,11 @@ def engine() -> Engine:
 def now() -> str:
     """Return the current time in UTC as ISO 8601."""
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def later(seconds: int) -> str:
+    """Return the time this many seconds from now, in the same format."""
+    return (datetime.fromisoformat(now()) + timedelta(seconds=seconds)).isoformat()
 
 
 def load(name: str) -> Any:

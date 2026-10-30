@@ -21,6 +21,8 @@ def test_queue_is_seeded_waiting(client):
         "submitted_on": "2026-06-24",
         "status": "waiting",
         "attempts": 0,
+        "thread_id": None,
+        "signed_off": False,
         "agent_working": False,
         "decision": None,
         "payout": None,
@@ -109,7 +111,7 @@ def test_every_operation_is_documented_with_no_optional_inputs():
 
 
 def test_reseed_starts_again_from_the_data(client):
-    client.post("/api/claims/CLM-1001/start")
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     client.post(
         "/api/claims/CLM-1001/decision",
         json={

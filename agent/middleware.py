@@ -1,6 +1,7 @@
 """Middleware for the claim agent: every step it takes is recorded on the claim."""
 
 import json
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -23,7 +24,8 @@ class StepRecorder(AgentMiddleware):
     def record(self, kind: str, text: str) -> None:
         """Record one step on the claim."""
         self.backend.post(
-            f"/api/claims/{self.claim_id}/steps", json={"kind": kind, "text": text}
+            f"/api/claims/{self.claim_id}/steps",
+            json={"kind": kind, "text": text, "key": uuid.uuid4().hex},
         )
 
     def after_model(self, state: Any, runtime: Any) -> None:

@@ -45,7 +45,9 @@ def fail(backend: httpx.Client, claim_id: str, reason: str) -> str:
 def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
     """Work one claim and report back in a line: the decision, or what went wrong."""
     with client.backend() as backend:
-        started = backend.post(f"/api/claims/{claim_id}/start")
+        started = backend.post(
+            f"/api/claims/{claim_id}/start", json={"thread_id": thread_id}
+        )
         if not started.is_success:
             return f"{claim_id}: not started, {client.reply(started)}"
         instructions = backend.get("/api/instructions").json()["claim"]
@@ -76,7 +78,7 @@ def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
         finally:
             tracing.flush()
         claim = backend.get(f"/api/claims/{claim_id}").json()
-        if claim["status"] == "in_progress":
+        if claim["status"] == "in_progress" and claim["decision"] is None:
             return fail(
                 backend, claim_id, "The agent finished without recording a decision"
             )

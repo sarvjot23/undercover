@@ -4,11 +4,14 @@ import json
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import Connection, RowMapping, select
+from sqlalchemy import Connection, RowMapping, or_, select
+from sqlalchemy.exc import IntegrityError
 
-from backend import db
+from backend import db, leases
 from backend.db import claims, run_claims, runs
-from backend.rules import fail, find_claim
+from backend.rules import fail, find_claim, standing
+
+IN_PROGRESS = "A run is already in progress"
 
 
 def waiting(conn: Connection) -> list[str]:
@@ -29,7 +32,8 @@ def describe(conn: Connection, row: RowMapping) -> dict[str, Any]:
         .order_by(run_claims.c.position)
     )
     return {
-        **dict(row),
+        **{key: value for key, value in row.items() if key != "lease_owner"},
+        "active": row["status"] == "running" and leases.is_live(row["lease_until"]),
         "todos": json.loads(row["todos"]),
         "claim_ids": list(conn.execute(query).scalars()),
     }
@@ -46,17 +50,37 @@ def find_run(conn: Connection, run_id: int) -> RowMapping:
     return row
 
 
-def start(conn: Connection, cap: int) -> int:
-    """Start a run on up to cap waiting claims, unless one is already going."""
-    if conn.execute(select(runs.c.run_id).where(runs.c.status == "running")).first():
-        raise HTTPException(409, "The agent is already working through the queue")
-    total = min(cap, len(waiting(conn)))
-    result = conn.execute(
-        runs.insert().values(
-            cap=cap, total=total, status="running", todos="[]", started_at=db.now()
+def start(conn: Connection, cap: int) -> tuple[int, bool]:
+    """Start a run, or pick up one that stopped; say which. A live run is refused."""
+    query = select(runs).where(runs.c.status == "running")
+    running = conn.execute(query).mappings().first()
+    if running:
+        stopped = (
+            runs.update()
+            .where(
+                runs.c.run_id == running["run_id"],
+                or_(runs.c.lease_until.is_(None), runs.c.lease_until < db.now()),
+            )
+            .values(lease_owner=None, lease_until=leases.expiry())
         )
-    )
-    return int(result.inserted_primary_key[0])  # type: ignore[index]
+        if conn.execute(stopped).rowcount == 0:
+            raise HTTPException(409, IN_PROGRESS)
+        return running["run_id"], True
+    total = min(cap, len(waiting(conn)))
+    try:
+        result = conn.execute(
+            runs.insert().values(
+                cap=cap,
+                total=total,
+                status="running",
+                todos="[]",
+                started_at=db.now(),
+                lease_until=leases.expiry(),
+            )
+        )
+    except IntegrityError:
+        raise HTTPException(409, IN_PROGRESS) from None
+    return int(result.inserted_primary_key[0]), False  # type: ignore[index]
 
 
 def take(conn: Connection, run_id: int, claim_id: str) -> int:
@@ -90,13 +114,20 @@ def missed(conn: Connection, run_id: int) -> list[str]:
 
 
 def end(conn: Connection, run_id: int, status: str, summary: str) -> None:
-    """End a run, failing any of its claims still in progress."""
+    """End a run, failing its claims in progress that have no decision yet."""
     run = find_run(conn, run_id)
     for claim_id in describe(conn, run)["claim_ids"]:
-        if find_claim(conn, claim_id)["status"] == "in_progress":
+        found = standing(conn, claim_id)
+        if found["status"] == "in_progress" and found["decision"] is None:
             fail(conn, claim_id, "The run ended while the agent was on this claim")
     conn.execute(
         runs.update()
         .where(runs.c.run_id == run_id)
-        .values(status=status, summary=summary, finished_at=db.now())
+        .values(
+            status=status,
+            summary=summary,
+            finished_at=db.now(),
+            lease_owner=None,
+            lease_until=None,
+        )
     )

@@ -9,7 +9,7 @@ from backend.api import app
 
 def new_run(cap):
     with db.engine().begin() as conn:
-        return runs.start(conn, cap)
+        return runs.start(conn, cap)[0]
 
 
 def api():

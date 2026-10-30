@@ -7,7 +7,7 @@ from backend.routes import runs as run_routes
 
 
 def decide(client, claim_id, decision="approve", payout=650.0):
-    client.post(f"/api/claims/{claim_id}/start")
+    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "thread-test"})
     return client.post(
         f"/api/claims/{claim_id}/decision",
         json={
@@ -24,23 +24,39 @@ def status(client, claim_id):
 
 
 def test_start_moves_to_in_progress(client):
-    assert client.post("/api/claims/CLM-1001/start").json()["status"] == "in_progress"
+    assert (
+        client.post(
+            "/api/claims/CLM-1001/start", json={"thread_id": "thread-test"}
+        ).json()["status"]
+        == "in_progress"
+    )
     assert status(client, "CLM-1001") == "in_progress"
 
 
 def test_start_twice_is_refused(client):
-    client.post("/api/claims/CLM-1001/start")
-    assert client.post("/api/claims/CLM-1001/start").status_code == 409
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
+    assert (
+        client.post(
+            "/api/claims/CLM-1001/start", json={"thread_id": "thread-test"}
+        ).status_code
+        == 409
+    )
 
 
 def test_start_unknown_claim(client):
-    assert client.post("/api/claims/CLM-9999/start").status_code == 404
+    assert (
+        client.post(
+            "/api/claims/CLM-9999/start", json={"thread_id": "thread-test"}
+        ).status_code
+        == 404
+    )
 
 
-def test_approval_under_the_limit_is_decided_and_paid(client):
-    assert decide(client, "CLM-1001").json()["status"] == "decided"
+def test_approval_under_the_limit_stays_in_progress_until_paid(client):
+    assert decide(client, "CLM-1001").json()["status"] == "in_progress"
     paid = client.post("/api/claims/CLM-1001/payment", json={"amount": 650.0})
-    assert paid.json() == {"claim_id": "CLM-1001", "amount": 650.0}
+    assert paid.json()["status"] == "decided"
+    assert paid.json()["payment"]["amount"] == 650.0
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["decision"]["payout"] == 650.0
     assert claim["payment"]["amount"] == 650.0
@@ -48,7 +64,7 @@ def test_approval_under_the_limit_is_decided_and_paid(client):
 
 
 @pytest.mark.parametrize(
-    ("payout", "expected"), [(800.0, "decided"), (800.01, "awaiting_sign_off")]
+    ("payout", "expected"), [(800.0, "in_progress"), (800.01, "awaiting_sign_off")]
 )
 def test_the_limit_is_800(client, payout, expected):
     assert decide(client, "CLM-1001", payout=payout).json()["status"] == expected
@@ -62,15 +78,18 @@ def test_payment_over_the_limit_waits_for_sign_off(client):
     assert client.get("/api/claims/CLM-1002").json()["payment"] is None
 
     signed = client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
-    assert signed.json() == {
-        "claim_id": "CLM-1002",
-        "amount": 1200.0,
-        "status": "decided",
-    }
+    assert signed.json()["status"] == "in_progress"
+    assert signed.json()["payment"] is None
+    assert signed.json()["sign_off"]["handler_id"] == "HND-01"
+    assert signed.json()["sign_off"]["signed_off_at"]
+
+    paid = client.post("/api/claims/CLM-1002/payment", json={"amount": 1200.0})
     claim = client.get("/api/claims/CLM-1002").json()
+    assert paid.status_code == 200
     assert claim["status"] == "decided"
     assert claim["payment"]["amount"] == 1200.0
     assert claim["payment"]["signed_off_by"] == "HND-01"
+    assert claim["payment"]["signed_off_at"] == claim["sign_off"]["signed_off_at"]
 
 
 def test_sign_off_by_unknown_handler(client):
@@ -92,11 +111,107 @@ def test_payment_must_match_the_payout(client):
     assert "$650.00" in paid.json()["detail"]
 
 
-def test_payment_only_once(client):
+def test_a_repeated_payment_counts_as_done(client):
+    decide(client, "CLM-1001")
+    first = client.post("/api/claims/CLM-1001/payment", json={"amount": 650.0})
+    again = client.post("/api/claims/CLM-1001/payment", json={"amount": 650.0})
+    assert again.status_code == 200
+    assert again.json()["payment"] == first.json()["payment"]
+
+
+def test_a_different_payment_is_refused(client):
     decide(client, "CLM-1001")
     client.post("/api/claims/CLM-1001/payment", json={"amount": 650.0})
-    again = client.post("/api/claims/CLM-1001/payment", json={"amount": 650.0})
-    assert again.status_code == 409
+    other = client.post("/api/claims/CLM-1001/payment", json={"amount": 10.0})
+    assert other.status_code == 409
+
+
+def test_a_repeated_decision_counts_as_done(client):
+    assert decide(client, "CLM-1001", payout=420.0).status_code == 200
+    again = client.post(
+        "/api/claims/CLM-1001/decision",
+        json={
+            "decision": "approve",
+            "payout": 420.0,
+            "reasons": "The same again, in other words.",
+            "policy_section": "3. Trip Delay",
+        },
+    )
+    assert again.status_code == 200
+    assert again.json()["decision"]["reasons"] != "The same again, in other words."
+
+
+def test_a_repeated_decision_works_after_the_claim_has_moved_on(client):
+    decide(client, "CLM-1001", decision="refer", payout=0)
+    again = decide(client, "CLM-1001", decision="refer", payout=0)
+    assert again.status_code == 200
+    assert again.json()["status"] == "decided"
+
+
+def test_the_sign_off_stands_until_the_payment(client):
+    decide(client, "CLM-1002", payout=1200.0)
+    client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    claim = client.get("/api/claims/CLM-1002").json()
+    assert claim["status"] == "in_progress"
+    assert claim["sign_off"]["handler_id"] == "HND-01"
+    assert claim["payment"] is None
+
+
+def test_a_held_claim_is_not_being_worked(client):
+    decide(client, "CLM-1002", payout=1200.0)
+    client.post(
+        "/api/claims/CLM-1002/steps",
+        json={"kind": "tool_result", "text": "Recorded", "key": "a"},
+    )
+    assert not client.get("/api/claims/CLM-1002").json()["agent_working"]
+
+
+def test_a_failure_cannot_undo_a_decision(client):
+    decide(client, "CLM-1001")
+    failed = client.post("/api/claims/CLM-1001/fail", json={"reason": "Timed out"})
+    assert failed.status_code == 409
+    assert status(client, "CLM-1001") == "in_progress"
+
+
+def test_a_failure_forgets_the_thread(client):
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "first"})
+    assert client.get("/api/claims/CLM-1001").json()["thread_id"] == "first"
+    client.post("/api/claims/CLM-1001/fail", json={"reason": "Timed out"})
+    assert client.get("/api/claims/CLM-1001").json()["thread_id"] is None
+
+
+def test_a_repeated_step_key_leaves_one_step(client):
+    step = {"kind": "read", "text": "Section 3", "key": "same"}
+    client.post("/api/claims/CLM-1001/steps", json=step)
+    client.post("/api/claims/CLM-1001/steps", json=step)
+    client.post("/api/claims/CLM-1002/steps", json=step)
+    assert len(client.get("/api/claims/CLM-1001/steps").json()) == 1
+    assert len(client.get("/api/claims/CLM-1002/steps").json()) == 1
+
+
+def test_a_second_worker_is_refused_until_the_lease_expires(client, monkeypatch):
+    lease = "/api/claims/CLM-1001/lease"
+    assert client.post(lease, json={"worker": "one"}).status_code == 200
+    assert client.post(lease, json={"worker": "two"}).status_code == 409
+    assert client.post(lease, json={"worker": "one"}).status_code == 200
+    monkeypatch.setattr(db, "now", lambda: "2099-01-01T00:00:00+00:00")
+    assert client.post(lease, json={"worker": "two"}).status_code == 200
+
+
+def test_a_released_lease_is_free_at_once(client):
+    lease = "/api/claims/CLM-1001/lease"
+    client.post(lease, json={"worker": "one"})
+    client.post(f"{lease}/release", json={"worker": "two"})
+    assert client.post(lease, json={"worker": "two"}).status_code == 409
+    client.post(f"{lease}/release", json={"worker": "one"})
+    assert client.post(lease, json={"worker": "two"}).status_code == 200
+
+
+def test_the_standing_is_one_query(client):
+    claim = client.get("/api/claims/CLM-1001/standing").json()
+    assert claim["status"] == "waiting"
+    assert set(claim) >= {"decision", "sign_off", "payment", "thread_id"}
+    assert client.get("/api/claims/CLM-9999/standing").status_code == 404
 
 
 def test_no_payment_on_a_decline(client):
@@ -130,7 +245,8 @@ def test_decision_needs_a_claim_in_progress(client):
 
 def test_steps_are_recorded_in_order(client):
     for kind, text in [("tool_call", "get_claim"), ("answer", "Approved")]:
-        client.post("/api/claims/CLM-1001/steps", json={"kind": kind, "text": text})
+        step = {"kind": kind, "text": text, "key": kind}
+        client.post("/api/claims/CLM-1001/steps", json=step)
     steps = client.get("/api/claims/CLM-1001/steps").json()
     assert [(step["kind"], step["text"]) for step in steps] == [
         ("tool_call", "get_claim"),
@@ -143,7 +259,7 @@ def test_steps_of_unknown_claim(client):
 
 
 def test_fail_sends_the_claim_back_to_waiting(client):
-    client.post("/api/claims/CLM-1001/start")
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     failed = client.post("/api/claims/CLM-1001/fail", json={"reason": "Timed out"})
     assert failed.json()["status"] == "waiting"
     steps = client.get("/api/claims/CLM-1001/steps").json()
@@ -161,7 +277,7 @@ def test_run_starts_the_agent(client, monkeypatch):
 
 def test_run_needs_a_waiting_claim(client, monkeypatch):
     monkeypatch.setattr(run_routes.agent, "run", lambda *args: None)
-    client.post("/api/claims/CLM-1001/start")
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     assert client.post("/api/claims/CLM-1001/run").status_code == 409
 
 
@@ -170,14 +286,15 @@ def test_agent_working_until_its_answer(client):
         return client.get("/api/claims/CLM-1001").json()["agent_working"]
 
     assert not working()
-    client.post("/api/claims/CLM-1001/start")
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     assert working()
-    decide(client, "CLM-1001")
+    decide(client, "CLM-1001", decision="refer", payout=0)
     assert not working()
-    step = {"kind": "tool_call", "text": "pay_claim"}
+    step = {"kind": "tool_call", "text": "record_decision", "key": "a"}
     client.post("/api/claims/CLM-1001/steps", json=step)
     assert working()
-    client.post("/api/claims/CLM-1001/steps", json={"kind": "answer", "text": "Done"})
+    answer = {"kind": "answer", "text": "Done", "key": "b"}
+    client.post("/api/claims/CLM-1001/steps", json=answer)
     assert not working()
 
 
@@ -187,7 +304,7 @@ def test_the_limit_comes_from_our_settings():
 
 
 def fail(client, claim_id="CLM-1001"):
-    client.post(f"/api/claims/{claim_id}/start")
+    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "thread-test"})
     return client.post(f"/api/claims/{claim_id}/fail", json={"reason": "Timed out"})
 
 
@@ -196,17 +313,21 @@ def test_a_second_failure_leaves_the_claim_for_a_handler(client):
     assert fail(client).json()["status"] == "needs_handler"
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["attempts"] == 2
-    assert client.post("/api/claims/CLM-1001/start").status_code == 409
+    assert (
+        client.post(
+            "/api/claims/CLM-1001/start", json={"thread_id": "thread-test"}
+        ).status_code
+        == 409
+    )
 
 
-def test_a_claim_left_in_progress_is_recovered_on_startup(client):
-    client.post("/api/claims/CLM-1001/start")
+def test_a_backend_restart_leaves_a_claim_in_progress(client):
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     with TestClient(app):
         claim = client.get("/api/claims/CLM-1001").json()
-    assert claim["status"] == "waiting"
-    assert claim["attempts"] == 1
-    steps = client.get("/api/claims/CLM-1001/steps").json()
-    assert steps[-1]["text"] == "The agent stopped partway"
+    assert claim["status"] == "in_progress"
+    assert claim["attempts"] == 0
+    assert claim["thread_id"] == "thread-test"
 
 
 def test_never_decided_or_paid_twice(client):
@@ -224,7 +345,7 @@ def test_never_decided_or_paid_twice(client):
     paid = client.post("/api/claims/CLM-1001/payment", json={"amount": 420.0})
     assert paid.status_code == 200
     twice = client.post("/api/claims/CLM-1001/payment", json={"amount": 420.0})
-    assert twice.status_code == 409
+    assert twice.status_code == 200
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["decision"]["decision"] == "approve"
     assert claim["payment"]["amount"] == 420.0

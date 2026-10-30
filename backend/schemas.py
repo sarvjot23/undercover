@@ -36,11 +36,24 @@ class SignOff(BaseModel):
     handler_id: str
 
 
+class ClaimStart(BaseModel):
+    """The thread the agent works a claim on."""
+
+    thread_id: str
+
+
+class Lease(BaseModel):
+    """The worker taking, renewing or giving up a lease."""
+
+    worker: str
+
+
 class Step(BaseModel):
     """One step of the agent's work on a claim."""
 
     kind: Literal["tool_call", "tool_result", "read", "answer", "error"]
     text: str
+    key: str
 
 
 class Failure(BaseModel):

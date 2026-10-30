@@ -7,15 +7,12 @@ from fastapi import FastAPI
 
 from backend import db
 from backend.routes import claims, documents, library, runs
-from backend.rules import recover
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Create and seed the database, and recover any claim a crash left stuck."""
+    """Create and seed the database."""
     db.init()
-    with db.engine().connect() as conn:
-        recover(conn)
     yield
 
 

@@ -1,5 +1,6 @@
 import pytest
 
+from backend import db
 from backend.routes import runs as run_routes
 
 
@@ -14,7 +15,7 @@ def start(client, cap=2):
 
 
 def decide(client, claim_id):
-    client.post(f"/api/claims/{claim_id}/start")
+    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "thread-test"})
     client.post(
         f"/api/claims/{claim_id}/decision",
         json={
@@ -44,7 +45,42 @@ def test_the_total_is_the_waiting_claims_when_fewer_than_the_cap(client):
 
 def test_only_one_run_at_a_time(client):
     start(client)
-    assert client.post("/api/runs", json={"cap": 2}).status_code == 409
+    refused = client.post("/api/runs", json={"cap": 2})
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "A run is already in progress"
+    assert client.get("/api/runs/current").json()["active"]
+
+
+def test_a_stopped_run_is_picked_up_once_its_lease_has_expired(client, monkeypatch):
+    run = start(client, cap=2)
+    assert run["resumed"] is False
+    client.post(f"/api/runs/{run['run_id']}/lease", json={"worker": "one"})
+    monkeypatch.setattr(db, "now", lambda: "2099-01-01T00:00:00+00:00")
+    assert not client.get("/api/runs/current").json()["active"]
+    again = client.post("/api/runs", json={"cap": 9}).json()
+    assert again["run_id"] == run["run_id"]
+    assert again["resumed"] is True
+    assert again["cap"] == 2
+    assert again["active"]
+
+
+def test_a_worker_holds_a_run_and_a_finished_run_cannot_be_held(client):
+    run_id = start(client)["run_id"]
+    lease = f"/api/runs/{run_id}/lease"
+    assert client.post(lease, json={"worker": "one"}).status_code == 200
+    assert client.post(lease, json={"worker": "two"}).status_code == 409
+    client.post(f"{lease}/release", json={"worker": "one"})
+    assert not client.get("/api/runs/current").json()["active"]
+    assert start(client)["resumed"] is True
+    client.post(f"/api/runs/{run_id}/fail", json={"reason": "Broke"})
+    assert client.post(lease, json={"worker": "two"}).status_code == 409
+
+
+def test_a_finished_run_makes_way_for_a_new_one(client):
+    run_id = start(client)["run_id"]
+    client.post(f"/api/runs/{run_id}/fail", json={"reason": "Broke"})
+    assert not client.get("/api/runs/current").json()["active"]
+    assert start(client)["resumed"] is False
 
 
 def test_a_cap_must_be_at_least_one(client):
@@ -106,7 +142,7 @@ def test_finishing_is_refused_while_a_claim_within_the_cap_waits(client):
 def test_finishing_is_refused_while_a_failed_claim_waits_for_its_retry(client):
     run_id = start(client, cap=1)["run_id"]
     client.post(f"/api/runs/{run_id}/claims/CLM-1001")
-    client.post("/api/claims/CLM-1001/start")
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     client.post("/api/claims/CLM-1001/fail", json={"reason": "Timed out"})
     refused = client.post(f"/api/runs/{run_id}/finish", json={"summary": "Done."})
     assert "CLM-1001" in refused.json()["detail"]
@@ -115,7 +151,7 @@ def test_finishing_is_refused_while_a_failed_claim_waits_for_its_retry(client):
 def test_a_failed_run_sends_its_claims_back_to_the_queue(client):
     run_id = start(client)["run_id"]
     client.post(f"/api/runs/{run_id}/claims/CLM-1001")
-    client.post("/api/claims/CLM-1001/start")
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
     failed = client.post(f"/api/runs/{run_id}/fail", json={"reason": "Broke"})
     assert failed.json()["status"] == "failed"
     assert client.get("/api/claims/CLM-1001").json()["status"] == "waiting"

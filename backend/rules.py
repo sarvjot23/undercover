@@ -1,13 +1,15 @@
 """The claims rules: where a claim stands, how it moves, and the approval limit."""
 
 import json
+import uuid
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import Connection, RowMapping, Table, func, select
+from sqlalchemy import Connection, RowMapping, Select, Table, select
+from sqlalchemy.dialects.postgresql import insert
 
 from backend import db
-from backend.db import claims, decisions, steps
+from backend.db import claims, decisions, payments, sign_offs, steps
 
 APPROVAL_LIMIT = float(db.load("company.json")["payout_approval_limit"])
 MAX_ATTEMPTS = 2
@@ -17,6 +19,11 @@ LOOKUPS: dict[str, tuple[Table, str]] = {
     "customer": (db.customers, "customer_id"),
     "plan": (db.plans, "plan"),
 }
+PARTS: dict[str, Table] = {
+    "decision": decisions,
+    "payment": payments,
+    "sign_off": sign_offs,
+}
 
 
 def record(conn: Connection, kind: str, key: str) -> Any:
@@ -24,6 +31,63 @@ def record(conn: Connection, kind: str, key: str) -> Any:
     table, column = LOOKUPS[kind]
     query = select(table.c.body).where(table.c[column] == key)
     return json.loads(conn.execute(query).scalar_one())
+
+
+def standing_query() -> Select[Any]:
+    """Select a claim with all that's recorded on it, in one query.
+
+    Supabase is a round trip away, so what the agent asks often costs a single query.
+    """
+    last_step = (
+        select(steps.c.kind)
+        .where(steps.c.claim_id == claims.c.claim_id)
+        .order_by(steps.c.step_id.desc())
+        .limit(1)
+        .scalar_subquery()
+        .label("last_step")
+    )
+    columns = [
+        column.label(f"{name}_{column.name}")
+        for name, table in PARTS.items()
+        for column in table.c
+    ]
+    joined = claims
+    for table in PARTS.values():
+        joined = joined.outerjoin(table, table.c.claim_id == claims.c.claim_id)
+    return select(claims, last_step, *columns).select_from(joined)
+
+
+def standing_of(row: RowMapping) -> dict[str, Any]:
+    """Turn a row of the standing query into a claim and what's recorded on it."""
+    standing = {
+        "claim_id": row["claim_id"],
+        "status": row["status"],
+        "attempts": row["attempts"],
+        "thread_id": row["thread_id"],
+        "agent_working": is_working(row["status"], row["last_step"]),
+    }
+    for name, table in PARTS.items():
+        found = row[f"{name}_claim_id"] is not None
+        standing[name] = (
+            {column.name: row[f"{name}_{column.name}"] for column in table.c}
+            if found
+            else None
+        )
+    return standing
+
+
+def find_standing(conn: Connection, claim_id: str) -> RowMapping:
+    """Return a claim's row of the standing query, or raise 404."""
+    query = standing_query().where(claims.c.claim_id == claim_id)
+    row = conn.execute(query).mappings().first()
+    if row is None:
+        raise HTTPException(404, f"No claim {claim_id}")
+    return row
+
+
+def standing(conn: Connection, claim_id: str) -> dict[str, Any]:
+    """Return where a claim stands and what's recorded on it, or raise 404."""
+    return standing_of(find_standing(conn, claim_id))
 
 
 def find_claim(conn: Connection, claim_id: str) -> RowMapping:
@@ -36,72 +100,56 @@ def find_claim(conn: Connection, claim_id: str) -> RowMapping:
 
 
 def is_working(status: str, last_step: str | None) -> bool:
-    """Whether the agent is still at work: in progress, or not yet given its answer."""
+    """Whether the agent is at work: in progress, or not yet given its answer."""
+    if status == "awaiting_sign_off":
+        return False
     return status == "in_progress" or last_step in ("tool_call", "tool_result", "read")
-
-
-def agent_working(conn: Connection, row: RowMapping) -> bool:
-    """Whether the agent is still at work on this claim."""
-    query = (
-        select(steps.c.kind)
-        .where(steps.c.claim_id == row["claim_id"])
-        .order_by(steps.c.step_id.desc())
-        .limit(1)
-    )
-    return is_working(row["status"], conn.execute(query).scalar())
-
-
-def last_steps(conn: Connection) -> dict[str, str]:
-    """Return the kind of the latest step on every claim, in one query."""
-    latest = select(func.max(steps.c.step_id)).group_by(steps.c.claim_id)
-    query = select(steps.c.claim_id, steps.c.kind).where(steps.c.step_id.in_(latest))
-    return {row["claim_id"]: row["kind"] for row in conn.execute(query).mappings()}
-
-
-def decision_of(conn: Connection, claim_id: str) -> dict[str, Any] | None:
-    """Return the decision on a claim, if there is one."""
-    query = select(decisions).where(decisions.c.claim_id == claim_id)
-    row = conn.execute(query).mappings().first()
-    return dict(row) if row else None
 
 
 def move(conn: Connection, claim_id: str, before: str, after: str) -> None:
     """Move a claim from one state to another, or raise 409."""
-    find_claim(conn, claim_id)
     update = (
         claims.update()
         .where(claims.c.claim_id == claim_id, claims.c.status == before)
         .values(status=after)
     )
     if conn.execute(update).rowcount == 0:
+        find_claim(conn, claim_id)
         raise HTTPException(409, f"Claim {claim_id} is not {before}")
 
 
-def add(conn: Connection, claim_id: str, kind: str, text: str) -> None:
-    """Record one step of the agent's work."""
-    conn.execute(
-        steps.insert().values(claim_id=claim_id, kind=kind, text=text, at=db.now())
+def insert_once(conn: Connection, table: Table, **values: Any) -> bool:
+    """Insert a row unless it's already there, and say whether it was new.
+
+    ON CONFLICT DO NOTHING reads the same on SQLite and Postgres.
+    """
+    statement = insert(table).values(**values).on_conflict_do_nothing()
+    return conn.execute(statement).rowcount > 0
+
+
+def add(conn: Connection, claim_id: str, kind: str, text: str, key: str) -> None:
+    """Record one step of the agent's work; a step with the same key is a repeat."""
+    insert_once(
+        conn, steps, claim_id=claim_id, kind=kind, text=text, key=key, at=db.now()
     )
 
 
 def fail(conn: Connection, claim_id: str, reason: str) -> str:
     """Count a failed attempt on a claim in progress and say where it goes next.
 
-    The first failure sends it back to the queue; the second leaves it for a handler.
+    The first failure sends it back to the queue to start afresh; the second leaves
+    it for a handler. A claim with a decision stands, so it can't fail.
     """
-    attempts = find_claim(conn, claim_id)["attempts"] + 1
+    found = standing(conn, claim_id)
+    if found["decision"] is not None:
+        raise HTTPException(409, f"Claim {claim_id} has a decision and carries on")
+    attempts = found["attempts"] + 1
     after = "waiting" if attempts < MAX_ATTEMPTS else "needs_handler"
     move(conn, claim_id, "in_progress", after)
     conn.execute(
-        claims.update().where(claims.c.claim_id == claim_id).values(attempts=attempts)
+        claims.update()
+        .where(claims.c.claim_id == claim_id)
+        .values(attempts=attempts, thread_id=None)
     )
-    add(conn, claim_id, "error", reason)
+    add(conn, claim_id, "error", reason, f"error-{uuid.uuid4().hex}")
     return after
-
-
-def recover(conn: Connection) -> None:
-    """Fail every claim a crash left in progress, so none stays stuck."""
-    query = select(claims.c.claim_id).where(claims.c.status == "in_progress")
-    for claim_id in conn.execute(query).scalars().all():
-        fail(conn, claim_id, "The agent stopped partway")
-    conn.commit()

@@ -215,7 +215,7 @@ Success criteria:
 - [x] Vitest checks the live view board: several claims worked at once, each stamped as it ends, and the summary at the end.
 - [x] An end-to-end test starts a dispatch at N=5 on the dashboard, and the stand-in receives `{"n": 5}`.
 - [x] The end-to-end test that played a capped run out through the API now plays out a dispatch, and the panel shows the summary from the records. The to-do list's test is gone.
-- [ ] `npm run dev` starts all three on Windows, and `npm run seed` reseeds. (Checked in phase 6: the new schema needs Supabase reseeded, and the plan reseeds once, before the live runs.)
+- [x] `npm run dev` starts all three on Windows, and `npm run seed` reseeds. (Checked in phase 6, when Supabase was reseeded for the live runs.)
 - [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 4: evaluations
@@ -257,15 +257,15 @@ Reseed once, then only these runs, on the default model. By the labs' figures ea
 
 Success criteria:
 
-- [ ] With `npm run dev` running, a dispatch at N=3 started on the dashboard through the Playwright MCP server is stopped partway by killing every process listening on port 8002. On Windows that's `Get-NetTCPConnection -LocalPort 8002 -State Listen` and `Stop-Process -Force` on each owner. `npm run dev` then stops the others, and is started again.
-- [ ] The stopped dispatch shows as stopped. A dispatch at N=25 carries on the claims left in progress as the same attempts (the same threads and attempts) and works the rest with 25 at once, which the claims' start times show.
-- [ ] Its run takes well under the sum of its claims' times. Comparing claims worked from the start, each takes about as long as the claims at N=3. If they are slower, the report says where the time goes, keeping to 4 connections.
-- [ ] Claims held for sign-off wait. A sign-off on the dashboard still pays within five seconds, checked with a screenshot.
-- [ ] No claim fails for want of a database connection. During the dispatch, `pg_stat_activity` through the Supabase MCP server shows no more than 12 connections whose user is postgres.
-- [ ] The run panel shows the dispatch's model cost and time, and the summary from the records. The live view board is checked with a screenshot.
-- [ ] An evaluation of the evaluation set at N=25, and one of the held-out set's five `tiny` claims at N=5, appear on the scoreboard with every measure. The queue page's counts are the same before and after them.
-- [ ] Through Langfuse's API, the claims of the N=25 dispatch are found together by its tag.
-- [ ] `docs/SPEC.md` (its sections on working the queue and on what the team needs to see, with its Rules left alone), `docs/TECH_STACK.md`, `docs/PROCESS.md` (these runs replace the five-claim cap), `docs/CODE_STANDARDS.md` (see decision 6) and `docs/STATUS.md` describe the product as it now is.
-- [ ] `npm run check` passes with `.env` moved out of the way, and the results are reported.
+- [x] With `npm run dev` running, a dispatch at N=3 started on the dashboard through the Playwright MCP server is stopped partway by killing every process listening on port 8002. On Windows that's `Get-NetTCPConnection -LocalPort 8002 -State Listen` and `Stop-Process -Force` on each owner. `npm run dev` then stops the others, and is started again. (The Playwright MCP server didn't connect, so the dashboard was driven by a script on Playwright's own library, with screenshots.)
+- [x] The stopped dispatch shows as stopped. A dispatch at N=25 carries on the claims left in progress as the same attempts (the same threads and attempts) and works the rest with 25 at once, which the claims' start times show. (20 claims were left, so 20 at once, all started within 3.1 seconds.)
+- [x] Its run takes well under the sum of its claims' times. Comparing claims worked from the start, each takes about as long as the claims at N=3. If they are slower, the report says where the time goes, keeping to 4 connections. (155 seconds against 2,123. Claims were slower, 71 to 94 seconds against 24 to 59; the model wasn't, so the time goes to Supabase round trips on 4 connections a process. See `docs/STATUS.md`.)
+- [ ] Claims held for sign-off wait. A sign-off on the dashboard still pays within five seconds, checked with a screenshot. Not met: they wait, but a sign-off paid in 7.0 seconds, then 5.5. Picking the claim back up and paying it takes about eight Supabase round trips in turn, at 0.3 to 0.8 seconds each that day.
+- [x] No claim fails for want of a database connection. During the dispatch, `pg_stat_activity` through the Supabase MCP server shows no more than 12 connections whose user is postgres. (Met after two fixes, both in `docs/STATUS.md`: the first N=25 dispatch failed 19 claims on timeouts, and an evaluation then stalled on FastAPI's thread pool. The final evaluation at N=25 had no failures, with 8 connections.)
+- [x] The run panel shows the dispatch's model cost and time, and the summary from the records. The live view board is checked with a screenshot.
+- [x] An evaluation of the evaluation set at N=25, and one of the held-out set's five `tiny` claims at N=5, appear on the scoreboard with every measure. The queue page's counts are the same before and after them.
+- [x] Through Langfuse's API, the claims of the N=25 dispatch are found together by its tag. (Through the v2 observations API: the legacy traces API is closed to this account.)
+- [x] `docs/SPEC.md` (its sections on working the queue and on what the team needs to see, with its Rules left alone), `docs/TECH_STACK.md`, `docs/PROCESS.md` (these runs replace the five-claim cap), `docs/CODE_STANDARDS.md` (see decision 6) and `docs/STATUS.md` describe the product as it now is. (`docs/CODE_STANDARDS.md` is unchanged: the build added no standard.)
+- [x] `npm run check` passes with `.env` moved out of the way, and the results are reported.
 
 Moving `.env` out of the way is a rename and back, and nothing reads it. Throughout, the keys stay in the environment of the processes that need them and are never printed.

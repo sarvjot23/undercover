@@ -19,15 +19,21 @@ Our goal is to handle claims straight through, as accurately as our handlers do.
 
 ## Working the queue
 
-One run of the agent works the whole queue, or a capped number of claims for a trial, with the rest left waiting. It chooses the order, plans the run as a to-do list the team can watch, and hands each claim to a helper that works it from a clean start and reports back in a line. It finishes with a short summary for the handlers. A claim that fails with an error goes back in the queue to start afresh, and a claim that fails twice is left for a handler. If the agent is stopped partway through a claim, it carries on from where it got to the next time it runs, and that doesn't count as a new attempt; a run that was stopped is finished by the next run. When the agent approves a payout that needs a sign-off, it keeps everything it has worked out and waits. As soon as a handler signs off, the agent picks the claim back up and pays it, and the payment records who signed off and when. A handler can only sign off for now. No claim is decided or paid twice, only one run works the queue at a time, and a run cannot finish while a claim within its cap is still waiting. The agent can still be run on one named claim.
+A dispatch works every claim left in progress and every waiting claim, oldest submitted first, with up to N claim agents working at once: from 1 to 25, with 3 to start with. Choosing the claims and keeping track of the dispatch is a fixed rule, with no model. Each claim is worked from a clean start and saves its progress as it goes. A claim that hits a rate limit or a timeout waits and carries on from where it got to, as the same attempt, and one still hitting them after its waits stays in progress for the next dispatch. A claim that fails with any other error goes back in the queue and the same dispatch tries it once more, and a claim that fails twice is left for a handler. One bad claim never stops a dispatch. If a dispatch is stopped partway, the next one carries on the claims it left in progress, and that doesn't count as a new attempt. When the agent approves a payout that needs a sign-off, it keeps everything it has worked out and waits. As soon as a handler signs off, the agent picks the claim back up and pays it, and the payment records who signed off and when. A handler can only sign off for now. No claim is decided or paid twice, and only one dispatch or evaluation runs at a time. The agent can still be run on one named claim.
+
+The tokens and cost of every model call, as OpenRouter reports them, and the time the agent spends working on each claim, which leaves out any wait for a sign-off, are recorded with the dispatch or evaluation they happened in.
+
+An evaluation works copies of one of our two labelled sets, whole or just its five tiny claims, through the same dispatcher and claim agent, and scores the agent against our handlers' decisions. The copies never reach the queue, and nobody signs them off: an approval held for sign-off counts as finished.
 
 ## What the team needs to see
 
 - The queue, with where each claim stands: waiting, in progress, waiting for sign-off, decided or left for a handler.
-- The current run's to-do list, and the agent's summary when it ends.
+- The latest dispatch: each of its claims and where it stands, its model cost and time, and when it ends a summary built from our records, with no model writing it: how many claims were approved, declined and referred, each payout waiting for a sign-off, and each claim left for a handler or still in progress.
+- The swarm at work, live, one card for each claim.
 - Each claim in full, with the agent's decision and its reasons.
 - What the agent is doing on a claim while it works, step by step, and the sections of the wording and the manual it read.
-- The agent's instructions for running the queue and for working a claim, read only.
+- A scoreboard of the evaluations, newest first, with decision accuracy, accuracy, the cost of mistakes, the straight-through rate, model cost per claim, time per claim and the time for the whole run, each opening to its claims with the handler's decision and payout beside the agent's.
+- The claim agent's instructions, read only.
 
 ## Rules
 

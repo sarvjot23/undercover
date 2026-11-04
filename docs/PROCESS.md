@@ -1,6 +1,6 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard, and passes them `.env`.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard, and passes them `.env`. `npm run seed` starts the database again from `data/`.
 
 `npm run check` runs every check:
 
@@ -34,7 +34,7 @@ When the last phase is done, run `npm run check` and report the results.
 ## Rules
 
 - Add tests with each change. Tests never call a model; use a stub model.
-- For any live run with the real model, reseed first and cap the run at five claims.
+- For live runs with the real model, reseed first with `npm run seed`, then keep to the runs the plan names, such as a dispatch or an evaluation of the five `tiny` claims.
 - Outside a plan, commit each change once you have checked it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.

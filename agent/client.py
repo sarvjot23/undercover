@@ -3,11 +3,13 @@
 import httpx
 
 BACKEND_URL = "http://127.0.0.1:8000"
+# Longer than the backend waits for a database connection, so a busy swarm waits.
+TIMEOUT = 150
 
 
 def backend() -> httpx.Client:
     """Return a client for the UnderCover backend."""
-    return httpx.Client(base_url=BACKEND_URL, timeout=30)
+    return httpx.Client(base_url=BACKEND_URL, timeout=TIMEOUT)
 
 
 def reply(response: httpx.Response) -> str:

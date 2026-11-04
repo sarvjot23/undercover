@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from backend import db
 from backend.routes import claims, documents, evaluations, library, runs, usage
+from backend.turns import TakingTurns
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="UnderCover", lifespan=lifespan)
+app.add_middleware(TakingTurns)
 app.include_router(claims.router)
 app.include_router(documents.router)
 app.include_router(library.router)

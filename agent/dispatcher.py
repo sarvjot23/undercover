@@ -75,6 +75,10 @@ def work_claim(state: Task, *, runtime: Runtime) -> dict[str, Any]:
         if attempt is not None and attempt.node_attempt < ATTEMPTS:
             raise
         report = leave_in_progress(claim_id, error)
+    except Exception as error:
+        # Outside the claim's graph, such as the backend not answering in time: the
+        # claim stays as it is for the next dispatch, and the others carry on.
+        report = f"{claim_id}: stopped ({error!r}), the next dispatch carries it on"
     return {"results": [report]}
 
 

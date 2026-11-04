@@ -4,14 +4,15 @@ import threading
 import time
 
 import dotenv
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.callbacks import BaseCallbackHandler
 
-from agent import checkpoints, dispatcher, graph, service, tracing
+from agent import checkpoints, client, dispatcher, graph, service, tracing
 from agent import claim as claim_agent
 from agent.tests.stubs import BrokenModel, RateLimitedModel, call, script
-from backend import runs
+from backend import db, runs
 from backend.api import app
 
 RECORD = {
@@ -330,3 +331,32 @@ def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, m
     assert all(row["started"] for row in found["claims"])
     assert found["scores"]["decision_accuracy"] == pytest.approx(4 / 5)
     assert all(not c["claim_id"].startswith("EV") for c in service.backend_claims())
+
+
+def test_an_error_outside_the_graph_never_stops_the_dispatch(
+    requests, monkeypatch, only, models
+):
+    only("CLM-1001", "CLM-1002")
+    original = claim_agent.record_time
+    timed_out = []
+
+    def slow_backend(claim_id, in_run, started, finished):
+        if claim_id == "CLM-1001" and not timed_out:
+            timed_out.append(claim_id)
+            raise httpx.ReadTimeout("timed out")
+        original(claim_id, in_run, started, finished)
+
+    monkeypatch.setattr(claim_agent, "record_time", slow_backend)
+    models("CLM-1001", script(refer("CLM-1001")))
+    models("CLM-1002", script(refer("CLM-1002")))
+    run = new_run()
+    results = dispatcher.dispatch(run, 1)
+    assert "the next dispatch carries it on" in results[0]
+    assert claim("CLM-1002")["status"] == "decided"
+    assert api().get(f"/api/runs/{run['run_id']}").json()["status"] == "finished"
+
+
+def test_the_agent_waits_longer_than_the_backend_waits_for_a_connection():
+    assert client.TIMEOUT > db.POOL_TIMEOUT
+    engine = db.postgres_engine("postgresql://user:secret@example.invalid:5432/app")
+    assert engine.pool.timeout() == db.POOL_TIMEOUT  # type: ignore[attr-defined]

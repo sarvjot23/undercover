@@ -34,6 +34,8 @@ DATA = Path(__file__).parent.parent / "data"
 ANSWER_KEY = {"evaluation": "decisions.json", "held_out": "held_out_decisions.json"}
 SCHEMA = "undercover"
 MAX_CONNECTIONS = 4
+# 25 claim agents share the 4 connections: a request waits for one rather than fail.
+POOL_TIMEOUT = 120
 CHECKPOINT_TABLES = ("checkpoint_writes", "checkpoint_blobs", "checkpoints")
 
 metadata = MetaData()
@@ -179,6 +181,7 @@ def postgres_engine(url: str) -> Engine:
         url.replace("postgresql://", "postgresql+psycopg://", 1),
         pool_size=MAX_CONNECTIONS,
         max_overflow=0,
+        pool_timeout=POOL_TIMEOUT,
         pool_recycle=1800,
         connect_args={"options": f"-c search_path={SCHEMA}", "prepare_threshold": 0},
     )

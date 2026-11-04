@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.callbacks import BaseCallbackHandler
 
-from agent import checkpoints, dispatcher, graph, tracing
+from agent import checkpoints, dispatcher, graph, service, tracing
 from agent import claim as claim_agent
 from agent.tests.stubs import BrokenModel, RateLimitedModel, call, script
 from backend import runs
@@ -279,3 +279,54 @@ def test_one_claim_still_runs_from_the_command_line(monkeypatch, capsys):
     runpy.run_module("agent", run_name="__main__")
     assert worked == [None]
     assert capsys.readouterr().out == "done\n"
+
+
+def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, models):
+    before = api().get("/api/claims").json()
+    created = (
+        api()
+        .post(
+            "/api/runs",
+            json={
+                **RECORD,
+                "kind": "evaluation",
+                "set_name": "evaluation",
+                "tiny": True,
+            },
+        )
+        .json()
+    )
+    copies = {entry["source_id"]: entry["claim_id"] for entry in created["claims"]}
+    answers = {
+        "CLM-1007": approve(copies["CLM-1007"], 50.0),
+        "CLM-1015": refer(copies["CLM-1015"]),
+        "CLM-1017": refer(copies["CLM-1017"]),
+        "CLM-1020": approve(copies["CLM-1020"], 240.0),
+        "CLM-1021": approve(copies["CLM-1021"], 825.0),
+    }
+    for source, answer in answers.items():
+        models(copies[source], script(answer))
+    run: tracing.Run = {"run_id": created["run_id"], "kind": "evaluation"}
+    dispatcher.dispatch(run, 1)
+
+    assert api().get("/api/claims").json() == before
+    held = claim(copies["CLM-1021"])
+    assert held["status"] == "awaiting_sign_off"
+    gone = checkpoints.saver().get_tuple(
+        {"configurable": {"thread_id": held["thread_id"]}}
+    )
+    assert gone is None
+
+    found = api().get(f"/api/evaluations/{created['run_id']}").json()
+    assert found["status"] == "finished"
+    assert (found["set_name"], found["n"], found["model"]) == (
+        "evaluation",
+        1,
+        "openai/gpt-6-luna",
+    )
+    rows = {row["source_id"]: row for row in found["claims"]}
+    assert rows["CLM-1021"]["agent_payout"] == 825.0
+    assert rows["CLM-1021"]["reasons"].startswith("The wording settles it.")
+    assert all(row["started"] for row in found["claims"])
+    assert found["scores"]["decision_accuracy"] == pytest.approx(4 / 5)
+    assert all(not c["claim_id"].startswith("EV") for c in service.backend_claims())

@@ -227,16 +227,16 @@ Success criteria:
 
 Success criteria, all on a stub model:
 
-- [ ] A test runs an evaluation of the five `tiny` claims, and the queue's claims and their states are the same before and after.
-- [ ] A test shows a copy held for sign-off counted as finished, with its thread gone from the checkpointer.
-- [ ] A test shows a sign-off on a copy refused with a 409.
-- [ ] A test shows `get_claim` on a copy holds its new id and nothing from the handlers' decisions: none of their fields, reasons or payouts.
-- [ ] A test with a handful of claims, with the measures worked out by hand in the test, matches `scoring.py` on each one, including a claim the agent didn't decide counting as a referral.
-- [ ] A test shows an evaluation records its set, N, model and reasoning, and each claim's decision, payout, reason, cost and time.
-- [ ] A test shows an evaluation that stopped partway reported as stopped.
-- [ ] A test shows a dispatch never takes a copy, and the service's startup never picks one up.
-- [ ] Every new operation has an `operation_id`, a one-line docstring and no optional inputs.
-- [ ] `npm run check:python` passes, with coverage at 80% or more.
+- [x] A test runs an evaluation of the five `tiny` claims, and the queue's claims and their states are the same before and after.
+- [x] A test shows a copy held for sign-off counted as finished, with its thread gone from the checkpointer.
+- [x] A test shows a sign-off on a copy refused with a 409.
+- [x] A test shows `get_claim` on a copy holds its new id and nothing from the handlers' decisions: none of their fields, reasons or payouts.
+- [x] A test with a handful of claims, with the measures worked out by hand in the test, matches `scoring.py` on each one, including a claim the agent didn't decide counting as a referral.
+- [x] A test shows an evaluation records its set, N, model and reasoning, and each claim's decision, payout, reason, cost and time.
+- [x] A test shows an evaluation that stopped partway reported as stopped.
+- [x] A test shows a dispatch never takes a copy, and the service's startup never picks one up.
+- [x] Every new operation has an `operation_id`, a one-line docstring and no optional inputs.
+- [x] `npm run check:python` passes, with coverage at 80% or more.
 
 ### Phase 5: the scoreboard
 

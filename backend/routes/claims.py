@@ -91,9 +91,11 @@ def get_claim(claim_id: str, conn: SingleStatementDb) -> dict[str, Any]:
     claim = json.loads(row["body"])
     policy = record(conn, "policy", claim["policy_id"])
     customer = record(conn, "customer", claim["customer_id"])
+    # Whether this is an evaluation's copy is left out: the agent reads this.
+    found = {k: v for k, v in standing_of(row).items() if k != "evaluation_id"}
     return {
         **claim,
-        **standing_of(row),
+        **found,
         "policy": policy,
         "plan": record(conn, "plan", policy["plan"]),
         "customer": {

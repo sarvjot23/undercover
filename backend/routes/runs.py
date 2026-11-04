@@ -1,9 +1,9 @@
 """Running the UnderCover Agent: on one claim, or a dispatch over the queue."""
 
 import uuid
-from http import HTTPStatus
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, select
 
@@ -25,12 +25,15 @@ def thread_id_for(claim_id: str) -> str:
 
 
 def ask_to_start(path: str, body: dict[str, object]) -> dict[str, bool]:
-    """Ask the agent's service to start a run, passing on a refusal or its absence."""
-    status = agent_service.ask(path, body)
-    if status is None:
+    """Ask the agent's service to start some work, passing on a refusal or absence.
+
+    A refusal says why, such as what is running.
+    """
+    answer = agent_service.ask(path, body)
+    if answer is None:
         raise HTTPException(503, SERVICE_AWAY)
-    if status == HTTPStatus.CONFLICT:
-        raise HTTPException(409, runs.ALREADY_RUNNING)
+    if not httpx.codes.is_success(answer.status):
+        raise HTTPException(answer.status, answer.detail or runs.ALREADY_RUNNING)
     return {"accepted": True}
 
 

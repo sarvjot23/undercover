@@ -106,3 +106,61 @@ class WorkSession(BaseModel):
     run_id: int | None
     started: datetime
     finished: datetime
+
+
+class RoundStart(BaseModel):
+    """The handler who started a round, as the agent's service passes it on."""
+
+    handler_id: str
+
+
+class RoundProgress(BaseModel):
+    """Where a working round has got to, such as evaluations, 2 of 3."""
+
+    stage: Literal["first_evaluations", "improving", "evaluations"]
+    progress: str | None
+
+
+class ChangeProposal(BaseModel):
+    """A new version of the claim agent's configuration, proposed by the improver."""
+
+    instructions: str = Field(min_length=1)
+    model: str
+    reasoning: str
+    reason: str = Field(min_length=1)
+
+
+class RecipeProposal(BaseModel):
+    """A new version of the improver's recipe."""
+
+    recipe: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
+class RoundDecision(BaseModel):
+    """A handler's approval or rejection of a proposal; a rejection says why."""
+
+    decision: Literal["approve", "reject"]
+    message: str
+
+
+class RecordedDecision(RoundDecision):
+    """A decision on a proposal, with the handler, as the agent's service records it."""
+
+    handler_id: str
+
+
+class Verdict(BaseModel):
+    """Judge the version tried, or roll it back as one the round can't afford."""
+
+    unaffordable: bool
+
+
+class RoundUsage(BaseModel):
+    """The tokens and cost of one of the improver's model replies."""
+
+    model: str
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    cost: float = Field(ge=0)
+    key: str

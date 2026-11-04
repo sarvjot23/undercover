@@ -180,7 +180,9 @@ def test_an_unknown_run(client):
 def test_a_dispatch_is_asked_of_the_agents_service_with_n(client, monkeypatch):
     asked = []
     monkeypatch.setattr(
-        agent_service, "ask", lambda path, body: asked.append((path, body)) or 202
+        agent_service,
+        "ask",
+        lambda path, body: asked.append((path, body)) or agent_service.Answer(202, ""),
     )
     started = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert started.status_code == 202
@@ -188,7 +190,8 @@ def test_a_dispatch_is_asked_of_the_agents_service_with_n(client, monkeypatch):
 
 
 def test_a_dispatch_refused_by_the_service_is_refused(client, monkeypatch):
-    monkeypatch.setattr(agent_service, "ask", lambda path, body: 409)
+    refusal = agent_service.Answer(409, "A dispatch or evaluation is already running")
+    monkeypatch.setattr(agent_service, "ask", lambda path, body: refusal)
     refused = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert refused.status_code == 409
     assert refused.json()["detail"] == "A dispatch or evaluation is already running"

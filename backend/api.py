@@ -13,6 +13,7 @@ from backend.routes import (
     documents,
     evaluations,
     library,
+    rounds,
     runs,
     settings,
     usage,
@@ -38,6 +39,7 @@ app.include_router(usage.router)
 app.include_router(evaluations.router)
 app.include_router(configuration.router)
 app.include_router(settings.router)
+app.include_router(rounds.router)
 
 
 @app.get("/api/health", operation_id="health")

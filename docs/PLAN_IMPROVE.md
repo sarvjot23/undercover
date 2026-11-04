@@ -285,17 +285,17 @@ Success criteria:
 
 Success criteria, all on a stub model and a stub judge:
 
-- [ ] Tests of the rule, with the measures worked out by hand: a version kept, one rolled back for missing an objective, one for a measure worse than its tolerance, one where nothing beat the noise, and one with no grade. Cost and time are compared as fractions, accuracy and the grade as differences.
-- [ ] A test shows the improver's view holds the held-out set's scores and nothing else from it: no claim ids, decisions or reasons.
-- [ ] A test plays a round from start to finish: the first evaluations, a proposal that changes nothing until approved, a rejection whose reason reaches the improver, a second proposal approved, the evaluations, the verdict, and a recipe proposal approved.
-- [ ] A test shows a proposal outside the models allowed going back to the improver without a pause.
-- [ ] A test shows an approval refused while a dispatch runs, with a message naming the dispatch, and nothing recorded.
-- [ ] A test shows an evaluation refused when its estimate is over what's left, and one cut short by the limit shown as stopped, with its version rolled back.
-- [ ] A test shows a round stopped before its verdict leaving the current version as it was, and one stopped after keeping it.
-- [ ] A test shows a round keeping its own settings when the settings change.
-- [ ] A test shows a round waiting for approval survives a restart of the service, and a round that was working is marked stopped.
-- [ ] A test shows the improver's model calls recorded with the round, and its trace config with the round's session and tags.
-- [ ] `npm run check:python` passes, with coverage at 80% or more.
+- [x] Tests of the rule, with the measures worked out by hand: a version kept, one rolled back for missing an objective, one for a measure worse than its tolerance, one where nothing beat the noise, and one with no grade. Cost and time are compared as fractions, accuracy and the grade as differences.
+- [x] A test shows the improver's view holds the held-out set's scores and nothing else from it: no claim ids, decisions or reasons.
+- [x] A test plays a round from start to finish: the first evaluations, a proposal that changes nothing until approved, a rejection whose reason reaches the improver, a second proposal approved, the evaluations, the verdict, and a recipe proposal approved.
+- [x] A test shows a proposal outside the models allowed going back to the improver without a pause.
+- [x] A test shows an approval refused while a dispatch runs, with a message naming the dispatch, and nothing recorded.
+- [x] A test shows an evaluation refused when its estimate is over what's left, and one cut short by the limit shown as stopped, with its version rolled back.
+- [x] A test shows a round stopped before its verdict leaving the current version as it was, and one stopped after keeping it.
+- [x] A test shows a round keeping its own settings when the settings change.
+- [x] A test shows a round waiting for approval survives a restart of the service, and a round that was working is marked stopped.
+- [x] A test shows the improver's model calls recorded with the round, and its trace config with the round's session and tags.
+- [x] `npm run check:python` passes, with coverage at 80% or more.
 
 ### Phase 5: the Improvement page
 

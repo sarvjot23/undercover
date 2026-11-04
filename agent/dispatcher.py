@@ -13,11 +13,12 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 from langgraph.types import RetryPolicy, Send
 
-from agent import claim, client, graph
+from agent import claim, client, graph, improver_client
 from agent.tracing import Run
 
 ATTEMPTS = 4
 FIRST_WAIT = 5.0
+NOT_STARTED = "not started, the round is stopped or has spent its limit"
 
 
 class Dispatch(TypedDict):
@@ -66,6 +67,9 @@ def work_claim(state: Task, *, runtime: Runtime) -> dict[str, Any]:
     when other Send tasks run beside it, so the node handles its own last attempt.
     """
     claim_id = state["claim_id"]
+    round_id = state["run"]["round_id"]
+    if round_id is not None and not improver_client.may_go_on(round_id):
+        return {"results": [f"{claim_id}: {NOT_STARTED}"]}
     try:
         report = claim.work(claim_id, state["run"])
         if graph.standing(claim_id)["status"] == "waiting":
@@ -104,6 +108,7 @@ def dispatch(run: Run, n: int) -> list[str]:
     """Work the run's claims, N at once, then tell the backend the run has finished.
 
     If the dispatcher itself breaks, the run is marked stopped, so the next can start.
+    A round's evaluation cut short by its spending limit is stopped too.
     """
     path = f"/api/runs/{run['run_id']}"
     try:
@@ -112,6 +117,7 @@ def dispatch(run: Run, n: int) -> list[str]:
         with client.backend() as backend:
             backend.post(f"{path}/stop")
         raise
+    cut_short = any(NOT_STARTED in report for report in result["results"])
     with client.backend() as backend:
-        backend.post(f"{path}/finish")
+        backend.post(f"{path}/stop" if cut_short else f"{path}/finish")
     return result["results"]

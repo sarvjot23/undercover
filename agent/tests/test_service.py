@@ -45,7 +45,7 @@ def held(monkeypatch):
     monkeypatch.setattr(service, "work_run", lambda record, n: taken.append(record))
     yield taken
     if service.busy.locked():
-        service.busy.release()
+        service.let_go()
 
 
 def test_health():
@@ -96,7 +96,7 @@ def test_a_second_start_is_refused_while_a_run_is_going(held):
         "/evaluations", json={**{"n": 3}, "set_name": "evaluation", "tiny": False}
     )
     assert refused.status_code == 409
-    assert refused.json()["detail"] == "A dispatch or evaluation is already running"
+    assert refused.json()["detail"] == "A dispatch is starting"
     assert len(held) == 1
 
 

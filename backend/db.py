@@ -167,8 +167,10 @@ usage = Table(
     "usage",
     metadata,
     Column("usage_id", Integer, primary_key=True, autoincrement=True),
-    Column("claim_id", Text, nullable=False),
+    # A claim agent's reply, or the improver's with its round and no claim.
+    Column("claim_id", Text),
     Column("run_id", Integer),
+    Column("round_id", Integer),
     Column("model", Text, nullable=False),
     Column("input_tokens", Integer, nullable=False),
     Column("output_tokens", Integer, nullable=False),
@@ -220,6 +222,42 @@ recipe_versions = Table(
     Column("proposed_by", Text, nullable=False),
     Column("approved_by", Text),
     Column("approved_at", Text, nullable=False),
+)
+# A round of improvement: its own copy of the settings, where it has got to, and
+# the proposal waiting for a handler, if one is.
+rounds = Table(
+    "rounds",
+    metadata,
+    Column("round_id", Integer, primary_key=True, autoincrement=True),
+    Column("thread_id", Text),
+    Column("recipe_version", Integer, nullable=False),
+    Column("settings", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("stage", Text, nullable=False),
+    Column("progress", Text),
+    Column("proposal", Text),
+    Column("version_before", Integer, nullable=False),
+    Column("version_tried", Integer),
+    Column("reason", Text),
+    Column("before", Text),
+    Column("after", Text),
+    Column("verdict", Text),
+    Column("why", Text),
+    Column("started_by", Text, nullable=False),
+    Column("started_at", Text, nullable=False),
+    Column("finished_at", Text),
+)
+# Each approval or rejection of an improver's proposal, by whom and why.
+round_events = Table(
+    "round_events",
+    metadata,
+    Column("event_id", Integer, primary_key=True, autoincrement=True),
+    Column("round_id", Integer, nullable=False),
+    Column("decision", Text, nullable=False),
+    Column("proposal", Text, nullable=False),
+    Column("handler_id", Text, nullable=False),
+    Column("message", Text, nullable=False),
+    Column("at", Text, nullable=False),
 )
 settings = Table(
     "settings",

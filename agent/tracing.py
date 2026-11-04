@@ -44,3 +44,16 @@ def flush() -> None:
     """Send what's been traced, so it isn't lost if the process stops."""
     if enabled():
         get_client().flush()
+
+
+def round_config(thread_id: str, round_id: int) -> RunnableConfig:
+    """The improver's config for a round: one Langfuse session, tagged with it."""
+    return {
+        "configurable": {"thread_id": thread_id},
+        "callbacks": [CallbackHandler()] if enabled() else [],
+        "metadata": {
+            "langfuse_session_id": thread_id,
+            "langfuse_tags": [f"round-{round_id}", "improver"],
+        },
+        "run_name": f"Improver round {round_id}",
+    }

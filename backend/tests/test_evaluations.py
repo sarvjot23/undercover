@@ -190,7 +190,9 @@ def test_a_dispatch_is_not_an_evaluation(client):
 def test_an_evaluation_is_asked_of_the_agents_service(client, monkeypatch):
     asked = []
     monkeypatch.setattr(
-        agent_service, "ask", lambda path, body: asked.append((path, body)) or 202
+        agent_service,
+        "ask",
+        lambda path, body: asked.append((path, body)) or agent_service.Answer(202, ""),
     )
     body = {"set_name": "held_out", "tiny": True, "n": 5}
     assert (

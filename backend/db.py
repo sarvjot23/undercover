@@ -147,6 +147,21 @@ handler_decisions = Table(
     Column("decision", Text, nullable=False),
     Column("payout", Float, nullable=False),
     Column("tiny", Boolean, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("reference", Text, nullable=False),
+)
+# The judge's grade on each claim of an evaluation, kept apart from the answers.
+judgements = Table(
+    "judgements",
+    metadata,
+    Column("run_id", Integer, primary_key=True),
+    Column("claim_id", Text, primary_key=True),
+    Column("graded", Boolean, nullable=False),
+    Column("grade", Float),
+    Column("letter", Text),
+    Column("same_grounds", Float),
+    Column("same_section", Float),
+    Column("cost", Float),
 )
 usage = Table(
     "usage",
@@ -395,6 +410,8 @@ def seed_answer_key(conn: Connection) -> None:
                 "decision": decision["decision"],
                 "payout": decision["payout"],
                 "tiny": decision["tiny"],
+                "reason": decision["reason"],
+                "reference": decision["reference"],
             }
             for set_name, name in ANSWER_KEY.items()
             for decision in load(f"evals/{name}")

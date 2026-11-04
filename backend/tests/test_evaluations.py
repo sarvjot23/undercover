@@ -99,6 +99,7 @@ def test_the_measures_match_ones_worked_out_by_hand():
     ]
     entries = [
         {
+            "claim_id": f"EV1-{source}",
             "source_id": source,
             "decision": decision,
             "payout": payout,
@@ -107,7 +108,7 @@ def test_the_measures_match_ones_worked_out_by_hand():
         }
         for number, (source, decision, payout) in enumerate(answers)
     ]
-    rows = scoring.score_rows(entries, key)
+    rows = scoring.score_rows(entries, key, {})
     assert [row["right"] for row in rows] == [True, False, False, False, False, False]
     assert [row["mistake_cost"] for row in rows] == [0.5, 80.0, 1500, 250.0, 50, 50]
     assert rows[5]["agent_decision"] == "refer"

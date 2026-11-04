@@ -92,3 +92,20 @@ export function byWhom(
   if (who === "improver") return "The improver";
   return handlers?.find((handler) => handler.handler_id === who)?.name ?? who;
 }
+
+/** The judge's grade: its letter and score, such as B (2.10). */
+export function grade(letter: string | null, score: number | null): string {
+  if (letter === null || score === null) return "Not graded";
+  return `${letter} (${score.toFixed(2)})`;
+}
+
+/** One of the judge's checks, kept as a probability and shown as yes or no. */
+export function check(probability: number | null): string {
+  if (probability === null) return "";
+  return probability >= 0.5 ? "Yes" : "No";
+}
+
+/** An average grade from 0 to 3, or why there's none. */
+export function averageGrade(score: number | null): string {
+  return score === null ? "Not graded" : score.toFixed(2);
+}

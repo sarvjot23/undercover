@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, select
 
-from backend import agent_service, runs
+from backend import agent_service, db, grading, runs
 from backend.auth import SignedIn
 from backend.db import Db, SingleStatementDb
 from backend.db import runs as run_table
@@ -94,11 +94,19 @@ def describe_run(run_id: int, conn: Connection) -> dict[str, Any]:
 
 
 @router.post("/runs/{run_id}/finish", operation_id="finish_run")
-def finish_run(run_id: int, conn: Db) -> dict[str, Any]:
-    """Mark a run finished once the dispatcher has worked all its claims."""
-    runs.end(conn, run_id, "finished")
-    conn.commit()
-    return describe_run(run_id, conn)
+def finish_run(run_id: int) -> dict[str, Any]:
+    """Mark a run finished once its claims are worked, grading an evaluation's."""
+    # The judge works with no connection held: there are only 4 to share.
+    with db.engine().connect() as conn:
+        row = runs.find_run(conn, run_id)
+        grading_due = row["kind"] == "evaluation" and row["status"] == "running"
+        work = grading.tasks(conn, row) if grading_due else []
+    graded = grading.grade_all(work)
+    with db.engine().begin() as conn:
+        runs.end(conn, run_id, "finished")
+        grading.save(conn, run_id, graded)
+    with db.engine().connect() as conn:
+        return describe_run(run_id, conn)
 
 
 @router.post("/runs/{run_id}/stop", operation_id="stop_run")

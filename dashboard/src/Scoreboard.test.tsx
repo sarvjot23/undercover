@@ -28,6 +28,17 @@ const scores: Scores = {
   cost_per_claim: 0.01,
   seconds_per_claim: 42,
   seconds: 61,
+  grade: 1.87,
+  judge_cost: 0.0006,
+};
+
+const notGraded = {
+  graded: false,
+  grade: null,
+  letter: null,
+  same_grounds: null,
+  same_section: null,
+  judge_cost: 0,
 };
 
 function evaluationSummary(
@@ -82,10 +93,12 @@ it("lists the evaluations, newest first, with every measure", async () => {
     "80%",
     "60%",
     "$110.00",
+    "1.87",
     "60%",
     "$0.01",
     "42s",
     "1m 01s",
+    "$0.0006",
   ]);
   const stopped = within(rows[2])
     .getAllByRole("cell")
@@ -173,6 +186,12 @@ const evaluation: Evaluation = {
       agent_payout: 50,
       right: true,
       mistake_cost: 0,
+      graded: true,
+      grade: 2.1,
+      letter: "B",
+      same_grounds: 0.9,
+      same_section: 0.3,
+      judge_cost: 0.0002,
     },
     {
       ...runClaim({
@@ -188,6 +207,7 @@ const evaluation: Evaluation = {
       agent_payout: 300,
       right: false,
       mistake_cost: 60,
+      ...notGraded,
     },
     {
       ...runClaim({
@@ -201,6 +221,12 @@ const evaluation: Evaluation = {
       agent_payout: 0,
       right: false,
       mistake_cost: 50,
+      graded: true,
+      grade: 0,
+      letter: "F",
+      same_grounds: 0,
+      same_section: 0,
+      judge_cost: 0,
     },
   ],
 };
@@ -226,6 +252,9 @@ it("shows an evaluation's claims, the handler's answer beside the agent's", asyn
       "Approved $50.00",
       "Approved $50.00",
       "Right",
+      "B (2.10)",
+      "Yes",
+      "No",
       "",
       "$0.012",
       "30s",
@@ -236,6 +265,9 @@ it("shows an evaluation's claims, the handler's answer beside the agent's", asyn
       "Approved $240.00",
       "Approved $300.00",
       "Miss",
+      "Not graded",
+      "",
+      "",
       "$60.00",
       "$0.00",
       "0s",
@@ -246,6 +278,9 @@ it("shows an evaluation's claims, the handler's answer beside the agent's", asyn
       "Approved $825.00",
       "Not decided, counted as a referral",
       "Miss",
+      "F (0.00)",
+      "No",
+      "No",
       "$50.00",
       "$0.00",
       "0s",
@@ -262,6 +297,12 @@ it("shows an evaluation's claims, the handler's answer beside the agent's", asyn
   );
   expect(screen.getByText("Decision accuracy").nextSibling?.textContent).toBe(
     "80%",
+  );
+  expect(
+    screen.getByText("Grade", { selector: "dt" }).nextSibling?.textContent,
+  ).toBe("1.87");
+  expect(screen.getByText("Judge’s cost").nextSibling?.textContent).toBe(
+    "$0.0006",
   );
 });
 

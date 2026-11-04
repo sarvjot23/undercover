@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { EvaluationSummary, Run, Scores, SetName } from "./api";
 import { postForRefusal } from "./api";
 import {
+  averageGrade,
   claimsLabel,
   cost,
   duration,
@@ -113,6 +114,9 @@ export function Scoreboard() {
                   Cost of mistakes
                 </th>
                 <th scope="col" className="number">
+                  Grade
+                </th>
+                <th scope="col" className="number">
                   Straight through
                 </th>
                 <th scope="col" className="number">
@@ -123,6 +127,9 @@ export function Scoreboard() {
                 </th>
                 <th scope="col" className="number">
                   Run time
+                </th>
+                <th scope="col" className="number">
+                  Judge&rsquo;s cost
                 </th>
               </tr>
             </thead>
@@ -170,10 +177,12 @@ function Measures({ scores }: Readonly<{ scores: Scores | null }>) {
     ["decision_accuracy", scores ? percent(scores.decision_accuracy) : ""],
     ["accuracy", scores ? percent(scores.accuracy) : ""],
     ["cost_of_mistakes", scores ? money(scores.cost_of_mistakes) : ""],
+    ["grade", scores ? averageGrade(scores.grade) : ""],
     ["straight_through", scores ? percent(scores.straight_through) : ""],
     ["cost_per_claim", scores ? cost(scores.cost_per_claim) : ""],
     ["seconds_per_claim", scores ? duration(scores.seconds_per_claim) : ""],
     ["seconds", scores ? duration(scores.seconds) : ""],
+    ["judge_cost", scores ? cost(scores.judge_cost) : ""],
   ];
   return (
     <>

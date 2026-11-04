@@ -149,6 +149,7 @@ def claim_entries(conn: Connection, run_id: int) -> list[dict[str, Any]]:
                 "decision": decision.get("decision"),
                 "payout": decision.get("payout"),
                 "reasons": decision.get("reasons"),
+                "policy_section": decision.get("policy_section"),
                 "paid": found["payment"] is not None,
                 "cost": costs.get(row["claim_id"], 0.0),
                 "seconds": time.get("seconds", 0.0),

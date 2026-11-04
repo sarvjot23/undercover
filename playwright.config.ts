@@ -11,6 +11,8 @@ const database =
 process.env.UNDERCOVER_E2E_DB = database;
 // Handlers sign in at a stand-in for Supabase Auth, never Supabase itself.
 const SUPABASE = "http://127.0.0.1:8004";
+// The judge is a stand-in too, never OpenRouter.
+const JUDGE = "http://127.0.0.1:8005";
 
 export default defineConfig({
   testDir: "e2e",
@@ -28,12 +30,19 @@ export default defineConfig({
       url: `${SUPABASE}/health`,
     },
     {
+      command: "node e2e/judge-standin.ts",
+      url: `${JUDGE}/health`,
+    },
+    {
       command: "uv run -m uvicorn backend.api:app --port 8001",
       url: "http://127.0.0.1:8001/api/health",
       env: {
         UNDERCOVER_DB: database,
         UNDERCOVER_AGENT: "http://127.0.0.1:8003",
         VITE_SUPABASE_URL: SUPABASE,
+        JUDGE_URL: JUDGE,
+        OPENROUTER_API_KEY: "e2e-key",
+        MODEL_NAME: "",
         DATABASE_URL: "",
       },
     },

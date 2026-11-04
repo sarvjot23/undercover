@@ -1,7 +1,10 @@
 import type { Evaluation, Outcome, ScoredClaim } from "./api";
 import {
+  averageGrade,
+  check,
   claimsLabel,
   cost,
+  grade,
   duration,
   money,
   OUTCOME_LABELS,
@@ -69,6 +72,10 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
             <dd className="mono">{money(scores.cost_of_mistakes)}</dd>
           </div>
           <div>
+            <dt>Grade</dt>
+            <dd className="mono">{averageGrade(scores.grade)}</dd>
+          </div>
+          <div>
             <dt>Straight through</dt>
             <dd className="mono">{percent(scores.straight_through)}</dd>
           </div>
@@ -86,6 +93,10 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
             <dt>Run time</dt>
             <dd className="mono">{duration(scores.seconds)}</dd>
           </div>
+          <div>
+            <dt>Judge&rsquo;s cost</dt>
+            <dd className="mono">{cost(scores.judge_cost)}</dd>
+          </div>
         </dl>
       )}
       <p>
@@ -101,6 +112,9 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
               <th scope="col">Handler</th>
               <th scope="col">Agent</th>
               <th scope="col">Result</th>
+              <th scope="col">Grade</th>
+              <th scope="col">Same grounds</th>
+              <th scope="col">Same section</th>
               <th scope="col" className="number">
                 Cost of the mistake
               </th>
@@ -143,6 +157,9 @@ function ClaimRow({ claim }: Readonly<{ claim: ScoredClaim }>) {
           {claim.right ? "Right" : "Miss"}
         </span>
       </td>
+      <td className="mono">{grade(claim.letter, claim.grade)}</td>
+      <td>{check(claim.same_grounds)}</td>
+      <td>{check(claim.same_section)}</td>
       <td className="mono number">
         {claim.right ? "" : money(claim.mistake_cost)}
       </td>

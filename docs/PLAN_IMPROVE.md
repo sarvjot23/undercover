@@ -270,13 +270,13 @@ Success criteria:
 
 Success criteria:
 
-- [ ] A test on a stub judge shows the letter is the most likely level, not the score rounded (for example, probabilities that make the score 1.6 but C the most likely).
-- [ ] A test shows an undecided claim graded F without a call, and an ungraded claim (a timeout) left out of the average.
-- [ ] A test shows grading 25 claims in parallel finishes inside 20 seconds when each stubbed call takes 2 seconds.
-- [ ] A test shows the judge's cost recorded with the evaluation, apart from the claim agent's.
-- [ ] A test shows the judge's address read once from the environment and passed as `server_url`, with retries off and a 10-second timeout.
-- [ ] Vitest checks the grade on the scoreboard and each claim's grade with its two checks.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] A test on a stub judge shows the letter is the most likely level, not the score rounded (for example, probabilities that make the score 1.6 but C the most likely).
+- [x] A test shows an undecided claim graded F without a call, and an ungraded claim (a timeout) left out of the average.
+- [x] A test shows grading 25 claims in parallel finishes inside 20 seconds when each stubbed call takes 2 seconds.
+- [x] A test shows the judge's cost recorded with the evaluation, apart from the claim agent's.
+- [x] A test shows the judge's address read once from the environment and passed as `server_url`, with retries off and a 10-second timeout.
+- [x] Vitest checks the grade on the scoreboard and each claim's grade with its two checks.
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 4: the improver
 

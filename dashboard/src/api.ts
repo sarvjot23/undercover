@@ -173,6 +173,9 @@ export interface Scores {
   cost_per_claim: number;
   seconds_per_claim: number;
   seconds: number;
+  /** The judge's average grade, from 0 (F) to 3 (A), or null if it graded nothing. */
+  grade: number | null;
+  judge_cost: number;
 }
 
 /** One claim of an evaluation: the handler's answer beside the agent's. */
@@ -184,6 +187,13 @@ export interface ScoredClaim extends RunClaim {
   agent_payout: number;
   right: boolean;
   mistake_cost: number;
+  /** The judge's grade on the explanation, unless it couldn't grade it. */
+  graded: boolean;
+  grade: number | null;
+  letter: "F" | "C" | "B" | "A" | null;
+  same_grounds: number | null;
+  same_section: number | null;
+  judge_cost: number;
 }
 
 /** An evaluation as the scoreboard lists it, with its measures once finished. */
@@ -201,10 +211,7 @@ export interface DiffLine {
 }
 
 /** A version's scores on a set: the averages of the evaluations rounds ran on it. */
-export type VersionScores = Partial<Scores> & {
-  runs: number;
-  grade?: number | null;
-};
+export type VersionScores = Partial<Scores> & { runs: number };
 
 /** A version of the claim agent's configuration. */
 export interface ConfigVersion {

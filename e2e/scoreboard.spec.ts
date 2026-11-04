@@ -89,6 +89,13 @@ test("an evaluation played out through the API shows on the scoreboard with its 
   await expect(row).toContainText("100%");
   await expect(row).toContainText("80%");
   await expect(row).toContainText("$60.00");
+  await expect(row).toContainText("2.00");
+  const asked = (await (
+    await request.get("http://127.0.0.1:8005/asked")
+  ).json()) as { handler: { reason: string }; agent: { rationale: string } }[];
+  expect(asked).toHaveLength(5);
+  expect(asked[0]?.agent.rationale).toBe("Recorded by the end-to-end test.");
+  expect(asked[0]?.handler.reason).toBeTruthy();
 
   await row
     .getByRole("link", { name: `Evaluation ${String(run.run_id)}` })
@@ -98,6 +105,7 @@ test("an evaluation played out through the API shows on the scoreboard with its 
   await expect(miss).toContainText("Approved $240.00");
   await expect(miss).toContainText("Approved $300.00");
   await expect(miss).toContainText("Miss");
+  await expect(miss).toContainText("B (2.00)YesNo");
 
   await page.getByRole("link", { name: copy("CLM-1021") }).click();
   await expect(page.getByText(/Nobody signs off a copy/)).toBeVisible();

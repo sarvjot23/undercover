@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Claim, Handler, Step } from "./api";
-import { postJson } from "./api";
+import { postForRefusal, postJson } from "./api";
 import { date, dateTime, label, money, OUTCOME_LABELS } from "./format";
+import { ONLY_APPROVERS, useHandler } from "./handler";
 import { useJson } from "./hooks";
 import { StatusBadge } from "./StatusBadge";
 import { Steps } from "./Steps";
@@ -179,11 +180,7 @@ function DecisionPanel({
         <SignedOff claim={claim} handlers={handlers} />
       )}
       {claim.status === "awaiting_sign_off" && !isCopy && (
-        <SignOff
-          claimId={claim.claim_id}
-          handlers={handlers}
-          onSignedOff={onSignedOff}
-        />
+        <SignOff claimId={claim.claim_id} onSignedOff={onSignedOff} />
       )}
     </div>
   );
@@ -233,50 +230,42 @@ function PaymentLine({
 
 function SignOff({
   claimId,
-  handlers,
   onSignedOff,
-}: Readonly<{
-  claimId: string;
-  handlers: Handler[] | undefined;
-  onSignedOff: () => void;
-}>) {
-  const [handlerId, setHandlerId] = useState("");
+}: Readonly<{ claimId: string; onSignedOff: () => void }>) {
+  const handler = useHandler();
   const [problem, setProblem] = useState("");
-  const chosen =
-    handlerId === "" ? (handlers?.[0]?.handler_id ?? "") : handlerId;
+  const [busy, setBusy] = useState(false);
+  const limit = (
+    <p>
+      This payout is over $800.00, so the payment waits for a handler&rsquo;s
+      sign-off.
+    </p>
+  );
+
+  if (!handler?.can_approve_over_limit) {
+    return (
+      <div className="sign-off">
+        {limit}
+        <p className="muted">{ONLY_APPROVERS} can sign this off.</p>
+      </div>
+    );
+  }
 
   const signOff = () => {
-    postJson(`/api/claims/${claimId}/sign-off`, { handler_id: chosen }).then(
-      onSignedOff,
-      () => {
-        setProblem("The sign-off didn't go through.");
-      },
-    );
+    setBusy(true);
+    setProblem("");
+    void postForRefusal(`/api/claims/${claimId}/sign-off`).then((refusal) => {
+      setBusy(false);
+      if (refusal) setProblem(refusal);
+      else onSignedOff();
+    });
   };
 
   return (
     <div className="sign-off">
-      <p>
-        This payout is over $800.00, so the payment waits for a handler&rsquo;s
-        sign-off.
-      </p>
-      <label>
-        Handler{" "}
-        <select
-          value={chosen}
-          onChange={(event) => {
-            setHandlerId(event.target.value);
-          }}
-        >
-          {handlers?.map((handler) => (
-            <option key={handler.handler_id} value={handler.handler_id}>
-              {handler.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="button" onClick={signOff} disabled={!chosen}>
-        Sign off
+      {limit}
+      <button type="button" onClick={signOff} disabled={busy}>
+        Sign off as {handler.name}
       </button>
       {problem && <p role="alert">{problem}</p>}
     </div>

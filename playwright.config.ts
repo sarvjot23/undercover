@@ -9,6 +9,8 @@ const database =
   join(tmpdir(), `undercover-e2e-${String(Date.now())}.db`);
 // The tests play the agent's part, against a stand-in for its service on its own port.
 process.env.UNDERCOVER_E2E_DB = database;
+// Handlers sign in at a stand-in for Supabase Auth, never Supabase itself.
+const SUPABASE = "http://127.0.0.1:8004";
 
 export default defineConfig({
   testDir: "e2e",
@@ -22,18 +24,27 @@ export default defineConfig({
       url: "http://127.0.0.1:8003/health",
     },
     {
+      command: "node e2e/auth-standin.ts",
+      url: `${SUPABASE}/health`,
+    },
+    {
       command: "uv run -m uvicorn backend.api:app --port 8001",
       url: "http://127.0.0.1:8001/api/health",
       env: {
         UNDERCOVER_DB: database,
         UNDERCOVER_AGENT: "http://127.0.0.1:8003",
+        VITE_SUPABASE_URL: SUPABASE,
         DATABASE_URL: "",
       },
     },
     {
-      command: "npx vite dashboard --port 5174 --strictPort",
+      command: "npx vite dashboard --port 5174 --strictPort --mode e2e",
       url: "http://localhost:5174",
-      env: { BACKEND_URL: "http://127.0.0.1:8001" },
+      env: {
+        BACKEND_URL: "http://127.0.0.1:8001",
+        VITE_SUPABASE_URL: SUPABASE,
+        VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_e2e",
+      },
     },
   ],
 });

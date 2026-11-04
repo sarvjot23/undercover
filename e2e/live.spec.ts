@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createDispatch, endRun, pay, start } from "./api";
 
 test("the live view shows a dispatch as a board, stamps each claim and ends on the summary", async ({

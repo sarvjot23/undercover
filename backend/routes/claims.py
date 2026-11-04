@@ -8,6 +8,7 @@ from sqlalchemy import Connection, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
 from backend import agent_service, db, leases
+from backend.auth import Approver
 from backend.db import (
     Db,
     SingleStatementDb,
@@ -21,7 +22,6 @@ from backend.db import claims as claim_table
 from backend.payout import Payout, work_out_payout
 from backend.rules import (
     APPROVAL_LIMIT,
-    HANDLER_IDS,
     add,
     fail,
     find_claim,
@@ -40,7 +40,6 @@ from backend.schemas import (
     Lease,
     Payment,
     PayoutRequest,
-    SignOff,
     Step,
 )
 
@@ -281,18 +280,16 @@ def pay_claim(
 @router.post("/{claim_id}/sign-off", operation_id="sign_off")
 def sign_off(
     claim_id: str,
-    sign_off: SignOff,
+    handler: Approver,
     background_tasks: BackgroundTasks,
     conn: SingleStatementDb,
 ) -> dict[str, Any]:
-    """Record a handler's sign-off on a payout over the limit; the agent pays it."""
-    if sign_off.handler_id not in HANDLER_IDS:
-        raise HTTPException(404, f"No handler {sign_off.handler_id}")
+    """Record the signed-in handler's sign-off on a payout; the agent pays it."""
     if find_claim(conn, claim_id)["evaluation_id"] is not None:
         raise HTTPException(409, f"Claim {claim_id} is a copy for an evaluation")
     signed = {
         "claim_id": claim_id,
-        "handler_id": sign_off.handler_id,
+        "handler_id": handler["handler_id"],
         "signed_off_at": db.now(),
     }
     # The sign-off goes first: if we stop here, the claim still waits to be signed off.

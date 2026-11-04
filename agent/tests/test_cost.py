@@ -9,6 +9,7 @@ from agent import graph, model, tracing
 from agent.tests.stubs import call, script
 from backend import db
 from backend.api import app
+from backend.tests.signing import as_handler
 
 CLAIM = "CLM-1001"
 RUN: tracing.Run = {"run_id": 12, "kind": "dispatch"}
@@ -121,7 +122,7 @@ def test_the_wait_for_a_sign_off_is_not_counted(requests, monkeypatch):
     )
     monkeypatch.setattr(claim_agent, "clock", lambda: next(times))
     claim_agent.run(CLAIM, "thread-1", script(approve(1200.0)), RUN)
-    TestClient(app).post(f"/api/claims/{CLAIM}/sign-off", json={"handler_id": "HND-01"})
+    TestClient(app).post(f"/api/claims/{CLAIM}/sign-off", headers=as_handler())
     claim_agent.carry_on(CLAIM, script())
     sessions = rows(db.work_sessions)
     assert [row["seconds"] for row in sessions] == [10.0, 3.0]

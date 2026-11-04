@@ -1,6 +1,7 @@
 import pytest
 
 from backend import agent_service, scoring
+from backend.tests.signing import as_handler
 
 TINY = ["CLM-1007", "CLM-1015", "CLM-1017", "CLM-1020", "CLM-1021"]
 HELD_OUT_TINY = ["CLM-1104", "CLM-1106", "CLM-1110", "CLM-1112", "CLM-1114"]
@@ -74,9 +75,7 @@ def test_get_claim_on_a_copy_holds_its_new_id_and_nothing_of_the_answer_key(clie
 def test_a_sign_off_on_a_copy_is_refused(client):
     copy_id = evaluate(client)["claims"][4]["claim_id"]
     decide(client, copy_id, "approve", 825)
-    refused = client.post(
-        f"/api/claims/{copy_id}/sign-off", json={"handler_id": "HND-01"}
-    )
+    refused = client.post(f"/api/claims/{copy_id}/sign-off", headers=as_handler())
     assert refused.status_code == 409
     assert refused.json()["detail"] == f"Claim {copy_id} is a copy for an evaluation"
 
@@ -193,5 +192,8 @@ def test_an_evaluation_is_asked_of_the_agents_service(client, monkeypatch):
         agent_service, "ask", lambda path, body: asked.append((path, body)) or 202
     )
     body = {"set_name": "held_out", "tiny": True, "n": 5}
-    assert client.post("/api/evaluations", json=body).status_code == 202
+    assert (
+        client.post("/api/evaluations", json=body, headers=as_handler()).status_code
+        == 202
+    )
     assert asked == [("/evaluations", body)]

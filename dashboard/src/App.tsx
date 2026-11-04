@@ -1,59 +1,99 @@
+import type { Handler } from "./api";
+import { signOut, useSession } from "./auth";
 import { ClaimView } from "./ClaimView";
 import { EvaluationView } from "./EvaluationView";
-import { useRoute } from "./hooks";
+import { HandlerContext } from "./handler";
+import type { Route } from "./hooks";
+import { useJson, useRoute } from "./hooks";
 import { Instructions } from "./Instructions";
 import { LiveView } from "./LiveView";
 import { Queue } from "./Queue";
 import { Scoreboard } from "./Scoreboard";
+import { SignIn } from "./SignIn";
 
 export function App() {
-  const route = useRoute();
+  const session = useSession();
+  if (session === undefined) return <p className="page">Loading</p>;
+  if (session === null) return <SignIn />;
+  return <SignedIn email={session.user.email ?? ""} />;
+}
 
-  if (route.view === "live") return <LiveView />;
+/** Every page, for a signed-in handler, found among our handlers by email. */
+function SignedIn({ email }: Readonly<{ email: string }>) {
+  const route = useRoute();
+  const { data: handlers } = useJson<Handler[]>("/api/handlers");
+  const handler = handlers?.find((found) => found.email === email) ?? null;
 
   return (
-    <div className="page">
-      <header className="masthead">
-        <a href="#/" className="brand">
-          UnderCover
+    <HandlerContext value={handler}>
+      {route.view === "live" ? (
+        <LiveView />
+      ) : (
+        <div className="page">
+          <Masthead route={route} handler={handler} email={email} />
+          <main>
+            <Page route={route} />
+          </main>
+        </div>
+      )}
+    </HandlerContext>
+  );
+}
+
+function Page({ route }: Readonly<{ route: Route }>) {
+  switch (route.view) {
+    case "claim":
+      return <ClaimView key={route.claimId} claimId={route.claimId} />;
+    case "scoreboard":
+      return <Scoreboard />;
+    case "evaluation":
+      return <EvaluationView key={route.runId} runId={route.runId} />;
+    case "instructions":
+      return <Instructions />;
+    default:
+      return <Queue />;
+  }
+}
+
+function Masthead({
+  route,
+  handler,
+  email,
+}: Readonly<{ route: Route; handler: Handler | null; email: string }>) {
+  const here = (...views: Route["view"][]) =>
+    views.includes(route.view) ? ("page" as const) : undefined;
+  return (
+    <header className="masthead">
+      <a href="#/" className="brand">
+        UnderCover
+      </a>
+      <span className="tagline">Claims, decided with care</span>
+      <nav aria-label="Main">
+        <a href="#/" aria-current={here("queue", "claim")}>
+          Queue
         </a>
-        <span className="tagline">Claims, decided with care</span>
-        <nav aria-label="Main">
-          <a
-            href="#/"
-            aria-current={route.view === "queue" ? "page" : undefined}
-          >
-            Queue
-          </a>
-          <a
-            href="#/scoreboard"
-            aria-current={
-              route.view === "scoreboard" || route.view === "evaluation"
-                ? "page"
-                : undefined
-            }
-          >
-            Scoreboard
-          </a>
-          <a
-            href="#/instructions"
-            aria-current={route.view === "instructions" ? "page" : undefined}
-          >
-            Instructions
-          </a>
-        </nav>
-      </header>
-      <main>
-        {route.view === "instructions" && <Instructions />}
-        {route.view === "claim" && (
-          <ClaimView key={route.claimId} claimId={route.claimId} />
-        )}
-        {route.view === "queue" && <Queue />}
-        {route.view === "scoreboard" && <Scoreboard />}
-        {route.view === "evaluation" && (
-          <EvaluationView key={route.runId} runId={route.runId} />
-        )}
-      </main>
-    </div>
+        <a href="#/scoreboard" aria-current={here("scoreboard", "evaluation")}>
+          Scoreboard
+        </a>
+        <a href="#/instructions" aria-current={here("instructions")}>
+          Instructions
+        </a>
+      </nav>
+      <div className="who">
+        <span>
+          <strong>{handler?.name ?? email}</strong>
+          {handler && <span className="muted"> {handler.role}</span>}
+        </span>
+        <button
+          type="button"
+          className="quiet"
+          onClick={() => {
+            void signOut();
+          }}
+        >
+          Sign out
+        </button>
+      </div>
+    </header>
   );
 }

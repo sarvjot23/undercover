@@ -31,12 +31,6 @@ class PayoutRequest(BaseModel):
     paid_by_others: float = Field(ge=0)
 
 
-class SignOff(BaseModel):
-    """A handler's sign-off on a payout over the approval limit."""
-
-    handler_id: str
-
-
 class ClaimStart(BaseModel):
     """The thread the agent works a claim on."""
 

@@ -1,6 +1,7 @@
 import pytest
 
 from backend import agent_service
+from backend.tests.signing import as_handler
 
 DISPATCH = {
     "kind": "dispatch",
@@ -181,25 +182,28 @@ def test_a_dispatch_is_asked_of_the_agents_service_with_n(client, monkeypatch):
     monkeypatch.setattr(
         agent_service, "ask", lambda path, body: asked.append((path, body)) or 202
     )
-    started = client.post("/api/dispatches", json={"n": 5})
+    started = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert started.status_code == 202
     assert asked == [("/dispatches", {"n": 5})]
 
 
 def test_a_dispatch_refused_by_the_service_is_refused(client, monkeypatch):
     monkeypatch.setattr(agent_service, "ask", lambda path, body: 409)
-    refused = client.post("/api/dispatches", json={"n": 5})
+    refused = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert refused.status_code == 409
     assert refused.json()["detail"] == "A dispatch or evaluation is already running"
 
 
 def test_a_dispatch_needs_the_agents_service(client, monkeypatch):
     monkeypatch.setattr(agent_service, "ask", lambda path, body: None)
-    refused = client.post("/api/dispatches", json={"n": 5})
+    refused = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert refused.status_code == 503
     assert refused.json()["detail"] == "The agent's service isn't running"
 
 
 @pytest.mark.parametrize("n", [0, 26])
 def test_n_is_from_1_to_25(client, n):
-    assert client.post("/api/dispatches", json={"n": n}).status_code == 422
+    assert (
+        client.post("/api/dispatches", json={"n": n}, headers=as_handler()).status_code
+        == 422
+    )

@@ -7,6 +7,7 @@ from agent import graph, lease
 from agent.tests.stubs import BrokenModel, Stopped, StoppedModel, call, script
 from backend import db
 from backend.api import app
+from backend.tests.signing import as_handler
 
 CLAIM = "CLM-1001"
 THREAD = "CLM-1001-first"
@@ -53,7 +54,7 @@ def hold():
 
 
 def sign_off():
-    return api().post(f"/api/claims/{CLAIM}/sign-off", json={"handler_id": "HND-02"})
+    return api().post(f"/api/claims/{CLAIM}/sign-off", headers=as_handler())
 
 
 def test_an_approval_up_to_the_limit_is_paid_straight_after_the_decision(requests):
@@ -81,7 +82,7 @@ def test_a_sign_off_resumes_the_claim_and_pays_it_once(requests):
     assert answer == "CLM-1001: approve $1,200.00"
     assert claim()["status"] == "decided"
     assert claim()["payment"]["amount"] == 1200.0
-    assert claim()["payment"]["signed_off_by"] == "HND-02"
+    assert claim()["payment"]["signed_off_by"] == "HND-01"
     assert claim()["payment"]["signed_off_at"] == claim()["sign_off"]["signed_off_at"]
     assert saved_state().next == ()
 

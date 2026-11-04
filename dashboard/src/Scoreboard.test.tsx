@@ -11,6 +11,8 @@ import type { Evaluation, EvaluationSummary, Run, Scores } from "./api";
 import { App } from "./App";
 import { runClaim, runRecord, stubBackend } from "./testing";
 
+vi.mock("./auth");
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

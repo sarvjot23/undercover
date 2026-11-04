@@ -1,5 +1,9 @@
+import { render } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { createElement } from "react";
 import { vi } from "vitest";
-import type { Claim, ClaimSummary, Run, RunClaim } from "./api";
+import type { Claim, ClaimSummary, Handler, Run, RunClaim } from "./api";
+import { HandlerContext } from "./handler";
 
 export function pathOf(input: RequestInfo | URL): string {
   return input instanceof Request ? input.url : input.toString();
@@ -142,4 +146,36 @@ export function runRecord(overrides: Partial<Run> = {}): Run {
     summary: null,
     ...overrides,
   };
+}
+
+export const dana: Handler = {
+  handler_id: "HND-01",
+  name: "Dana Whitfield",
+  role: "Senior Claims Handler",
+  email: "dana.whitfield@undercover.example",
+  can_approve_over_limit: true,
+};
+
+export const marcus: Handler = {
+  handler_id: "HND-02",
+  name: "Marcus Oyelaran",
+  role: "Claims Handler",
+  email: "marcus.oyelaran@undercover.example",
+  can_approve_over_limit: false,
+};
+
+/** Render a page for a signed-in handler. */
+export function renderAs(handler: Handler | null, page: ReactNode) {
+  return render(createElement(HandlerContext, { value: handler }, page));
+}
+
+let signedInEmail: string | null = dana.email;
+
+/** Who the mocked sign-in says is signed in: an email, or null for nobody. */
+export function signInAs(email: string | null): void {
+  signedInEmail = email;
+}
+
+export function whoIsSignedIn(): string | null {
+  return signedInEmail;
 }

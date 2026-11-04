@@ -235,13 +235,13 @@ Each phase ends with its criteria ticked here, `docs/STATUS.md` updated and a co
 
 Success criteria:
 
-- [ ] A test shows every handler action refused with a 401 without a token, with a bad token, with an expired token and with a token for an email that isn't a handler.
-- [ ] A test shows a sign-off over the limit refused with a 403 for Marcus, and recorded for Dana with her id and the time.
-- [ ] A test shows `/openapi.json` still has an `operation_id`, a one-line docstring and no optional inputs for every operation.
-- [ ] Vitest checks the sign-in page (success, a wrong password, and no sign-up), the header with the name and "Sign out", and that an action sends the bearer token.
-- [ ] Vitest checks that Marcus sees why he can't sign off a held payout, with no sign-off button.
-- [ ] Every end-to-end spec signs in through the stand-in, and the sign-off test records the signed-in handler.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] A test shows every handler action refused with a 401 without a token, with a bad token, with an expired token and with a token for an email that isn't a handler.
+- [x] A test shows a sign-off over the limit refused with a 403 for Marcus, and recorded for Dana with her id and the time.
+- [x] A test shows `/openapi.json` still has an `operation_id`, a one-line docstring and no optional inputs for every operation.
+- [x] Vitest checks the sign-in page (success, a wrong password, and no sign-up), the header with the name and "Sign out", and that an action sends the bearer token.
+- [x] Vitest checks that Marcus sees why he can't sign off a held payout, with no sign-off button.
+- [x] Every end-to-end spec signs in through the stand-in, and the sign-off test records the signed-in handler.
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 2: the configuration's versions and the settings
 

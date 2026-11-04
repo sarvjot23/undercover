@@ -6,6 +6,7 @@ from agent import claim, client, dispatcher, service
 from agent.tests.stubs import call, script
 from backend import runs
 from backend.api import app as backend_app
+from backend.tests.signing import as_handler
 
 
 def agent_service():
@@ -34,7 +35,7 @@ def hold(claim_id="CLM-1001"):
 
 
 def sign_off(claim_id="CLM-1001"):
-    backend().post(f"/api/claims/{claim_id}/sign-off", json={"handler_id": "HND-01"})
+    backend().post(f"/api/claims/{claim_id}/sign-off", headers=as_handler())
 
 
 @pytest.fixture

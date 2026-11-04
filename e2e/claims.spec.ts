@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, MARCUS, switchTo, test } from "./fixtures";
 import { decide, pay } from "./api";
 
 test("a claim in full", async ({ page }) => {
@@ -45,8 +45,9 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
     "Waiting for sign-off",
   );
   await expect(page.locator(".paid")).toHaveCount(0);
-  await page.getByRole("combobox").selectOption({ label: "Dana Whitfield" });
-  await page.getByRole("button", { name: "Sign off" }).click();
+  await page
+    .getByRole("button", { name: "Sign off as Dana Whitfield" })
+    .click();
   await expect(page.locator(".claim-head .badge")).toHaveText("In progress");
   await expect(page.getByText(/The agent\s+is paying it/)).toBeVisible();
 
@@ -63,5 +64,22 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
   await expect(page.locator(".paid")).toContainText("Paid $805.00 on");
   await expect(page.locator(".paid")).toContainText(
     "signed off by Dana Whitfield",
+  );
+});
+
+test("Marcus sees why he can't sign off a held payout", async ({
+  page,
+  request,
+}) => {
+  await decide(request, "CLM-1015", "approve", 900);
+  await switchTo(page, MARCUS);
+  await page.goto("/#/claims/CLM-1015");
+  await expect(
+    page.getByText(
+      "Only a handler who can sign off payouts over the limit can sign this off.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sign off as/ })).toHaveCount(
+    0,
   );
 });

@@ -14,6 +14,7 @@ from agent import claim as claim_agent
 from agent.tests.stubs import BrokenModel, RateLimitedModel, call, script
 from backend import db, runs
 from backend.api import app
+from backend.tests.signing import as_handler
 
 RECORD = {
     "kind": "dispatch",
@@ -194,7 +195,7 @@ def test_a_claim_that_fails_twice_is_left_for_a_handler(requests, only, models):
 
 def test_a_claim_being_resumed_after_a_sign_off_is_skipped(requests, only, models):
     claim_agent.run("CLM-1008", "CLM-1008-first", script(approve("CLM-1008", 2240.0)))
-    api().post("/api/claims/CLM-1008/sign-off", json={"handler_id": "HND-01"})
+    api().post("/api/claims/CLM-1008/sign-off", headers=as_handler())
     api().post("/api/claims/CLM-1008/lease", json={"worker": "the-service"})
     only("CLM-1008")
     models("CLM-1008", script())

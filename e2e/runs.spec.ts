@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createDispatch, decide, endRun, pay, received, start } from "./api";
 
 test("starting a dispatch on the dashboard reaches the agent's service with N", async ({

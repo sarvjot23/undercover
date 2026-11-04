@@ -13,7 +13,6 @@ from backend.db import claims, decisions, payments, sign_offs, steps
 
 APPROVAL_LIMIT = float(db.load("company.json")["payout_approval_limit"])
 MAX_ATTEMPTS = 2
-HANDLER_IDS = {handler["handler_id"] for handler in db.load("handlers.json")}
 
 LOOKUPS: dict[str, tuple[Table, str]] = {
     "policy": (db.policies, "policy_id"),

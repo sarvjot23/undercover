@@ -8,7 +8,18 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { runClaim, runRecord, stubBackend, summary } from "./testing";
+import { signOut } from "./auth";
+import {
+  dana,
+  marcus,
+  runClaim,
+  signInAs,
+  runRecord,
+  stubBackend,
+  summary,
+} from "./testing";
+
+vi.mock("./auth");
 
 afterEach(() => {
   cleanup();
@@ -297,4 +308,23 @@ it("shows the summary from the records once the dispatch ends", async () => {
   expect(summary?.textContent).toContain("Left for a handler: CLM-1004");
   expect(summary?.textContent).toContain("Still in progress: CLM-1005");
   expect(panel.textContent).toContain("Finished");
+});
+
+it("shows who is signed in, with a way to sign out", async () => {
+  stubBackend({ "/api/claims": queue, "/api/handlers": [dana, marcus] });
+  render(<App />);
+  expect(await screen.findByText("Dana Whitfield")).toBeDefined();
+  expect(screen.getByText("Senior Claims Handler")).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  expect(signOut).toHaveBeenCalled();
+});
+
+it("shows the sign-in page to anyone signed out", async () => {
+  signInAs(null);
+  stubBackend({ "/api/claims": queue });
+  render(<App />);
+  expect(await screen.findByRole("heading", { name: "Sign in" })).toBeDefined();
+  expect(screen.queryByRole("navigation")).toBeNull();
+  expect(screen.queryByText(/sign up/i)).toBeNull();
+  signInAs(dana.email);
 });

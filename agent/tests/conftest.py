@@ -4,12 +4,14 @@ from fastapi.testclient import TestClient
 from agent import checkpoints, client, graph
 from agent.tests.stubs import Backend
 from backend.api import app
+from backend.tests import signing
 
 
 @pytest.fixture
 def requests(tmp_path, monkeypatch) -> list[str]:
     """Point the agent at the backend with a fresh database; collect its requests."""
     monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "test.db"))
+    signing.install(monkeypatch)
     with TestClient(app):
         pass
     paths: list[str] = []

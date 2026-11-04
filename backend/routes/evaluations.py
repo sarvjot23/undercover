@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, RowMapping, select
 
 from backend import runs, scoring
+from backend.auth import SignedIn
 from backend.db import SingleStatementDb, handler_decisions
 from backend.db import runs as run_table
 from backend.routes.runs import ask_to_start
@@ -36,7 +37,7 @@ def describe(conn: Connection, row: RowMapping) -> dict[str, Any]:
 
 
 @router.post("", operation_id="start_evaluation", status_code=202)
-def start_evaluation(start: EvaluationStart) -> dict[str, bool]:
+def start_evaluation(start: EvaluationStart, _: SignedIn) -> dict[str, bool]:
     """Ask the agent's service to evaluate the agent on a labelled set."""
     return ask_to_start("/evaluations", start.model_dump())
 

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { endRun, pay, received } from "./api";
 
 test("starting an evaluation on the Scoreboard page reaches the agent's service", async ({

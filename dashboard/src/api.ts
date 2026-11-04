@@ -1,3 +1,5 @@
+import { accessToken } from "./auth";
+
 export type Status =
   "waiting" | "in_progress" | "awaiting_sign_off" | "decided" | "needs_handler";
 export type Outcome = "approve" | "decline" | "refer";
@@ -192,6 +194,8 @@ export interface Handler {
   handler_id: string;
   name: string;
   role: string;
+  email: string;
+  can_approve_over_limit: boolean;
 }
 
 export async function getJson<T>(path: string): Promise<T> {
@@ -200,27 +204,34 @@ export async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function postJson<T>(path: string, body?: object): Promise<T> {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+/** POST as the signed-in handler, with their access token. */
+async function post(path: string, body?: object, method = "POST") {
+  const token = await accessToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(path, {
+    method,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+}
+
+export async function postJson<T>(path: string, body?: object): Promise<T> {
+  const response = await post(path, body);
   if (!response.ok) throw new Error(`${path}: ${String(response.status)}`);
   return (await response.json()) as T;
 }
 
-/** POST, and return the backend's reason when it refuses, or null when it accepts. */
+/** Send an action, and return the backend's reason when it refuses, or null. */
 export async function postForRefusal(
   path: string,
-  body: object,
+  body?: object,
+  method = "POST",
 ): Promise<string | null> {
   try {
-    const response = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const response = await post(path, body, method);
     if (response.ok) return null;
     const refusal = (await response.json()) as { detail?: unknown };
     return typeof refusal.detail === "string"

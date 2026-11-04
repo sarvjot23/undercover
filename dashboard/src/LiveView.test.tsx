@@ -11,6 +11,8 @@ import type { Run } from "./api";
 import { LiveView } from "./LiveView";
 import { runClaim, runRecord, stubBackend } from "./testing";
 
+vi.mock("./auth");
+
 let reducedMotion = true;
 
 beforeEach(() => {

@@ -67,7 +67,13 @@ claims = Table(
 policies = body_table("policies", "policy_id")
 customers = body_table("customers", "customer_id")
 plans = body_table("plans", "plan")
-handlers = body_table("handlers", "handler_id")
+handlers = Table(
+    "handlers",
+    metadata,
+    Column("handler_id", Text, primary_key=True),
+    Column("email", Text, nullable=False, unique=True),
+    Column("body", Text, nullable=False),
+)
 decisions = Table(
     "decisions",
     metadata,
@@ -253,7 +259,17 @@ def seed(conn: Connection) -> None:
     )
     conn.execute(policies.insert(), rows("policies.json", "policy_id"))
     conn.execute(customers.insert(), rows("customers.json", "customer_id"))
-    conn.execute(handlers.insert(), rows("handlers.json", "handler_id"))
+    conn.execute(
+        handlers.insert(),
+        [
+            {
+                "handler_id": handler["handler_id"],
+                "email": handler["email"],
+                "body": json.dumps(handler),
+            }
+            for handler in load("handlers.json")
+        ],
+    )
     conn.execute(
         plans.insert(),
         [

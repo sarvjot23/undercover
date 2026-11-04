@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, select
 
 from backend import agent_service, runs
+from backend.auth import SignedIn
 from backend.db import Db, SingleStatementDb
 from backend.db import runs as run_table
 from backend.rules import find_claim
@@ -34,7 +35,7 @@ def ask_to_start(path: str, body: dict[str, object]) -> dict[str, bool]:
 
 
 @router.post("/claims/{claim_id}/run", operation_id="run_claim")
-def run_claim(claim_id: str, conn: Db) -> dict[str, str]:
+def run_claim(claim_id: str, _: SignedIn, conn: Db) -> dict[str, str]:
     """Ask the agent's service to start on a waiting claim."""
     if find_claim(conn, claim_id)["status"] != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is not waiting")
@@ -45,7 +46,7 @@ def run_claim(claim_id: str, conn: Db) -> dict[str, str]:
 
 
 @router.post("/dispatches", operation_id="start_dispatch", status_code=202)
-def start_dispatch(start: DispatchStart) -> dict[str, bool]:
+def start_dispatch(start: DispatchStart, _: SignedIn) -> dict[str, bool]:
     """Ask the agent's service to dispatch the queue with N claim agents at once."""
     return ask_to_start("/dispatches", start.model_dump())
 

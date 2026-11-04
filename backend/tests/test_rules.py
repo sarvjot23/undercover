@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from backend import agent_service, db, rules
 from backend.api import app
+from backend.tests.signing import as_handler
 
 
 def decide(client, claim_id, decision="approve", payout=650.0):
@@ -77,7 +78,7 @@ def test_payment_over_the_limit_waits_for_sign_off(client):
     assert "sign-off" in refused.json()["detail"]
     assert client.get("/api/claims/CLM-1002").json()["payment"] is None
 
-    signed = client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    signed = client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
     assert signed.json()["status"] == "in_progress"
     assert signed.json()["sign_off"]["handler_id"] == "HND-01"
     assert signed.json()["sign_off"]["signed_off_at"]
@@ -91,15 +92,9 @@ def test_payment_over_the_limit_waits_for_sign_off(client):
     assert claim["payment"]["signed_off_at"] == claim["sign_off"]["signed_off_at"]
 
 
-def test_sign_off_by_unknown_handler(client):
-    decide(client, "CLM-1002", payout=1200.0)
-    signed = client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-99"})
-    assert signed.status_code == 404
-
-
 def test_sign_off_needs_a_claim_waiting_for_it(client):
     decide(client, "CLM-1001")
-    signed = client.post("/api/claims/CLM-1001/sign-off", json={"handler_id": "HND-01"})
+    signed = client.post("/api/claims/CLM-1001/sign-off", headers=as_handler())
     assert signed.status_code == 409
 
 
@@ -159,7 +154,7 @@ def test_a_repeated_decision_works_after_the_claim_has_moved_on(client):
 
 def test_the_sign_off_stands_until_the_payment(client):
     decide(client, "CLM-1002", payout=1200.0)
-    client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "in_progress"
     assert claim["sign_off"]["handler_id"] == "HND-01"
@@ -168,7 +163,7 @@ def test_the_sign_off_stands_until_the_payment(client):
 
 def test_a_sign_off_is_saved_only_on_a_claim_waiting_for_one(client):
     decide(client, "CLM-1001", decision="refer", payout=0)
-    signed = client.post("/api/claims/CLM-1001/sign-off", json={"handler_id": "HND-01"})
+    signed = client.post("/api/claims/CLM-1001/sign-off", headers=as_handler())
     assert signed.status_code == 409
     assert client.get("/api/claims/CLM-1001").json()["sign_off"] is None
 
@@ -184,10 +179,10 @@ def test_a_sign_off_cut_short_is_finished_by_signing_off_again(client):
             )
         )
     assert status(client, "CLM-1002") == "awaiting_sign_off"
-    client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-02"})
+    client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "in_progress"
-    assert claim["sign_off"]["handler_id"] == "HND-01"
+    assert claim["sign_off"]["signed_off_at"] == "2026-10-30T00:00:00+00:00"
 
 
 def test_a_held_claim_is_not_being_worked(client):
@@ -303,18 +298,22 @@ def test_fail_sends_the_claim_back_to_waiting(client):
 def test_run_asks_the_agents_service(client, monkeypatch):
     told = []
     monkeypatch.setattr(agent_service, "tell", lambda *args: told.append(args) or True)
-    started = client.post("/api/claims/CLM-1001/run").json()
+    started = client.post("/api/claims/CLM-1001/run", headers=as_handler()).json()
     assert started["thread_id"].startswith("CLM-1001-")
     assert told == [("/claims/CLM-1001/run", {"thread_id": started["thread_id"]})]
 
 
 def test_run_needs_the_agents_service(client):
-    assert client.post("/api/claims/CLM-1001/run").status_code == 503
+    assert (
+        client.post("/api/claims/CLM-1001/run", headers=as_handler()).status_code == 503
+    )
 
 
 def test_run_needs_a_waiting_claim(client):
     client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
-    assert client.post("/api/claims/CLM-1001/run").status_code == 409
+    assert (
+        client.post("/api/claims/CLM-1001/run", headers=as_handler()).status_code == 409
+    )
 
 
 def test_a_sign_off_reaches_the_agent_only_once_it_is_saved(client, monkeypatch):
@@ -326,14 +325,14 @@ def test_a_sign_off_reaches_the_agent_only_once_it_is_saved(client, monkeypatch)
             seen.append((claim_id, rules.standing(conn, claim_id)["sign_off"]))
 
     monkeypatch.setattr(agent_service, "resume", resume)
-    client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
     assert seen[0][0] == "CLM-1002"
     assert seen[0][1]["handler_id"] == "HND-01"
 
 
 def test_a_sign_off_stands_when_the_agent_cannot_be_reached(client):
     decide(client, "CLM-1002", payout=1200.0)
-    signed = client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
+    signed = client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
     assert signed.status_code == 200
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "in_progress"

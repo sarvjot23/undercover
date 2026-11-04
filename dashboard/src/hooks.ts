@@ -6,6 +6,7 @@ export type Route =
   | { view: "claim"; claimId: string }
   | { view: "configuration" }
   | { view: "settings" }
+  | { view: "improvement" }
   | { view: "scoreboard" }
   | { view: "evaluation"; runId: number }
   | { view: "live" };
@@ -17,6 +18,7 @@ export function parseRoute(hash: string): Route {
   if (hash === "#/configuration" || hash === "#/instructions")
     return { view: "configuration" };
   if (hash === "#/settings") return { view: "settings" };
+  if (hash === "#/improvement") return { view: "improvement" };
   if (hash === "#/scoreboard") return { view: "scoreboard" };
   const evaluation = /^#\/scoreboard\/(\d+)$/.exec(hash);
   if (evaluation?.[1])

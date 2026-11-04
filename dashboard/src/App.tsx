@@ -4,6 +4,7 @@ import { ClaimView } from "./ClaimView";
 import { Configuration } from "./Configuration";
 import { EvaluationView } from "./EvaluationView";
 import { HandlerContext } from "./handler";
+import { Improvement } from "./Improvement";
 import type { Route } from "./hooks";
 import { useJson, useRoute } from "./hooks";
 import { LiveView } from "./LiveView";
@@ -49,6 +50,8 @@ function Page({ route }: Readonly<{ route: Route }>) {
       return <Scoreboard />;
     case "evaluation":
       return <EvaluationView key={route.runId} runId={route.runId} />;
+    case "improvement":
+      return <Improvement />;
     case "configuration":
       return <Configuration />;
     case "settings":
@@ -77,6 +80,9 @@ function Masthead({
         </a>
         <a href="#/scoreboard" aria-current={here("scoreboard", "evaluation")}>
           Scoreboard
+        </a>
+        <a href="#/improvement" aria-current={here("improvement")}>
+          Improvement
         </a>
         <a href="#/configuration" aria-current={here("configuration")}>
           Configuration

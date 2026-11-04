@@ -1171,3 +1171,121 @@ tr.chosen td {
 .spaced {
   margin-top: 20px;
 }
+
+/* The Improvement page */
+.stages {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stages li {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stages li.done {
+  color: var(--ink);
+}
+
+.stages li.now {
+  background: var(--gold);
+  color: #121212;
+  font-weight: 600;
+}
+
+.badge-round-working {
+  background: var(--gold);
+  color: #121212;
+}
+
+.badge-round-waiting {
+  background: var(--burnished);
+  color: #121212;
+}
+
+.badge-round-finished,
+.badge-verdict-kept {
+  background: var(--antique);
+  color: #121212;
+}
+
+.badge-round-stopped,
+.badge-verdict-rolled_back {
+  background: var(--steel);
+  color: #ffffff;
+}
+
+.events {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.recipe-versions {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.chart {
+  margin: 0;
+}
+
+.chart figcaption {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.chart svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--soft);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 2;
+}
+
+.chart-point {
+  fill: var(--accent-text);
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+
+.chart-point.rolled-back {
+  fill: var(--panel);
+  stroke: var(--accent-text);
+}
+
+.placeholder {
+  min-height: 3em;
+  color: var(--muted);
+}

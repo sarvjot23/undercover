@@ -340,3 +340,73 @@ export async function postForRefusal(
     return "The backend is not responding.";
   }
 }
+
+export type RoundStage =
+  | "first_evaluations"
+  | "improving"
+  | "change_waiting"
+  | "evaluations"
+  | "verdict"
+  | "recipe_waiting"
+  | "finished"
+  | "stopped";
+
+/** A new version of the claim agent's configuration, waiting for a handler. */
+export interface ChangeProposal {
+  kind: "change";
+  instructions: string;
+  model: string;
+  reasoning: string;
+  reason: string;
+  diff: DiffLine[];
+  model_before: string;
+  reasoning_before: string;
+}
+
+/** A new version of the improver's recipe, waiting for a handler. */
+export interface RecipeProposal {
+  kind: "recipe";
+  recipe: string;
+  reason: string;
+  diff: DiffLine[];
+}
+
+export interface RoundEvent {
+  event_id: number;
+  decision: "approve" | "reject";
+  proposal: "change" | "recipe";
+  handler_id: string;
+  message: string;
+  at: string;
+}
+
+/** A round of improvement, as the backend records it. */
+export interface Round {
+  round_id: number;
+  thread_id: string;
+  recipe_version: number;
+  settings: PlatformSettings;
+  status: "working" | "waiting" | "finished" | "stopped";
+  stage: RoundStage;
+  progress: string | null;
+  proposal: ChangeProposal | RecipeProposal | null;
+  version_before: number;
+  version_tried: number | null;
+  reason: string | null;
+  before: VersionScores | null;
+  after: VersionScores | null;
+  verdict: "kept" | "rolled_back" | null;
+  why: string | null;
+  started_by: string;
+  started_at: string;
+  finished_at: string | null;
+  tried: { version: number; model: string; reasoning: string } | null;
+  events: RoundEvent[];
+  evaluations: {
+    run_id: number;
+    set_name: SetName;
+    version: number;
+    status: Run["status"];
+  }[];
+  spent: number;
+}

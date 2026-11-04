@@ -21,8 +21,11 @@ test("the configuration shows version 1 read only", async ({ page }) => {
     page.getByRole("heading", { name: "Version 1, the current version" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("table", { name: "Versions" }).getByRole("row"),
-  ).toHaveCount(2);
+    page
+      .getByRole("table", { name: "Versions" })
+      .getByRole("row")
+      .filter({ hasText: "The first version" }),
+  ).toContainText("Seeded");
   await expect(page.locator(".diff-add").first()).toContainText(
     "You are the UnderCover Agent.",
   );

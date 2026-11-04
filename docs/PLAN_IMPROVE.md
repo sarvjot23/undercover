@@ -303,10 +303,10 @@ Success criteria, all on a stub model and a stub judge:
 
 Success criteria:
 
-- [ ] Vitest checks each stage of a round as it shows, a proposal's diff with the model and effort before and after, approve with a confirmation, reject with a reason, the rounds newest first, the chart's points and the recipes.
-- [ ] Vitest checks that Marcus sees why he can't start, stop, approve or reject.
-- [ ] An end-to-end test starts a round (the stand-in receives it), and approves a proposal that the test plays out through the API.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] Vitest checks each stage of a round as it shows, a proposal's diff with the model and effort before and after, approve with a confirmation, reject with a reason, the rounds newest first, the chart's points and the recipes.
+- [x] Vitest checks that Marcus sees why he can't start, stop, approve or reject.
+- [x] An end-to-end test starts a round (the stand-in receives it), and approves a proposal that the test plays out through the API.
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 6: the look of the dashboard, the live runs and the handover
 

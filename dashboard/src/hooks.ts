@@ -5,12 +5,18 @@ export type Route =
   | { view: "queue" }
   | { view: "claim"; claimId: string }
   | { view: "instructions" }
+  | { view: "scoreboard" }
+  | { view: "evaluation"; runId: number }
   | { view: "live" };
 
 export function parseRoute(hash: string): Route {
   const claim = /^#\/claims\/([\w-]+)$/.exec(hash);
   if (claim?.[1]) return { view: "claim", claimId: claim[1] };
   if (hash === "#/instructions") return { view: "instructions" };
+  if (hash === "#/scoreboard") return { view: "scoreboard" };
+  const evaluation = /^#\/scoreboard\/(\d+)$/.exec(hash);
+  if (evaluation?.[1])
+    return { view: "evaluation", runId: Number(evaluation[1]) };
   if (hash === "#/live") return { view: "live" };
   return { view: "queue" };
 }

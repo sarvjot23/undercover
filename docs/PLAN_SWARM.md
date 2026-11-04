@@ -244,12 +244,12 @@ Success criteria, all on a stub model:
 
 Success criteria:
 
-- [ ] Vitest checks the scoreboard: newest first, with every measure, and a stopped evaluation shown as stopped.
-- [ ] Vitest checks an evaluation's page: the handler's decision and payout beside the agent's, the misses marked, and each claim linked.
-- [ ] Vitest checks a copy's claim page shows no sign-off form.
-- [ ] An end-to-end test starts an evaluation on the Scoreboard page, and the stand-in receives the set, `tiny` and N.
-- [ ] An end-to-end test plays an evaluation out through the API, as `e2e/runs.spec.ts` does with a run, and sees it on the scoreboard with its measures.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] Vitest checks the scoreboard: newest first, with every measure, and a stopped evaluation shown as stopped.
+- [x] Vitest checks an evaluation's page: the handler's decision and payout beside the agent's, the misses marked, and each claim linked.
+- [x] Vitest checks a copy's claim page shows no sign-off form.
+- [x] An end-to-end test starts an evaluation on the Scoreboard page, and the stand-in receives the set, `tiny` and N.
+- [x] An end-to-end test plays an evaluation out through the API, as `e2e/runs.spec.ts` does with a run, and sees it on the scoreboard with its measures.
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 6: the live runs, and the handover
 

@@ -246,3 +246,25 @@ it("lists the sections the agent read, and its failed attempts", async () => {
   );
   expect(screen.getAllByText("Read")).toHaveLength(2);
 });
+
+it("shows a copy for an evaluation with no sign-off form and no run button", async () => {
+  stubBackend({
+    "/api/claims/EV7-CLM-1021": claim({
+      claim_id: "EV7-CLM-1021",
+      status: "awaiting_sign_off",
+      decision: approval,
+    }),
+    "/api/claims/EV7-CLM-1021/steps": [step],
+    "/api/claims/EV7-CLM-1021/standing": { evaluation_id: 7 },
+    "/api/handlers": handlers,
+  });
+  render(<ClaimView claimId="EV7-CLM-1021" />);
+  const note = await screen.findByText(/Nobody signs off a copy/);
+  expect(note.textContent).toContain("A copy for evaluation 7.");
+  expect(
+    screen.getByRole("link", { name: "evaluation 7" }).getAttribute("href"),
+  ).toBe("#/scoreboard/7");
+  expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
+  expect(screen.queryByRole("combobox")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Run the agent" })).toBeNull();
+});

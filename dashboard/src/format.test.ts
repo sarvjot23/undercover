@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cost, date, duration, label, money } from "./format";
+import { cost, date, duration, label, money, percent } from "./format";
 
 it("formats money in US dollars", () => {
   expect(money(1250)).toBe("$1,250.00");
@@ -23,4 +23,9 @@ it("formats a model cost to a hundredth of a cent", () => {
 it("formats a length of time", () => {
   expect(duration(42.4)).toBe("42s");
   expect(duration(185)).toBe("3m 05s");
+});
+
+it("formats a share as a percentage", () => {
+  expect(percent(0.8)).toBe("80%");
+  expect(percent(2 / 3)).toBe("67%");
 });

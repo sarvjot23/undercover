@@ -855,3 +855,28 @@ button.quiet {
   border-radius: 10px;
   background: var(--soft);
 }
+
+.evaluation-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin: 16px 0;
+}
+
+.cap select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--soft);
+  border: none;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.badge-miss {
+  background: var(--burnished);
+}
+
+tr.miss td {
+  background: color-mix(in srgb, var(--burnished) 14%, transparent);
+}

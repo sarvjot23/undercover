@@ -19,6 +19,11 @@ it("parses each route", () => {
   });
   expect(parseRoute("#/instructions")).toEqual({ view: "instructions" });
   expect(parseRoute("#/live")).toEqual({ view: "live" });
+  expect(parseRoute("#/scoreboard")).toEqual({ view: "scoreboard" });
+  expect(parseRoute("#/scoreboard/7")).toEqual({
+    view: "evaluation",
+    runId: 7,
+  });
   expect(parseRoute("#/nowhere")).toEqual({ view: "queue" });
 });
 

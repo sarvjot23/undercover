@@ -1,8 +1,10 @@
 import { ClaimView } from "./ClaimView";
+import { EvaluationView } from "./EvaluationView";
 import { useRoute } from "./hooks";
 import { Instructions } from "./Instructions";
 import { LiveView } from "./LiveView";
 import { Queue } from "./Queue";
+import { Scoreboard } from "./Scoreboard";
 
 export function App() {
   const route = useRoute();
@@ -24,6 +26,16 @@ export function App() {
             Queue
           </a>
           <a
+            href="#/scoreboard"
+            aria-current={
+              route.view === "scoreboard" || route.view === "evaluation"
+                ? "page"
+                : undefined
+            }
+          >
+            Scoreboard
+          </a>
+          <a
             href="#/instructions"
             aria-current={route.view === "instructions" ? "page" : undefined}
           >
@@ -37,6 +49,10 @@ export function App() {
           <ClaimView key={route.claimId} claimId={route.claimId} />
         )}
         {route.view === "queue" && <Queue />}
+        {route.view === "scoreboard" && <Scoreboard />}
+        {route.view === "evaluation" && (
+          <EvaluationView key={route.runId} runId={route.runId} />
+        )}
       </main>
     </div>
   );

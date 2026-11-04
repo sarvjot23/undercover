@@ -1,4 +1,4 @@
-import type { Outcome, Status } from "./api";
+import type { Outcome, SetName, Status } from "./api";
 
 const dollars = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -19,6 +19,11 @@ const cents = new Intl.NumberFormat("en-US", {
 /** A model cost, which is often a fraction of a cent. */
 export function cost(amount: number): string {
   return cents.format(amount);
+}
+
+/** A share, such as 0.8, as a percentage. */
+export function percent(share: number): string {
+  return `${String(Math.round(share * 100))}%`;
 }
 
 /** A length of time, such as 42s or 3m 05s. */
@@ -67,3 +72,13 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   decline: "Declined",
   refer: "Referred",
 };
+
+export const SET_LABELS: Record<SetName, string> = {
+  evaluation: "Evaluation set",
+  held_out: "Held-out set",
+};
+
+/** Which claims of the set an evaluation works: all of them, or the five tiny ones. */
+export function claimsLabel(tiny: boolean): string {
+  return tiny ? "Five tiny claims" : "The whole set";
+}

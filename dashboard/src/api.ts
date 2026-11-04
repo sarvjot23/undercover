@@ -157,6 +157,37 @@ export interface Run {
   summary: RunSummary | null;
 }
 
+/** An evaluation's measures, from our team's labs. */
+export interface Scores {
+  decision_accuracy: number;
+  accuracy: number;
+  cost_of_mistakes: number;
+  straight_through: number;
+  cost: number;
+  cost_per_claim: number;
+  seconds_per_claim: number;
+  seconds: number;
+}
+
+/** One claim of an evaluation: the handler's answer beside the agent's. */
+export interface ScoredClaim extends RunClaim {
+  handler_decision: Outcome;
+  handler_payout: number;
+  /** The agent's decision, with a claim it didn't decide counted as a referral. */
+  agent_decision: Outcome;
+  agent_payout: number;
+  right: boolean;
+  mistake_cost: number;
+}
+
+/** An evaluation as the scoreboard lists it, with its measures once finished. */
+export type EvaluationSummary = Omit<Run, "claims"> & { scores: Scores | null };
+
+export interface Evaluation extends Run {
+  claims: ScoredClaim[];
+  scores: Scores | null;
+}
+
 export interface Handler {
   handler_id: string;
   name: string;

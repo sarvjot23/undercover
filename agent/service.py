@@ -42,7 +42,7 @@ def signed_off_claims() -> list[str]:
 def pick_up_signed_off() -> None:
     """Pay what was signed off while the agent was away, and warm up for the next."""
     claims = signed_off_claims()
-    config = tracing.config("warm-up", graph.RECURSION_LIMIT)
+    config = tracing.config("warm-up", graph.RECURSION_LIMIT, None)
     claim.build(None).get_state(config)
     for claim_id in claims:
         claim.carry_on(claim_id)

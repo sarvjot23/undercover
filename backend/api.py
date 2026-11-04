@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from backend import db
-from backend.routes import claims, documents, library, runs
+from backend.routes import claims, documents, library, runs, usage
 
 
 @asynccontextmanager
@@ -23,6 +23,7 @@ app.include_router(claims.router)
 app.include_router(documents.router)
 app.include_router(library.router)
 app.include_router(runs.router)
+app.include_router(usage.router)
 
 
 @app.get("/api/health", operation_id="health")

@@ -5,8 +5,10 @@ from collections.abc import Callable
 from functools import cache
 from typing import Annotated, Any, Literal, TypedDict
 
+from langchain_core.exceptions import ModelRateLimitError, ModelTimeoutError
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AnyMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, SystemMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -22,6 +24,8 @@ RETRIES = 2
 RETRY_DELAY = 1.0
 RECURSION_LIMIT = 3 * MODEL_CALLS + 20
 STEP_LENGTH = 600
+# The dispatcher waits these out and carries the claim on, so the graph doesn't retry.
+PASSED_UP = (ModelRateLimitError, ModelTimeoutError)
 
 
 class ClaimState(TypedDict):
@@ -65,8 +69,27 @@ def report(claim: dict[str, Any]) -> str:
 
 
 def retry_model(error: Exception) -> bool:
-    """Retry a provider's errors, but not the limit on model calls."""
-    return not isinstance(error, TooManyModelCalls)
+    """Retry a provider's errors, but not the limit, rate limits or timeouts."""
+    return not isinstance(error, (TooManyModelCalls, *PASSED_UP))
+
+
+def record_usage(claim_id: str, run_id: int | None, reply: AIMessage) -> None:
+    """Record a reply's tokens and cost, as OpenRouter reports them, once per reply."""
+    usage = reply.response_metadata.get("token_usage")
+    if not usage:
+        return
+    with client.backend() as backend:
+        backend.post(
+            f"/api/claims/{claim_id}/usage",
+            json={
+                "run_id": run_id,
+                "model": reply.response_metadata["model_name"],
+                "input_tokens": usage["prompt_tokens"],
+                "output_tokens": usage["completion_tokens"],
+                "cost": usage.get("cost", 0.0),
+                "key": reply.id,
+            },
+        )
 
 
 def record_tool_result(
@@ -170,11 +193,13 @@ def agent_node(make_llm: Callable[[], BaseChatModel], instructions: str) -> Any:
     def bound() -> Any:
         return make_llm().bind_tools(TOOLS)
 
-    def agent(state: ClaimState) -> dict[str, Any]:
+    def agent(state: ClaimState, config: RunnableConfig) -> dict[str, Any]:
         calls = state["model_calls"]
         if calls >= MODEL_CALLS:
             raise TooManyModelCalls(f"Stopped after {MODEL_CALLS} model calls")
         reply = bound().invoke([system, *state["messages"]])
+        run_id = config.get("configurable", {})["run_id"]
+        record_usage(state["claim_id"], run_id, reply)
         return {"messages": [reply], "model_calls": calls + 1}
 
     return agent

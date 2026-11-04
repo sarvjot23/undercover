@@ -1,5 +1,6 @@
 """The request bodies of the backend's API."""
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -86,3 +87,22 @@ class Summary(BaseModel):
     """The agent's summary of a run for the handlers."""
 
     summary: str = Field(min_length=1)
+
+
+class Usage(BaseModel):
+    """The tokens and cost of one model reply, as OpenRouter reports them."""
+
+    run_id: int | None
+    model: str
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    cost: float = Field(ge=0)
+    key: str
+
+
+class WorkSession(BaseModel):
+    """A spell of the agent's work on a claim, which ends when its graph stops."""
+
+    run_id: int | None
+    started: datetime
+    finished: datetime

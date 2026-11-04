@@ -116,6 +116,28 @@ run_claims = Table(
     Column("claim_id", Text, primary_key=True),
     Column("position", Integer, nullable=False),
 )
+usage = Table(
+    "usage",
+    metadata,
+    Column("usage_id", Integer, primary_key=True, autoincrement=True),
+    Column("claim_id", Text, nullable=False),
+    Column("run_id", Integer),
+    Column("model", Text, nullable=False),
+    Column("input_tokens", Integer, nullable=False),
+    Column("output_tokens", Integer, nullable=False),
+    Column("cost", Float, nullable=False),
+    Column("key", Text, nullable=False, unique=True),
+)
+work_sessions = Table(
+    "work_sessions",
+    metadata,
+    Column("session_id", Integer, primary_key=True, autoincrement=True),
+    Column("claim_id", Text, nullable=False),
+    Column("run_id", Integer),
+    Column("started", Text, nullable=False),
+    Column("finished", Text, nullable=False),
+    Column("seconds", Float, nullable=False),
+)
 steps = Table(
     "steps",
     metadata,

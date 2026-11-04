@@ -1,6 +1,6 @@
 # Status
 
-The claims pilot from `docs/PLAN.md` is built (7 phases), the harness from `docs/HARNESS.md` is built to `docs/PLAN_HARNESS.md` (6 phases), and durable state from `docs/DURABLE.md` is built to `docs/PLAN_DURABLE.md` (6 phases). The records are on Supabase. The claim agent is a LangGraph graph that waits for a handler's sign-off and carries on after a restart.
+The claims pilot from `docs/PLAN.md` is built (7 phases), the harness from `docs/HARNESS.md` is built to `docs/PLAN_HARNESS.md` (6 phases), and durable state from `docs/DURABLE.md` is built to `docs/PLAN_DURABLE.md` (6 phases). The swarm from `docs/SWARM.md` is being built to `docs/PLAN_SWARM.md`: phase 1 is done. The records are on Supabase. The claim agent is a LangGraph graph that waits for a handler's sign-off and carries on after a restart.
 
 ## What's built
 
@@ -16,6 +16,7 @@ The claims pilot from `docs/PLAN.md` is built (7 phases), the harness from `docs
   - The claim agent (`agent/claim.py`, with its graph in `agent/graph.py`, instructions in `backend/instructions/claim.md`). Its nodes are `agent`, `record`, `tools`, `sign_off`, `pay` and `close`. Its tools call the backend: `get_claim`, `list_sections`, `read_section`, `search_documents`, `calculate_payout` and `record_decision`. It has no pay tool; paying is a step of the graph. `run(claim_id, thread_id)` starts a claim and `carry_on(claim_id)` picks one up. Provider errors are retried twice, and a claim stops after 30 model calls.
   - Checkpoints (`agent/checkpoints.py`): `PostgresSaver` on a pool of at most 4 connections, in memory without `DATABASE_URL`, which only the tests rely on.
   - The service (`agent/service.py`), on port 8002: start a claim, start a run, resume a signed-off claim. When it starts, it pays anything signed off while it was away.
+  - The model (`agent/model.py`): `openai/gpt-6-luna` with low reasoning effort, or `MODEL_NAME` with none. Each model reply's tokens and cost, from OpenRouter's usage, go to `POST /api/claims/{id}/usage` once per reply, and each spell of work on a claim goes to `POST /api/claims/{id}/work`, stopping at a pause for a sign-off. Both carry the run, or none.
   - Tracing (`agent/tracing.py`): each claim's work is one Langfuse session, named by its thread, with traces from before and after a sign-off. There's no tracing without the keys.
 - `dashboard/`: React in UnderCover's brand, light and dark.
   - `#/`: the queue, with a count of claims in each state, "Run the queue" with "Claims in this run", "Watch live", and the current run's to-do list and summary. While a run is being worked, from here or the command line, "Run the queue" is disabled with "A run is already in progress". After a run stops, it offers to finish it.

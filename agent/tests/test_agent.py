@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import client, graph, model, tools, tracing
+from agent import client, graph, tools, tracing
 from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
 
@@ -139,15 +139,6 @@ def test_agent_reaches_only_the_backend_api(requests):
     assert all(path.startswith("/api/") for path in requests)
 
 
-def test_model_name(monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.delenv("MODEL_NAME", raising=False)
-    assert model.model().model_name == "deepseek/deepseek-v4.1-flash"
-    assert model.model().reasoning_effort == "low"
-    monkeypatch.setenv("MODEL_NAME", "openrouter/free")
-    assert model.model().model_name == "openrouter/free"
-
-
 def test_backend_url():
     assert str(client.backend().base_url) == "http://127.0.0.1:8000"
 
@@ -224,13 +215,13 @@ def test_a_claim_is_a_langfuse_session_named_by_its_thread(monkeypatch):
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-test")
     monkeypatch.setattr(tracing, "CallbackHandler", lambda: "handler")
-    config = tracing.config("CLM-1001-ab12cd34", 10)
+    config = tracing.config("CLM-1001-ab12cd34", 10, None)
     assert config.get("metadata") == {"langfuse_session_id": "CLM-1001-ab12cd34"}
     assert config.get("callbacks") == ["handler"]
 
 
 def test_no_tracing_without_the_keys():
-    assert tracing.config("thread-1", 10).get("callbacks") == []
+    assert tracing.config("thread-1", 10, None).get("callbacks") == []
     tracing.flush()
 
 

@@ -1,133 +1,188 @@
-"""The rules for a queue run: its cap, its claims and when it may finish."""
+"""The rules for a run, a dispatch or an evaluation: its claims, cost and time."""
 
 import json
+from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import Connection, RowMapping, or_, select
+from sqlalchemy import Connection, RowMapping, func, select
 from sqlalchemy.exc import IntegrityError
 
-from backend import db, leases
-from backend.db import claims, run_claims, runs
-from backend.rules import fail, find_claim, standing
+from backend import db, evaluations
+from backend.db import claims, run_claims, runs, steps, usage, work_sessions
+from backend.rules import standing_of, standing_query
+from backend.schemas import RunRecord
 
-IN_PROGRESS = "A run is already in progress"
+ALREADY_RUNNING = "A dispatch or evaluation is already running"
 
 
-def waiting(conn: Connection) -> list[str]:
-    """Return the waiting claims in the order they were submitted."""
-    query = select(claims.c.claim_id, claims.c.body).where(claims.c.status == "waiting")
+def dispatch_claims(conn: Connection) -> list[str]:
+    """The claims a dispatch works: in progress first, then waiting, oldest first.
+
+    An evaluation's copies are never among them.
+    """
+    query = select(claims.c.claim_id, claims.c.status, claims.c.body).where(
+        claims.c.evaluation_id.is_(None),
+        claims.c.status.in_(("in_progress", "waiting")),
+    )
     found = sorted(
-        (json.loads(row["body"])["submitted_on"], row["claim_id"])
+        (
+            row["status"] != "in_progress",
+            json.loads(row["body"])["submitted_on"],
+            row["claim_id"],
+        )
         for row in conn.execute(query).mappings()
     )
-    return [claim_id for _, claim_id in found]
+    return [claim_id for *_, claim_id in found]
 
 
-def describe(conn: Connection, row: RowMapping) -> dict[str, Any]:
-    """Return a run with its claims in the order the agent took them."""
-    query = (
-        select(run_claims.c.claim_id)
-        .where(run_claims.c.run_id == row["run_id"])
-        .order_by(run_claims.c.position)
-    )
-    return {
-        **{key: value for key, value in row.items() if key != "lease_owner"},
-        "active": row["status"] == "running" and leases.is_live(row["lease_until"]),
-        "todos": json.loads(row["todos"]),
-        "claim_ids": list(conn.execute(query).scalars()),
-    }
-
-
-def find_run(conn: Connection, run_id: int) -> RowMapping:
-    """Return a run that is still going, or raise 404 or 409."""
-    query = select(runs).where(runs.c.run_id == run_id)
-    row = conn.execute(query).mappings().first()
-    if row is None:
-        raise HTTPException(404, f"No run {run_id}")
-    if row["status"] != "running":
-        raise HTTPException(409, f"Run {run_id} is {row['status']}")
-    return row
-
-
-def start(conn: Connection, cap: int) -> tuple[int, bool]:
-    """Start a run, or pick up one that stopped; say which. A live run is refused."""
-    query = select(runs).where(runs.c.status == "running")
-    running = conn.execute(query).mappings().first()
-    if running:
-        stopped = (
-            runs.update()
-            .where(
-                runs.c.run_id == running["run_id"],
-                or_(runs.c.lease_until.is_(None), runs.c.lease_until < db.now()),
-            )
-            .values(lease_owner=None, lease_until=leases.expiry())
-        )
-        if conn.execute(stopped).rowcount == 0:
-            raise HTTPException(409, IN_PROGRESS)
-        return running["run_id"], True
-    total = min(cap, len(waiting(conn)))
+def start(conn: Connection, record: RunRecord) -> int:
+    """Create a run and fix its claims; refuse it while another run is going."""
     try:
         result = conn.execute(
             runs.insert().values(
-                cap=cap,
-                total=total,
-                status="running",
-                todos="[]",
-                started_at=db.now(),
-                lease_until=leases.expiry(),
+                **record.model_dump(), total=0, status="running", started_at=db.now()
             )
         )
     except IntegrityError:
-        raise HTTPException(409, IN_PROGRESS) from None
-    return int(result.inserted_primary_key[0]), False  # type: ignore[index]
-
-
-def take(conn: Connection, run_id: int, claim_id: str) -> int:
-    """Add a waiting claim to the run, within its cap, and return its position."""
-    run = find_run(conn, run_id)
-    if find_claim(conn, claim_id)["status"] != "waiting":
-        raise HTTPException(409, f"Claim {claim_id} is not waiting")
-    taken = describe(conn, run)["claim_ids"]
-    if claim_id in taken:
-        return taken.index(claim_id) + 1
-    if len(taken) >= run["cap"]:
-        raise HTTPException(
-            409, f"This run is capped at {run['cap']} claims and has taken them all"
+        raise HTTPException(409, ALREADY_RUNNING) from None
+    run_id = int(result.inserted_primary_key[0])  # type: ignore[index]
+    if record.set_name is None:
+        claim_ids = dispatch_claims(conn)
+    else:
+        claim_ids = evaluations.copy(conn, run_id, record.set_name, record.tiny)
+    if claim_ids:
+        conn.execute(
+            run_claims.insert(),
+            [
+                {"run_id": run_id, "claim_id": claim_id, "position": position}
+                for position, claim_id in enumerate(claim_ids, 1)
+            ],
         )
     conn.execute(
-        run_claims.insert().values(
-            run_id=run_id, claim_id=claim_id, position=len(taken) + 1
-        )
+        runs.update().where(runs.c.run_id == run_id).values(total=len(claim_ids))
     )
-    return len(taken) + 1
+    return run_id
 
 
-def missed(conn: Connection, run_id: int) -> list[str]:
-    """Return the waiting claims the run still has to work before it may finish."""
-    run = find_run(conn, run_id)
-    taken = describe(conn, run)["claim_ids"]
-    queue = waiting(conn)
-    retries = [claim_id for claim_id in taken if claim_id in queue]
-    fresh = [claim_id for claim_id in queue if claim_id not in taken]
-    return retries + fresh[: max(run["cap"] - len(taken), 0)]
+def find_run(conn: Connection, run_id: int) -> RowMapping:
+    """Return a run, or raise 404."""
+    row = conn.execute(select(runs).where(runs.c.run_id == run_id)).mappings().first()
+    if row is None:
+        raise HTTPException(404, f"No run {run_id}")
+    return row
 
 
-def end(conn: Connection, run_id: int, status: str, summary: str) -> None:
-    """End a run, failing its claims in progress that have no decision yet."""
-    run = find_run(conn, run_id)
-    for claim_id in describe(conn, run)["claim_ids"]:
-        found = standing(conn, claim_id)
-        if found["status"] == "in_progress" and found["decision"] is None:
-            fail(conn, claim_id, "The run ended while the agent was on this claim")
-    conn.execute(
+def end(conn: Connection, run_id: int, status: str) -> None:
+    """End a running run as finished or stopped; its claims carry on next time."""
+    update = (
         runs.update()
-        .where(runs.c.run_id == run_id)
-        .values(
-            status=status,
-            summary=summary,
-            finished_at=db.now(),
-            lease_owner=None,
-            lease_until=None,
-        )
+        .where(runs.c.run_id == run_id, runs.c.status == "running")
+        .values(status=status, finished_at=db.now())
     )
+    if conn.execute(update).rowcount == 0:
+        raise HTTPException(409, f"Run {run_id} is {find_run(conn, run_id)['status']}")
+
+
+def claim_entries(conn: Connection, run_id: int) -> list[dict[str, Any]]:
+    """Each of the run's claims, in order: where it stands, its cost and its time."""
+    in_run = select(run_claims.c.claim_id).where(run_claims.c.run_id == run_id)
+    positions = dict(
+        conn.execute(
+            select(run_claims.c.claim_id, run_claims.c.position).where(
+                run_claims.c.run_id == run_id
+            )
+        ).all()
+    )
+    costs = dict(
+        conn.execute(
+            select(usage.c.claim_id, func.sum(usage.c.cost))
+            .where(usage.c.run_id == run_id)
+            .group_by(usage.c.claim_id)
+        ).all()
+    )
+    times = {
+        row["claim_id"]: row
+        for row in conn.execute(
+            select(
+                work_sessions.c.claim_id,
+                func.sum(work_sessions.c.seconds).label("seconds"),
+                func.min(work_sessions.c.started).label("started"),
+            )
+            .where(work_sessions.c.run_id == run_id)
+            .group_by(work_sessions.c.claim_id)
+        ).mappings()
+    }
+    latest = (
+        select(steps.c.text)
+        .where(steps.c.claim_id == claims.c.claim_id)
+        .order_by(steps.c.step_id.desc())
+        .limit(1)
+        .scalar_subquery()
+        .label("latest_step")
+    )
+    query = standing_query().add_columns(latest).where(claims.c.claim_id.in_(in_run))
+    entries = []
+    for row in conn.execute(query).mappings():
+        found = standing_of(row)
+        decision = found["decision"] or {}
+        time = times.get(row["claim_id"], {})
+        entries.append(
+            {
+                "claim_id": row["claim_id"],
+                "source_id": row["source_id"],
+                "status": found["status"],
+                "attempts": found["attempts"],
+                "agent_working": found["agent_working"],
+                "latest_step": row["latest_step"],
+                "decision": decision.get("decision"),
+                "payout": decision.get("payout"),
+                "reasons": decision.get("reasons"),
+                "paid": found["payment"] is not None,
+                "cost": costs.get(row["claim_id"], 0.0),
+                "seconds": time.get("seconds", 0.0),
+                "started": time.get("started"),
+            }
+        )
+    return sorted(entries, key=lambda entry: positions[entry["claim_id"]])
+
+
+def summarise(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """The summary of an ended run, built from the records with no model."""
+    decisions = [entry["decision"] for entry in entries]
+    return {
+        "approved": decisions.count("approve"),
+        "declined": decisions.count("decline"),
+        "referred": decisions.count("refer"),
+        "awaiting_sign_off": [
+            {"claim_id": entry["claim_id"], "payout": entry["payout"]}
+            for entry in entries
+            if entry["status"] == "awaiting_sign_off"
+        ],
+        "left_for_handler": [
+            entry["claim_id"] for entry in entries if entry["status"] == "needs_handler"
+        ],
+        "in_progress": [
+            entry["claim_id"] for entry in entries if entry["status"] == "in_progress"
+        ],
+    }
+
+
+def elapsed(row: RowMapping) -> float:
+    """The run's time from its start to its end, or to now while it's running."""
+    ended = datetime.fromisoformat(row["finished_at"] or db.now())
+    return (ended - datetime.fromisoformat(row["started_at"])).total_seconds()
+
+
+def describe(conn: Connection, row: RowMapping) -> dict[str, Any]:
+    """Return a run with its claims, its cost and time, and its summary once ended."""
+    entries = claim_entries(conn, row["run_id"])
+    return {
+        **row,
+        "tiny": bool(row["tiny"]),
+        "claims": entries,
+        "cost": sum(entry["cost"] for entry in entries),
+        "seconds": sum(entry["seconds"] for entry in entries),
+        "elapsed": elapsed(row),
+        "summary": None if row["status"] == "running" else summarise(entries),
+    }

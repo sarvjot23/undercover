@@ -69,6 +69,7 @@ def standing_of(row: RowMapping) -> dict[str, Any]:
         "attempts": row["attempts"],
         "thread_id": row["thread_id"],
         "agent_working": is_working(row["status"], row["last_step"]),
+        "evaluation_id": row["evaluation_id"],
     }
     for name, table in PARTS.items():
         found = row[f"{name}_claim_id"] is not None

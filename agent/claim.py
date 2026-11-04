@@ -1,5 +1,6 @@
 """The claim agent: works one claim on its graph and reports back in a line."""
 
+import uuid
 from contextvars import Context
 from datetime import UTC, datetime
 from typing import Any
@@ -132,3 +133,24 @@ def carry_on(
         elif not saved.values:
             start = first_input(claim_id, thread_id)
         return invoke(claim_graph, claim_id, thread_id, start, in_run)
+
+
+def new_thread(claim_id: str) -> str:
+    """Return a new thread id for a claim."""
+    return f"{claim_id}-{uuid.uuid4().hex[:8]}"
+
+
+def work(claim_id: str, in_run: Run | None, llm: BaseChatModel | None = None) -> str:
+    """The one door to the claim agent: carry on a claim, or start a waiting one.
+
+    An evaluation's copy held for sign-off counts as finished: nobody signs off a
+    copy, so its saved progress is cleared.
+    """
+    if graph.standing(claim_id)["status"] == "in_progress":
+        report = carry_on(claim_id, llm, in_run)
+    else:
+        report = run(claim_id, new_thread(claim_id), llm, in_run)
+    found = graph.standing(claim_id)
+    if found["evaluation_id"] is not None and found["status"] == "awaiting_sign_off":
+        checkpoints.saver().delete_thread(found["thread_id"])
+    return report

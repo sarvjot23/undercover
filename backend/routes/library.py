@@ -23,11 +23,8 @@ def get_policy_wording() -> dict[str, str]:
 
 @router.get("/instructions", operation_id="get_instructions")
 def get_instructions() -> dict[str, str]:
-    """Get the UnderCover Agent's instructions for the queue and for a claim."""
-    return {
-        name: (INSTRUCTIONS / f"{name}.md").read_text(encoding="utf-8")
-        for name in ("queue", "claim")
-    }
+    """Get the claim agent's instructions."""
+    return {"claim": (INSTRUCTIONS / "claim.md").read_text(encoding="utf-8")}
 
 
 @router.get("/handlers", operation_id="list_handlers")

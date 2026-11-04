@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
@@ -59,8 +59,8 @@ def test_policy_wording(client):
 def test_instructions(client):
     instructions = client.get("/api/instructions").json()
     assert instructions["claim"].startswith("You are the UnderCover Agent.")
-    assert "running the claims queue" in instructions["queue"]
-    assert "data/evals" not in instructions["claim"] + instructions["queue"]
+    assert set(instructions) == {"claim"}
+    assert "data/evals" not in instructions["claim"]
 
 
 def test_handlers(client):
@@ -73,7 +73,7 @@ def test_seed_runs_once(client):
     assert len(client.get("/api/claims").json()) == 25
 
 
-def test_seed_never_reads_the_evals(tmp_path, monkeypatch):
+def test_seed_reads_only_the_answer_key_from_the_evals(tmp_path, monkeypatch):
     monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "seed.db"))
     read = []
     original = Path.read_text
@@ -84,8 +84,23 @@ def test_seed_never_reads_the_evals(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "read_text", spy)
     db.init()
-    assert read
-    assert all("evals" not in path.parts for path in read)
+    evals = {path.name for path in read if "evals" in path.parts}
+    assert evals == {
+        "decisions.json",
+        "held_out_claims.json",
+        "held_out_decisions.json",
+    }
+
+
+def test_the_answer_key_stays_out_of_the_queue(client):
+    claims = client.get("/api/claims").json()
+    assert [claim["claim_id"] for claim in claims][-1] == "CLM-1025"
+    assert client.get("/api/claims/CLM-1101").status_code == 404
+    with db.engine().connect() as conn:
+        held_out = conn.execute(select(func.count()).select_from(db.held_out_claims))
+        assert held_out.scalar() == 25
+        key = conn.execute(select(func.count()).select_from(db.handler_decisions))
+        assert key.scalar() == 50
 
 
 def test_no_response_holds_eval_fields(client):

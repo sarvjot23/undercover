@@ -1,4 +1,4 @@
-"""Leases: only one worker on a claim or a run, and a killed worker's lease expires."""
+"""Leases: only one worker on a claim, and a killed worker's lease expires."""
 
 from typing import Any
 
@@ -12,11 +12,6 @@ LEASE_SECONDS = 20
 def expiry() -> str:
     """Return when a lease taken now runs out."""
     return db.later(LEASE_SECONDS)
-
-
-def is_live(until: str | None) -> bool:
-    """Whether a lease that runs out at this time is still held."""
-    return until is not None and until >= db.now()
 
 
 def take(conn: Connection, table: Table, key: Any, worker: str) -> bool:

@@ -63,30 +63,33 @@ class Failure(BaseModel):
     reason: str
 
 
-class RunStart(BaseModel):
-    """How many claims a queue run may work."""
-
-    cap: int = Field(ge=1)
+SetName = Literal["evaluation", "held_out"]
+MAX_AGENTS = 25
 
 
-class Todo(BaseModel):
-    """One item on the agent's to-do list for a run."""
+class DispatchStart(BaseModel):
+    """How many claim agents a dispatch works with at once."""
 
-    claim_id: str
-    note: str
-    status: Literal["to_do", "in_progress", "done", "left_for_handler"]
+    n: int = Field(ge=1, le=MAX_AGENTS)
 
 
-class Todos(BaseModel):
-    """The agent's whole to-do list for a run."""
+class EvaluationStart(BaseModel):
+    """The labelled set to evaluate, whole or its tiny claims, and N."""
 
-    todos: list[Todo]
+    set_name: SetName
+    tiny: bool
+    n: int = Field(ge=1, le=MAX_AGENTS)
 
 
-class Summary(BaseModel):
-    """The agent's summary of a run for the handlers."""
+class RunRecord(BaseModel):
+    """A dispatch or an evaluation, as the agent's service starts it."""
 
-    summary: str = Field(min_length=1)
+    kind: Literal["dispatch", "evaluation"]
+    n: int = Field(ge=1, le=MAX_AGENTS)
+    set_name: SetName | None
+    tiny: bool
+    model: str
+    reasoning: str
 
 
 class Usage(BaseModel):

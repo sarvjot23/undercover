@@ -2,7 +2,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import agent_link, db, rules
+from backend import agent_service, db, rules
 from backend.api import app
 
 
@@ -302,7 +302,7 @@ def test_fail_sends_the_claim_back_to_waiting(client):
 
 def test_run_asks_the_agents_service(client, monkeypatch):
     told = []
-    monkeypatch.setattr(agent_link, "tell", lambda *args: told.append(args) or True)
+    monkeypatch.setattr(agent_service, "tell", lambda *args: told.append(args) or True)
     started = client.post("/api/claims/CLM-1001/run").json()
     assert started["thread_id"].startswith("CLM-1001-")
     assert told == [("/claims/CLM-1001/run", {"thread_id": started["thread_id"]})]
@@ -325,7 +325,7 @@ def test_a_sign_off_reaches_the_agent_only_once_it_is_saved(client, monkeypatch)
         with db.engine().connect() as conn:
             seen.append((claim_id, rules.standing(conn, claim_id)["sign_off"]))
 
-    monkeypatch.setattr(agent_link, "resume", resume)
+    monkeypatch.setattr(agent_service, "resume", resume)
     client.post("/api/claims/CLM-1002/sign-off", json={"handler_id": "HND-01"})
     assert seen[0][0] == "CLM-1002"
     assert seen[0][1]["handler_id"] == "HND-01"
@@ -347,10 +347,10 @@ def test_the_link_to_the_agents_service(monkeypatch):
         calls.append((url, json))
         return httpx.Response(200)
 
-    monkeypatch.setattr(agent_link.httpx, "post", post)
+    monkeypatch.setattr(agent_service.httpx, "post", post)
     monkeypatch.setenv("UNDERCOVER_AGENT", "http://127.0.0.1:8003")
-    assert agent_link.tell("/runs/1", {})
-    assert calls == [("http://127.0.0.1:8003/runs/1", {})]
+    assert agent_service.tell("/dispatches", {"n": 3})
+    assert calls == [("http://127.0.0.1:8003/dispatches", {"n": 3})]
 
 
 def test_agent_working_until_its_answer(client):
@@ -421,3 +421,12 @@ def test_never_decided_or_paid_twice(client):
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["decision"]["decision"] == "approve"
     assert claim["payment"]["amount"] == 420.0
+
+
+def test_the_link_says_when_the_service_is_away(monkeypatch):
+    def post(url, json, timeout):
+        raise httpx.ConnectError("refused")
+
+    monkeypatch.setattr(agent_service.httpx, "post", post)
+    assert agent_service.ask("/dispatches", {"n": 3}) is None
+    assert not agent_service.tell("/dispatches", {"n": 3})

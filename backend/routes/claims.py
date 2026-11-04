@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import Connection, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
-from backend import agent_link, db, leases
+from backend import agent_service, db, leases
 from backend.db import (
     Db,
     SingleStatementDb,
@@ -49,13 +49,17 @@ router = APIRouter(prefix="/api/claims")
 
 @router.get("", operation_id="list_claims")
 def list_claims(conn: SingleStatementDb) -> list[dict[str, Any]]:
-    """List the claims queue with where each claim stands."""
+    """List the claims queue with where each claim stands, leaving out copies."""
     names = {
         row["customer_id"]: json.loads(row["body"])["name"]
         for row in conn.execute(select(customers)).mappings()
     }
     claims = []
-    query = standing_query().order_by(claim_table.c.claim_id)
+    query = (
+        standing_query()
+        .where(claim_table.c.evaluation_id.is_(None))
+        .order_by(claim_table.c.claim_id)
+    )
     for row in conn.execute(query).mappings():
         claim = json.loads(row["body"])
         found = standing_of(row)
@@ -282,6 +286,8 @@ def sign_off(
     """Record a handler's sign-off on a payout over the limit; the agent pays it."""
     if sign_off.handler_id not in HANDLER_IDS:
         raise HTTPException(404, f"No handler {sign_off.handler_id}")
+    if find_claim(conn, claim_id)["evaluation_id"] is not None:
+        raise HTTPException(409, f"Claim {claim_id} is a copy for an evaluation")
     signed = {
         "claim_id": claim_id,
         "handler_id": sign_off.handler_id,
@@ -290,7 +296,7 @@ def sign_off(
     # The sign-off goes first: if we stop here, the claim still waits to be signed off.
     add_sign_off(conn, signed)
     move(conn, claim_id, "awaiting_sign_off", "in_progress")
-    background_tasks.add_task(agent_link.resume, claim_id)
+    background_tasks.add_task(agent_service.resume, claim_id)
     return {"claim_id": claim_id, "status": "in_progress", "sign_off": signed}
 
 

@@ -1,12 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import graph, lease, queue, tracing
+from agent import graph, lease
 from agent.tests.stubs import BrokenModel, Stopped, StoppedModel, call, script
-from backend import db, runs
+from backend import db
 from backend.api import app
 
 CLAIM = "CLM-1001"
@@ -261,134 +260,3 @@ def test_the_lease_is_renewed_and_given_up(requests, monkeypatch):
         assert len(requests) > before
         assert api().post(path, json={"worker": "other"}).status_code == 409
     assert api().post(path, json={"worker": "other"}).status_code == 200
-
-
-def new_run(cap):
-    with db.engine().begin() as conn:
-        return runs.start(conn, cap)[0]
-
-
-def test_a_stopped_run_is_finished_by_the_next_within_its_cap(requests):
-    run_id = new_run(cap=2)
-    with pytest.raises(Stopped):
-        queue.run(
-            run_id,
-            script(
-                call(
-                    "write_todos",
-                    todos=[
-                        {"claim_id": CLAIM, "note": "First", "status": "in_progress"}
-                    ],
-                ),
-                call("work_claim", claim_id=CLAIM),
-            ),
-            lambda claim_id: StoppedModel(messages=iter([])),
-        )
-    run = api().get("/api/runs/current").json()
-    assert run["status"] == "running"
-    assert not run["active"]
-    assert run["claim_ids"] == [CLAIM]
-    assert claim()["status"] == "in_progress"
-    thread = claim()["thread_id"]
-
-    with db.engine().begin() as conn:
-        again, resumed = runs.start(conn, 9)
-    assert (again, resumed) == (run_id, True)
-
-    answer = queue.run(
-        run_id,
-        script(
-            call("work_claim", claim_id="CLM-1008"),
-            call("work_claim", claim_id="CLM-1002"),
-            call("finish_run", summary="Finished what was stopped."),
-            AIMessage(content="Done."),
-        ),
-        lambda claim_id: script(
-            call(
-                "record_decision",
-                claim_id=claim_id,
-                decision="refer",
-                payout=0,
-                reasons="Needs a handler. The manual says so.",
-                policy_section="Claims manual 2.",
-            )
-        ),
-    )
-    assert answer == f"Run {run_id} finished: Finished what was stopped."
-    assert claim()["thread_id"] == thread
-    assert claim()["attempts"] == 0
-    assert claim()["status"] == "decided"
-    run = api().get("/api/runs/current").json()
-    assert run["claim_ids"] == [CLAIM, "CLM-1008"]
-    claims = api().get("/api/claims").json()
-    assert api().get("/api/claims/CLM-1002").json()["status"] == "waiting"
-    assert sum(found["status"] == "decided" for found in claims) == 2
-
-
-def test_a_second_worker_cannot_work_a_run(requests):
-    run_id = new_run(cap=1)
-    api().post(f"/api/runs/{run_id}/lease", json={"worker": "other"})
-    answer = queue.run(run_id, script())
-    assert answer == f"Run {run_id}: another worker is on it"
-
-
-def test_a_run_carries_on_a_signed_off_claim_first(requests):
-    hold()
-    sign_off()
-    run_id = new_run(cap=1)
-    answer = queue.run(
-        run_id,
-        script(
-            call("work_claim", claim_id="CLM-1008"),
-            call("finish_run", summary="Paid the claim that was signed off."),
-            AIMessage(content="Done."),
-        ),
-        lambda claim_id: script(
-            call(
-                "record_decision",
-                claim_id=claim_id,
-                decision="refer",
-                payout=0,
-                reasons="Needs a handler. The manual says so.",
-                policy_section="Claims manual 2.",
-            )
-        ),
-    )
-    assert "finished" in answer
-    assert claim()["status"] == "decided"
-    assert claim()["payment"]["signed_off_by"] == "HND-02"
-
-
-def test_a_finished_run_leaves_a_signed_off_claim_to_be_paid(requests):
-    hold()
-    run_id = new_run(cap=1)
-    api().post(f"/api/runs/{run_id}/claims/CLM-1008")
-    sign_off()
-    api().post(f"/api/runs/{run_id}/fail", json={"reason": "Broke"})
-    assert claim()["status"] == "in_progress"
-    assert claim()["attempts"] == 0
-
-
-def test_a_claim_in_a_queue_run_is_traced_as_a_session_of_its_own(
-    requests, monkeypatch
-):
-    class Spy(BaseCallbackHandler):
-        parents: list[object | None] = []  # noqa: RUF012
-
-        def on_chain_start(self, serialized, inputs, *, parent_run_id=None, **kwargs):
-            self.parents.append(parent_run_id)
-
-    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-test")
-    monkeypatch.setattr(tracing, "CallbackHandler", Spy)
-    monkeypatch.setattr(tracing, "flush", lambda: None)
-    run_id = new_run(cap=1)
-    queue.run(
-        run_id,
-        script(
-            call("work_claim", claim_id=CLAIM),
-            call("finish_run", summary="One referred."),
-            AIMessage(content="Done."),
-        ),
-        lambda claim_id: script(decision("refer", 0)),
-    )
-    assert Spy.parents[0] is None

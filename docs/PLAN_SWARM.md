@@ -186,18 +186,18 @@ Success criteria:
 
 Success criteria, all on a stub model:
 
-- [ ] A test with 10 claims and N=3 shows never more than 3 inside `claim.work` at once, and all 10 worked.
-- [ ] A test lists a dispatch's claims: those in progress first and waiting, oldest submitted first, with no evaluation copies.
-- [ ] A test gives one claim a `ModelRateLimitError` partway, and it carries on as the same attempt on the same thread, with one decision and no repeated steps.
-- [ ] A test gives one claim rate limits until the retries run out. It stays in progress with its thread, the other claims finish, and the next dispatch carries it on.
-- [ ] A test fails a claim with another error once. It goes back to the queue and is worked again in the same dispatch, and a claim failing twice is left for a handler.
-- [ ] A test shows a claim being resumed after a sign-off, with a live lease, skipped by the dispatch.
-- [ ] A test shows the summary built from the records: the counts, each payout waiting for a sign-off, and the claims left for a handler or in progress.
-- [ ] A test shows a second run refused with a 409 while one is running, for either kind.
-- [ ] A test shows each graph run gets its own saver, all on one pool.
-- [ ] `uv run -m agent CLM-1001` still works one claim (a test of `__main__` on a stub).
-- [ ] `agent/queue.py`, `backend/instructions/queue.md` and `write_todos` are gone, and `grep -r todos backend agent` finds nothing.
-- [ ] `npm run check:python` passes, with coverage at 80% or more.
+- [x] A test with 10 claims and N=3 shows never more than 3 inside `claim.work` at once, and all 10 worked.
+- [x] A test lists a dispatch's claims: those in progress first and waiting, oldest submitted first, with no evaluation copies.
+- [x] A test gives one claim a `ModelRateLimitError` partway, and it carries on as the same attempt on the same thread, with one decision and no repeated steps.
+- [x] A test gives one claim rate limits until the retries run out. It stays in progress with its thread, the other claims finish, and the next dispatch carries it on.
+- [x] A test fails a claim with another error once. It goes back to the queue and is worked again in the same dispatch, and a claim failing twice is left for a handler.
+- [x] A test shows a claim being resumed after a sign-off, with a live lease, skipped by the dispatch.
+- [x] A test shows the summary built from the records: the counts, each payout waiting for a sign-off, and the claims left for a handler or in progress.
+- [x] A test shows a second run refused with a 409 while one is running, for either kind.
+- [x] A test shows each graph run gets its own saver, all on one pool.
+- [x] `uv run -m agent CLM-1001` still works one claim (a test of `__main__` on a stub).
+- [x] `agent/queue.py`, `backend/instructions/queue.md` and `write_todos` are gone, and `grep -r todos backend agent` finds nothing.
+- [x] `npm run check:python` passes, with coverage at 80% or more.
 
 ### Phase 3: starting a dispatch from the dashboard
 

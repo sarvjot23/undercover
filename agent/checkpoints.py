@@ -13,33 +13,45 @@ from psycopg_pool import ConnectionPool
 
 SCHEMA = "undercover"
 MAX_CONNECTIONS = 4
+# A claim agent waits this long for one of the 4 connections rather than failing.
+POOL_TIMEOUT = 120
 
 
-def postgres_saver(url: str) -> PostgresSaver:
-    """Connect the checkpointer with at most 4 connections, in our own schema."""
+@lru_cache
+def pool(url: str) -> ConnectionPool[Any]:
+    """Open this process's pool of at most 4 connections, in our own schema."""
     settings: dict[str, Any] = {
         "autocommit": True,
         "prepare_threshold": 0,
         "row_factory": dict_row,
         "options": f"-c search_path={SCHEMA}",
     }
-    pool = ConnectionPool(
+    opened: ConnectionPool[Any] = ConnectionPool(
         url,
         min_size=2,
         max_size=MAX_CONNECTIONS,
+        timeout=POOL_TIMEOUT,
         kwargs=settings,
         open=True,
     )
-    atexit.register(pool.close)
-    with pool.connection() as conn:
+    atexit.register(opened.close)
+    with opened.connection() as conn:
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}")
-    saver = PostgresSaver(pool)  # type: ignore[arg-type]
-    saver.setup()
-    return saver
+    PostgresSaver(opened).setup()  # type: ignore[arg-type]
+    return opened
 
 
 @lru_cache
+def memory() -> InMemorySaver:
+    """The checkpointer in memory, shared by the process; only the tests use it."""
+    return InMemorySaver()
+
+
 def saver() -> BaseCheckpointSaver[Any]:
-    """Return this process's checkpointer; in memory only without DATABASE_URL."""
+    """Return a checkpointer for one run of the graph, on the process's shared pool.
+
+    A PostgresSaver holds a lock around every read and write, so claim agents that
+    shared one would take turns.
+    """
     url = os.getenv("DATABASE_URL")
-    return postgres_saver(url) if url else InMemorySaver()
+    return PostgresSaver(pool(url)) if url else memory()  # type: ignore[arg-type]

@@ -21,5 +21,5 @@ def requests(tmp_path, monkeypatch) -> list[str]:
 
     monkeypatch.setattr(client, "backend", backend)
     monkeypatch.setattr(graph, "RETRY_DELAY", 0.0)
-    checkpoints.saver.cache_clear()
+    checkpoints.memory.cache_clear()
     return paths

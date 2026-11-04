@@ -3,6 +3,7 @@
 import itertools
 
 from fastapi.testclient import TestClient
+from langchain_core.exceptions import ModelRateLimitError
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
@@ -32,6 +33,19 @@ class FlakyModel(StubModel):
         if not self.failed:
             self.failed = True
             raise RuntimeError("provider hiccup")
+        return super()._generate(*args, **kwargs)
+
+
+class RateLimitedModel(StubModel):
+    """A chat model that hits a rate limit on these calls, and answers on the others."""
+
+    limited: list[int]
+    calls: int = 0
+
+    def _generate(self, *args, **kwargs):
+        self.calls += 1
+        if self.calls in self.limited:
+            raise ModelRateLimitError("429 Too Many Requests")
         return super()._generate(*args, **kwargs)
 
 

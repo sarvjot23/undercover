@@ -27,12 +27,21 @@ export async function decide(
   expect(response.ok()).toBe(true);
 }
 
-/** Open a queue run without starting the agent, so the test can play its part. */
-export async function openRun(
+/** Create a dispatch without starting the agent, so the test can play its part. */
+export async function createDispatch(
   request: APIRequestContext,
-  cap: number,
+  n = 3,
 ): Promise<number> {
-  const response = await request.post("/api/runs/open", { data: { cap } });
+  const response = await request.post("/api/runs", {
+    data: {
+      kind: "dispatch",
+      n,
+      set_name: null,
+      tiny: false,
+      model: "openai/gpt-6-luna",
+      reasoning: "low",
+    },
+  });
   expect(response.ok()).toBe(true);
   return ((await response.json()) as { run_id: number }).run_id;
 }
@@ -49,39 +58,20 @@ export async function pay(
   expect(response.ok()).toBe(true);
 }
 
-/** Play the agent's part on one claim of a run: take it, start it and decide it. */
-export async function work(
+/** End a run, as the agent's service does when the dispatcher is done. */
+export async function endRun(
   request: APIRequestContext,
   runId: number,
-  claimId: string,
-  decision: "approve" | "decline" | "refer",
-  payout: number,
+  how: "finish" | "stop" = "finish",
 ) {
-  const taken = await request.post(
-    `/api/runs/${String(runId)}/claims/${claimId}`,
-  );
-  expect(taken.ok()).toBe(true);
-  await decide(request, claimId, decision, payout);
-}
-
-export async function writeTodos(
-  request: APIRequestContext,
-  runId: number,
-  todos: { claim_id: string; note: string; status: string }[],
-) {
-  const response = await request.put(`/api/runs/${String(runId)}/todos`, {
-    data: { todos },
-  });
+  const response = await request.post(`/api/runs/${String(runId)}/${how}`);
   expect(response.ok()).toBe(true);
 }
 
-export async function finishRun(
+/** What the stand-in for the agent's service has been asked. */
+export async function received(
   request: APIRequestContext,
-  runId: number,
-  summary: string,
-) {
-  const response = await request.post(`/api/runs/${String(runId)}/finish`, {
-    data: { summary },
-  });
-  expect(response.ok()).toBe(true);
+): Promise<{ path: string; body: unknown }[]> {
+  const response = await request.get("http://127.0.0.1:8003/received");
+  return (await response.json()) as { path: string; body: unknown }[];
 }

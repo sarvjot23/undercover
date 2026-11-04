@@ -1,4 +1,4 @@
-import type { Outcome, Status, TodoStatus } from "./api";
+import type { Outcome, Status } from "./api";
 
 const dollars = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -7,6 +7,28 @@ const dollars = new Intl.NumberFormat("en-US", {
 
 export function money(amount: number): string {
   return dollars.format(amount);
+}
+
+const cents = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+/** A model cost, which is often a fraction of a cent. */
+export function cost(amount: number): string {
+  return cents.format(amount);
+}
+
+/** A length of time, such as 42s or 3m 05s. */
+export function duration(seconds: number): string {
+  const whole = Math.round(seconds);
+  const minutes = Math.floor(whole / 60);
+  const rest = String(whole % 60);
+  return minutes === 0
+    ? `${rest}s`
+    : `${String(minutes)}m ${rest.padStart(2, "0")}s`;
 }
 
 export function date(iso: string): string {
@@ -44,11 +66,4 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   approve: "Approved",
   decline: "Declined",
   refer: "Referred",
-};
-
-export const TODO_LABELS: Record<TodoStatus, string> = {
-  to_do: "To do",
-  in_progress: "In progress",
-  done: "Done",
-  left_for_handler: "Left for a handler",
 };

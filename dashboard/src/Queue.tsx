@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ClaimSummary, Run, Status } from "./api";
 import { date, label, money, STATUS_LABELS } from "./format";
-import { runQueue, useJson } from "./hooks";
+import { agentsAtOnce, DEFAULT_AGENTS, startDispatch, useJson } from "./hooks";
 import { RunPanel } from "./RunPanel";
 import { StatusBadge } from "./StatusBadge";
 
@@ -10,50 +10,31 @@ const STATUSES = Object.keys(STATUS_LABELS) as Status[];
 export function Queue() {
   const { data: claims, error } = useJson<ClaimSummary[]>("/api/claims", 3000);
   const { data: run } = useJson<Run | null>("/api/runs/current", 1500);
-  const [cap, setCap] = useState<number | null>(null);
+  const { data: running } = useJson<Run | null>("/api/runs/running", 1500);
+  const [agents, setAgents] = useState(DEFAULT_AGENTS);
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   if (error) return <p role="alert">The backend is not responding.</p>;
   if (!claims) return <p>Loading the queue</p>;
 
-  const waiting = claims.filter((claim) => claim.status === "waiting").length;
-  const chosen = Math.min(cap ?? waiting, waiting);
-  const inProgress = run?.status === "running" && run.active;
-  const stopped = run?.status === "running" && !run.active;
+  const busy = Boolean(running);
+  const start = () => {
+    setRefusal(null);
+    void startDispatch(agents).then(setRefusal);
+  };
 
   return (
     <section aria-labelledby="queue-heading">
       <div className="queue-head">
         <h2 id="queue-heading">The claims queue</h2>
         <a href="#/live">Watch live</a>
-        <label className="cap">
-          Claims in this run
-          <input
-            type="number"
-            min={1}
-            max={Math.max(waiting, 1)}
-            value={chosen}
-            onChange={(event) => {
-              setCap(Number(event.target.value));
-            }}
-            disabled={waiting === 0}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            runQueue(Math.max(chosen, 1));
-          }}
-          disabled={inProgress || (chosen < 1 && !stopped)}
-        >
-          Run the queue
+        <AgentsAtOnce value={agents} onChange={setAgents} />
+        <button type="button" onClick={start} disabled={busy}>
+          Start a dispatch
         </button>
       </div>
-      {inProgress && <p role="status">A run is already in progress</p>}
-      {stopped && (
-        <p role="status">
-          The last run stopped partway. Running the queue finishes it
-        </p>
-      )}
+      {busy && <p role="status">A dispatch or evaluation is already running</p>}
+      {refusal && <p role="alert">{refusal}</p>}
       <RunPanel run={run} />
       <ul className="tiles">
         {STATUSES.map((status) => (
@@ -106,5 +87,26 @@ export function Queue() {
         </table>
       </div>
     </section>
+  );
+}
+
+/** How many claim agents work at once: 1 to 25. */
+export function AgentsAtOnce({
+  value,
+  onChange,
+}: Readonly<{ value: number; onChange: (value: number) => void }>) {
+  return (
+    <label className="cap">
+      Claim agents at once
+      <input
+        type="number"
+        min={1}
+        max={25}
+        value={value}
+        onChange={(event) => {
+          onChange(agentsAtOnce(Number(event.target.value)));
+        }}
+      />
+    </label>
   );
 }

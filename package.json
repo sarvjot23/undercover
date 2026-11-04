@@ -11,6 +11,7 @@
     "dev:backend": "uv run --env-file .env -m uvicorn backend.api:app --reload --reload-dir backend",
     "dev:agent": "uv run --env-file .env -m uvicorn agent.service:app --port 8002",
     "dev:dashboard": "vite dashboard",
+    "seed": "uv run -m backend.seed",
     "format": "uv run ruff format && prettier --write -u dashboard e2e *.config.*",
     "check": "npm run check:python && npm run check:ts && npm run e2e",
     "check:python": "uv run ruff format --check && uv run ruff check && pyright && uv run pytest -q",

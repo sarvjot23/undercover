@@ -1,55 +1,115 @@
-import type { Run } from "./api";
-import { TODO_LABELS } from "./format";
+import type { Run, RunSummary } from "./api";
+import { cost, duration, money } from "./format";
+import { hasEnded } from "./live";
+import { StatusBadge } from "./StatusBadge";
 
 const RUN_LABELS: Record<Run["status"], string> = {
-  running: "The agent is working through the queue",
-  finished: "The last run is finished",
-  failed: "The last run stopped",
+  running: "Running",
+  finished: "Finished",
+  stopped: "Stopped partway",
 };
 
-/** The current queue run: the agent's to-do list, ticked off as it goes, then its summary. */
+/** The latest dispatch: its claims and where each stands, its cost and time, its summary. */
 export function RunPanel({ run }: Readonly<{ run: Run | null | undefined }>) {
   if (!run) return null;
+  const done = run.claims.filter((claim) => hasEnded(claim.status)).length;
 
   return (
     <section className="panel run-panel" aria-labelledby="run-heading">
       <div className="run-head">
-        <h3 id="run-heading">The agent&rsquo;s to-do list</h3>
+        <h3 id="run-heading">The latest dispatch</h3>
         <span className="muted">
-          {run.status === "running" && !run.active
-            ? "The last run stopped partway"
-            : RUN_LABELS[run.status]}{" "}
-          &middot; <span className="mono">{run.claim_ids.length}</span> of{" "}
-          <span className="mono">{run.total}</span> claims taken
+          {RUN_LABELS[run.status]} &middot;{" "}
+          <span className="mono">{run.n}</span> claim agents at once &middot;{" "}
+          <span className="mono">{done}</span> of{" "}
+          <span className="mono">{run.total}</span> claims done
         </span>
       </div>
-      {run.todos.length === 0 ? (
-        <p className="muted">The agent is planning the run.</p>
-      ) : (
-        <ol className="todos">
-          {run.todos.map((todo) => (
-            <li key={todo.claim_id} className={`todo todo-${todo.status}`}>
-              <a className="mono" href={`#/claims/${todo.claim_id}`}>
-                {todo.claim_id}
-              </a>
-              <span className="todo-note">{todo.note}</span>
-              <span className={`badge todo-badge-${todo.status}`}>
-                {TODO_LABELS[todo.status]}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      {run.status !== "running" && run.summary && (
-        <div className="run-summary">
-          <h4>
-            {run.status === "finished"
-              ? "The agent's summary"
-              : "Why it stopped"}
-          </h4>
-          <p>{run.summary}</p>
-        </div>
-      )}
+      <RunFigures run={run} />
+      <ol className="run-claims" aria-label="The dispatch's claims">
+        {run.claims.map((claim) => (
+          <li key={claim.claim_id}>
+            <a className="mono" href={`#/claims/${claim.claim_id}`}>
+              {claim.claim_id}
+            </a>
+            <StatusBadge status={claim.status} />
+          </li>
+        ))}
+      </ol>
+      {run.summary && <SummaryOfRun summary={run.summary} />}
     </section>
+  );
+}
+
+/** A run's model cost, the agents' time on its claims, and the run's own time. */
+export function RunFigures({ run }: Readonly<{ run: Run }>) {
+  return (
+    <dl className="run-figures">
+      <div>
+        <dt>Model cost</dt>
+        <dd className="mono">{cost(run.cost)}</dd>
+      </div>
+      <div>
+        <dt>Agent time</dt>
+        <dd className="mono">{duration(run.seconds)}</dd>
+      </div>
+      <div>
+        <dt>Run time</dt>
+        <dd className="mono">{duration(run.elapsed)}</dd>
+      </div>
+    </dl>
+  );
+}
+
+/** The summary of an ended dispatch, from the records. */
+export function SummaryOfRun({ summary }: Readonly<{ summary: RunSummary }>) {
+  return (
+    <div className="run-summary">
+      <h4>Summary</h4>
+      <p>
+        <span className="mono">{summary.approved}</span> approved,{" "}
+        <span className="mono">{summary.declined}</span> declined and{" "}
+        <span className="mono">{summary.referred}</span> referred.
+      </p>
+      {summary.awaiting_sign_off.length > 0 && (
+        <p>
+          Waiting for a sign-off:{" "}
+          {summary.awaiting_sign_off.map((held, index) => (
+            <span key={held.claim_id}>
+              {index > 0 && ", "}
+              <a className="mono" href={`#/claims/${held.claim_id}`}>
+                {held.claim_id}
+              </a>{" "}
+              <span className="mono">{money(held.payout)}</span>
+            </span>
+          ))}
+        </p>
+      )}
+      <ClaimList
+        label="Left for a handler"
+        claimIds={summary.left_for_handler}
+      />
+      <ClaimList label="Still in progress" claimIds={summary.in_progress} />
+    </div>
+  );
+}
+
+function ClaimList({
+  label,
+  claimIds,
+}: Readonly<{ label: string; claimIds: string[] }>) {
+  if (claimIds.length === 0) return null;
+  return (
+    <p>
+      {label}:{" "}
+      {claimIds.map((claimId, index) => (
+        <span key={claimId}>
+          {index > 0 && ", "}
+          <a className="mono" href={`#/claims/${claimId}`}>
+            {claimId}
+          </a>
+        </span>
+      ))}
+    </p>
   );
 }

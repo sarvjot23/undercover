@@ -1,4 +1,4 @@
-import type { ClaimSummary } from "./api";
+import type { Run, RunClaim } from "./api";
 
 export type LiveOutcome =
   "approve" | "decline" | "refer" | "sign_off" | "handler";
@@ -11,130 +11,39 @@ export const LIVE_OUTCOMES: Record<LiveOutcome, string> = {
   handler: "Left for a handler",
 };
 
-export const HOLD_MS = 3000;
-export const LEAVE_MS = 450;
-
-export interface LiveState {
-  claims: ClaimSummary[];
-  running: boolean;
-  /** The claims the queue run has taken, in the order the agent took them. */
-  run: string[];
-  /** How many claims the queue run will work. */
-  total: number;
-  /** The agent's summary when the run ends. */
-  summary: string | null;
-  focus: string | null;
-  stage: "working" | "stamped" | "leaving";
-  held: boolean;
-  finished: string[];
-}
-
-export type LiveEvent =
-  | {
-      type: "poll";
-      claims: ClaimSummary[];
-      running: boolean;
-      run: string[];
-      total: number;
-      summary: string | null;
-    }
-  | { type: "held" }
-  | { type: "left" };
-
-export const START: LiveState = {
-  claims: [],
-  running: false,
-  run: [],
-  total: 0,
-  summary: null,
-  focus: null,
-  stage: "working",
-  held: false,
-  finished: [],
-};
-
-export function outcomeOf(claim: ClaimSummary): LiveOutcome | null {
+/** A card's stamp, once its claim has ended. An approval is stamped once it's paid. */
+export function outcomeOf(claim: RunClaim): LiveOutcome | null {
   if (claim.status === "awaiting_sign_off") return "sign_off";
   if (claim.status === "needs_handler") return "handler";
   return claim.status === "decided" ? claim.decision : null;
 }
 
-/** The claim the agent is on now, other than ones already shown. */
-function active(state: LiveState): ClaimSummary | undefined {
-  return state.claims.find(
-    (claim) =>
-      claim.status === "in_progress" &&
-      !state.finished.includes(claim.claim_id),
-  );
+/** Whether a claim of a run has reached an end: decided, held or left for a handler. */
+export function hasEnded(status: string): boolean {
+  return status !== "waiting" && status !== "in_progress";
 }
 
-/** Follow the claims: pick up the claim in progress, stamp it, then move on. */
-function settle(state: LiveState): LiveState {
-  if (state.focus === null) {
-    const next = active(state);
-    return next ? { ...state, focus: next.claim_id, stage: "working" } : state;
-  }
-  const claim = state.claims.find((c) => c.claim_id === state.focus);
-  if (state.stage === "working") {
-    if (claim?.status === "waiting") return { ...state, focus: null };
-    if (claim && outcomeOf(claim)) {
-      return {
-        ...state,
-        stage: "stamped",
-        held: false,
-        finished: [...state.finished, claim.claim_id],
-      };
-    }
-  }
-  if (
-    state.stage === "stamped" &&
-    state.held &&
-    (active(state) || !state.running)
-  ) {
-    return { ...state, stage: "leaving" };
-  }
-  return state;
+/** Where a card goes on the board: those being worked at the front, the waiting last. */
+function place(claim: RunClaim): number {
+  if (claim.status === "in_progress") return 0;
+  return outcomeOf(claim) ? 1 : 2;
 }
 
-export function reduce(state: LiveState, event: LiveEvent): LiveState {
-  switch (event.type) {
-    case "poll":
-      return settle({
-        ...state,
-        claims: event.claims,
-        running: event.running,
-        run: event.run,
-        total: event.total,
-        summary: event.summary,
-      });
-    case "held":
-      return settle({ ...state, held: true });
-    case "left":
-      return settle({ ...state, focus: null, stage: "working", held: false });
-  }
+/** The dispatch's claims in the board's order, each group in the dispatch's order. */
+export function board(run: Run): RunClaim[] {
+  return run.claims.toSorted((a, b) => place(a) - place(b));
 }
 
 export interface Tally {
   counts: Record<LiveOutcome, number>;
+  done: number;
+  working: number;
   paid: number;
   awaiting: number;
 }
 
-/**
- * The claims with an outcome to count: every decided claim in the queue run,
- * even ones decided before this view opened, and any claim it stamped.
- */
-function counted(state: LiveState): [ClaimSummary, LiveOutcome][] {
-  return state.claims.flatMap((claim) => {
-    const outcome = outcomeOf(claim);
-    const ours =
-      state.finished.includes(claim.claim_id) ||
-      state.run.includes(claim.claim_id);
-    return outcome && ours ? [[claim, outcome]] : [];
-  });
-}
-
-export function tally(state: LiveState): Tally {
+/** The dispatch's numbers: its outcomes so far, and the payouts paid and held. */
+export function tally(run: Run): Tally {
   const counts: Record<LiveOutcome, number> = {
     approve: 0,
     decline: 0,
@@ -144,36 +53,15 @@ export function tally(state: LiveState): Tally {
   };
   let paid = 0;
   let awaiting = 0;
-  for (const [claim, outcome] of counted(state)) {
-    counts[outcome] += 1;
+  for (const claim of run.claims) {
+    const outcome = outcomeOf(claim);
+    if (outcome) counts[outcome] += 1;
     if (outcome === "approve") paid += claim.payout ?? 0;
     if (outcome === "sign_off") awaiting += claim.payout ?? 0;
   }
-  return { counts, paid, awaiting };
-}
-
-/**
- * Where the live view is: "Claim 4 of 5". In a queue run this comes from the
- * run record: the claim's place in the order the agent took the claims, out of
- * the number the run will work. It is the same however long the view has been open.
- */
-export function progress(state: LiveState): {
-  position: number;
-  total: number;
-  done: number;
-} {
-  const done = counted(state).length;
-  const index = state.focus === null ? -1 : state.run.indexOf(state.focus);
-  if (index >= 0 || (state.focus === null && state.run.length > 0)) {
-    const position = index >= 0 ? index + 1 : done;
-    return { position, total: Math.max(state.total, state.run.length), done };
-  }
-  const remaining = state.claims.filter(
-    (claim) =>
-      !state.finished.includes(claim.claim_id) &&
-      (claim.status === "waiting" || claim.status === "in_progress"),
+  const done = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  const working = run.claims.filter(
+    (claim) => claim.status === "in_progress",
   ).length;
-  const shown = state.finished.length;
-  const position = state.stage === "working" && state.focus ? shown + 1 : shown;
-  return { position, total: shown + remaining, done };
+  return { counts, done, working, paid, awaiting };
 }

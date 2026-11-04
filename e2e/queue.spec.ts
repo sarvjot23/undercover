@@ -9,16 +9,20 @@ test("the queue shows the 25 claims", async ({ page }) => {
   await expect(
     page.getByRole("row").filter({ hasText: "CLM-1001" }).getByText("Waiting"),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "CLM-1001" })).toBeVisible();
+  await expect(
+    page.getByRole("table").getByRole("link", { name: "CLM-1001" }),
+  ).toBeVisible();
 });
 
 test("the instructions are shown read only", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Instructions" }).click();
   await expect(
-    page.getByRole("heading", { name: "Working the queue" }),
+    page.getByRole("heading", { name: "Working a claim" }),
   ).toBeVisible();
-  await expect(page.getByText(/running the claims queue/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Working the queue" }),
+  ).toHaveCount(0);
   await expect(page.getByText(/You decide one claim/)).toBeVisible();
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });

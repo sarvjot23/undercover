@@ -4,17 +4,18 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { ClaimSummary } from "./api";
+import type { Run } from "./api";
 import { LiveView } from "./LiveView";
-import { claim, runRecord, stubBackend, summary } from "./testing";
+import { runClaim, runRecord, stubBackend } from "./testing";
 
-let reducedMotion = false;
+let reducedMotion = true;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  reducedMotion = false;
+  reducedMotion = true;
   vi.stubGlobal("matchMedia", () => ({ matches: reducedMotion }));
 });
 
@@ -31,272 +32,214 @@ async function wait(ms: number) {
   });
 }
 
-/** Advance time until `check` passes, as the polls and timers run. */
-async function until(check: () => void) {
-  for (let i = 0; i < 40; i++) {
-    try {
-      check();
-      return;
-    } catch {
-      await wait(250);
-    }
-  }
-  check();
-}
-
-function stamp() {
-  return screen.getByRole("status");
-}
-
-function backend(
-  claims: ClaimSummary[],
-  running = true,
-  run: string[] = [],
-  total = run.length,
-  agentSummary: string | null = null,
-) {
-  const routes: Record<string, unknown> = {
-    "/api/claims": claims,
-    "/api/runs/current": runRecord({
-      status: running ? "running" : "finished",
-      claim_ids: run,
-      total,
-      summary: agentSummary,
-    }),
-    "/api/claims/CLM-1001/steps": [
-      { step_id: 1, kind: "tool_call", text: "get_claim CLM-1001", at: "" },
-    ],
-    "/api/claims/CLM-1002/steps": [],
-  };
-  for (const item of claims) {
-    routes[`/api/claims/${item.claim_id}`] = claim({
-      claim_id: item.claim_id,
-      status: item.status,
-      agent_working: item.status === "in_progress",
-    });
-  }
+function show(run: Run | null) {
+  const routes: Record<string, unknown> = { "/api/runs/current": run };
   stubBackend(routes);
   return routes;
 }
 
-it("shows each claim full screen, stamps it and moves on to a summary", async () => {
-  const routes = backend([
-    summary({ status: "in_progress" }),
-    summary({ claim_id: "CLM-1002" }),
-  ]);
-  render(<LiveView />);
-  await wait(100);
-  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-    "Flight home canceled by the airline",
-  );
-  expect(screen.getByText("Claim 1 of 2")).toBeDefined();
-  expect(screen.getByText("get_claim CLM-1001")).toBeDefined();
-  expect(screen.queryByRole("status")).toBeNull();
+function card(claimId: string) {
+  return screen.getByRole("article", { name: `Claim ${claimId}` });
+}
 
-  routes["/api/claims"] = [
-    summary({ status: "decided", decision: "approve", payout: 420 }),
-    summary({ claim_id: "CLM-1002" }),
-  ];
-  routes["/api/claims/CLM-1001"] = claim({
-    status: "decided",
-    decision: {
-      decision: "approve",
-      payout: 420,
-      reasons: "The delay is covered.",
-      policy_section: "3. Trip Delay",
-      decided_at: "",
-    },
-  });
-  await until(() => {
-    expect(stamp().textContent).toContain("Approved");
-  });
-  await until(() => {
-    expect(stamp().textContent).toContain("$420.00");
-  });
-  expect(stamp().textContent).toContain("The delay is covered.");
-  expect(
-    screen.getByRole("list", { name: "Outcomes so far" }).textContent,
-  ).toContain("1 Approved");
-
-  routes["/api/claims"] = [
-    summary({ status: "decided", decision: "approve", payout: 420 }),
-    summary({ claim_id: "CLM-1002", status: "in_progress" }),
-  ];
-  routes["/api/claims/CLM-1002"] = claim({
-    claim_id: "CLM-1002",
-    summary: "Suitcase lost",
-    status: "in_progress",
-    agent_working: true,
-  });
-  await wait(500);
-  expect(screen.getByRole("article").getAttribute("aria-label")).toBe(
-    "Claim CLM-1001",
-  );
-  await until(() => {
-    expect(screen.getByRole("article").getAttribute("aria-label")).toBe(
-      "Claim CLM-1002",
-    );
-  });
-  expect(screen.getByText("Claim 2 of 2")).toBeDefined();
-
-  routes["/api/claims"] = [
-    summary({ status: "decided", decision: "approve", payout: 420 }),
-    summary({
+const working = runRecord({
+  total: 4,
+  claims: [
+    runClaim({ claim_id: "CLM-1001", status: "waiting" }),
+    runClaim({
       claim_id: "CLM-1002",
-      status: "awaiting_sign_off",
-      decision: "approve",
-      payout: 1200,
+      status: "in_progress",
+      agent_working: true,
+      latest_step: 'read_section {"number": 3}',
+      cost: 0.0042,
+      seconds: 12,
     }),
-  ];
-  routes["/api/runs/current"] = runRecord({ status: "finished" });
-  await until(() => {
-    expect(stamp().textContent).toContain("Waiting for sign-off");
+    runClaim({
+      claim_id: "CLM-1003",
+      status: "in_progress",
+      agent_working: true,
+      latest_step: null,
+    }),
+    runClaim({
+      claim_id: "CLM-1004",
+      status: "decided",
+      decision: "decline",
+      payout: 0,
+    }),
+  ],
+  cost: 0.0042,
+  elapsed: 75,
+});
+
+it("shows several claims worked at once as cards, the ones at work first", async () => {
+  show(working);
+  render(<LiveView />);
+  await wait(10);
+  const cards = within(screen.getByRole("list", { name: "Dispatch 1" }))
+    .getAllByRole("article")
+    .map((article) => article.getAttribute("aria-label"));
+  expect(cards).toEqual([
+    "Claim CLM-1002",
+    "Claim CLM-1003",
+    "Claim CLM-1004",
+    "Claim CLM-1001",
+  ]);
+  expect(card("CLM-1002").textContent).toContain('read_section {"number": 3}');
+  expect(card("CLM-1002").textContent).toContain("$0.0042 · 12s");
+  expect(card("CLM-1003").textContent).toContain("Starting");
+  expect(card("CLM-1001").textContent).toContain("Waiting for a claim agent");
+  expect(within(card("CLM-1004")).getByRole("status").textContent).toBe(
+    "Declined",
+  );
+  expect(screen.getByText("1 of 4 done · 2 at work")).toBeDefined();
+  expect(screen.getByLabelText("Cost and time").textContent).toBe(
+    "$0.0042 · 1m 15s",
+  );
+});
+
+it("stamps each claim as it ends, an approval once it's paid", async () => {
+  const routes = show(working);
+  render(<LiveView />);
+  await wait(10);
+  expect(within(card("CLM-1002")).queryByRole("status")).toBeNull();
+
+  routes["/api/runs/current"] = runRecord({
+    ...working,
+    claims: [
+      runClaim({ claim_id: "CLM-1001", status: "in_progress" }),
+      runClaim({
+        claim_id: "CLM-1002",
+        status: "decided",
+        decision: "approve",
+        payout: 420,
+        paid: true,
+      }),
+      runClaim({
+        claim_id: "CLM-1003",
+        status: "awaiting_sign_off",
+        decision: "approve",
+        payout: 2240,
+      }),
+      runClaim({ claim_id: "CLM-1004", status: "needs_handler" }),
+    ],
   });
-  await until(() => {
-    expect(
-      screen.getByRole("heading", { name: "The queue is done" }),
-    ).toBeDefined();
-  });
+  await wait(1000);
+  expect(within(card("CLM-1002")).getByRole("status").textContent).toBe(
+    "Approved$420.00",
+  );
+  expect(within(card("CLM-1003")).getByRole("status").textContent).toBe(
+    "Waiting for sign-off$2,240.00",
+  );
+  expect(within(card("CLM-1004")).getByRole("status").textContent).toBe(
+    "Left for a handler",
+  );
+  const tally = screen.getByRole("list", { name: "Outcomes so far" });
+  expect(tally.textContent).toContain("1 Approved");
+  expect(tally.textContent).toContain("1 Waiting for sign-off");
+});
+
+it("counts the payout up unless motion is reduced", async () => {
+  reducedMotion = false;
+  show(
+    runRecord({
+      total: 1,
+      claims: [
+        runClaim({ status: "decided", decision: "approve", payout: 400 }),
+      ],
+    }),
+  );
+  render(<LiveView />);
+  await wait(10);
+  expect(screen.getByRole("status").textContent).not.toBe("Approved$400.00");
+  await wait(1000);
+  expect(screen.getByRole("status").textContent).toBe("Approved$400.00");
+});
+
+it("ends on the summary from the records", async () => {
+  show(
+    runRecord({
+      status: "finished",
+      total: 2,
+      claims: [
+        runClaim({
+          claim_id: "CLM-1001",
+          status: "decided",
+          decision: "approve",
+          payout: 420,
+        }),
+        runClaim({
+          claim_id: "CLM-1008",
+          status: "awaiting_sign_off",
+          decision: "approve",
+          payout: 2240,
+        }),
+      ],
+      summary: {
+        approved: 2,
+        declined: 0,
+        referred: 0,
+        awaiting_sign_off: [{ claim_id: "CLM-1008", payout: 2240 }],
+        left_for_handler: [],
+        in_progress: [],
+      },
+    }),
+  );
+  render(<LiveView />);
+  await wait(10);
+  expect(
+    screen.getByRole("heading", { name: "The dispatch is done" }),
+  ).toBeDefined();
+  expect(
+    screen.getByText("2 of 2 claims worked by 3 claim agents at once"),
+  ).toBeDefined();
   expect(screen.getByText(/Payouts approved/).textContent).toBe(
-    "Payouts approved: $420.00, and $1,200.00 waiting for sign-off",
+    "Payouts approved: $420.00, and $2,240.00 waiting for sign-off",
+  );
+  expect(screen.getByText(/Waiting for a sign-off/).textContent).toContain(
+    "CLM-1008 $2,240.00",
   );
 });
 
-it.each([
-  ["decline", "Declined"],
-  ["refer", "Referred"],
-] as const)("stamps a %s", async (decision, word) => {
-  backend([summary({ status: "in_progress" })]);
-  render(<LiveView />);
-  await wait(100);
-  backend([summary({ status: "decided", decision, payout: 0 })]);
-  await until(() => {
-    expect(stamp().textContent).toBe(word);
-  });
-});
-
-it("shows the payout at once with reduced motion", async () => {
-  reducedMotion = true;
-  backend([summary({ status: "in_progress" })]);
-  render(<LiveView />);
-  await wait(100);
-  backend([summary({ status: "decided", decision: "approve", payout: 75 })]);
-  await until(() => {
-    expect(stamp().textContent).toContain("$75.00");
-  });
-});
-
-it("waits for the agent, and can start the queue", async () => {
-  backend([summary()], false);
-  const fullscreen = vi.fn().mockResolvedValue(undefined);
-  document.documentElement.requestFullscreen = fullscreen;
-  render(<LiveView />);
-  await wait(100);
-  expect(
-    screen.getByText("Waiting for the agent to pick up a claim"),
-  ).toBeDefined();
-  fireEvent.click(screen.getByRole("button", { name: "Run the queue" }));
-  expect(fullscreen).toHaveBeenCalled();
-});
-
-it("keeps the queue run's numbers when it opens part way through", async () => {
-  const decline = { decision: "decline" as const, payout: 0 };
-  backend(
-    [
-      summary({ status: "decided", ...decline }),
-      summary({ claim_id: "CLM-1002", status: "in_progress" }),
-      summary({ claim_id: "CLM-1003" }),
-    ],
-    true,
-    ["CLM-1001", "CLM-1002", "CLM-1003"],
+it("says when a dispatch stopped partway", async () => {
+  show(
+    runRecord({
+      status: "stopped",
+      total: 1,
+      claims: [runClaim({ status: "in_progress" })],
+      summary: {
+        approved: 0,
+        declined: 0,
+        referred: 0,
+        awaiting_sign_off: [],
+        left_for_handler: [],
+        in_progress: ["CLM-1001"],
+      },
+    }),
   );
   render(<LiveView />);
-  await wait(100);
-  expect(screen.getByText("Claim 2 of 3")).toBeDefined();
+  await wait(10);
   expect(
-    screen.getByRole("list", { name: "Outcomes so far" }).textContent,
-  ).toContain("1 Declined");
+    screen.getByRole("heading", { name: "The dispatch stopped partway" }),
+  ).toBeDefined();
+  expect(screen.getByText(/Still in progress/).textContent).toBe(
+    "Still in progress: CLM-1001",
+  );
 });
 
-it("shows the last queue run's summary when it opens after the run", async () => {
-  const approve = { decision: "approve" as const, payout: 420 };
-  backend(
-    [
-      summary({ status: "decided", ...approve }),
-      summary({ claim_id: "CLM-1002", status: "decided", ...approve }),
-    ],
-    false,
-    ["CLM-1001", "CLM-1002"],
-  );
+it("waits for a first dispatch", async () => {
+  show(null);
   render(<LiveView />);
-  await wait(100);
+  await wait(10);
   expect(
-    screen.getByRole("heading", { name: "The queue is done" }),
+    screen.getByText("No dispatch yet. Start one on the queue page."),
   ).toBeDefined();
-  expect(
-    screen.getByText("2 claims decided by the UnderCover Agent"),
-  ).toBeDefined();
-  expect(screen.getByText("Claim 2 of 2")).toBeDefined();
 });
 
 it("leaves on Esc", async () => {
-  backend([summary()], false);
   window.location.hash = "#/live";
+  show(null);
   render(<LiveView />);
-  await wait(100);
   fireEvent.keyDown(window, { key: "Escape" });
+  await wait(10);
   expect(window.location.hash).toBe("#/");
-});
-
-it("counts from the run record: the agent's order, out of the run's total", async () => {
-  backend(
-    [
-      summary({ status: "decided", decision: "refer", payout: 0 }),
-      summary({ claim_id: "CLM-1002", status: "in_progress" }),
-    ],
-    true,
-    ["CLM-1001", "CLM-1002"],
-    5,
-  );
-  render(<LiveView />);
-  await wait(100);
-  expect(screen.getByText("Claim 2 of 5")).toBeDefined();
-});
-
-it("stamps a claim left for a handler", async () => {
-  backend([summary({ status: "in_progress" })], true, ["CLM-1001"]);
-  render(<LiveView />);
-  await wait(100);
-  backend([summary({ status: "needs_handler" })], true, ["CLM-1001"]);
-  await until(() => {
-    expect(stamp().textContent).toBe("Left for a handler");
-  });
-});
-
-it("lets a claim sent back to the queue leave without a stamp", async () => {
-  backend([summary({ status: "in_progress" })], true, ["CLM-1001"]);
-  render(<LiveView />);
-  await wait(100);
-  backend([summary({ attempts: 1 })], true, ["CLM-1001"]);
-  await until(() => {
-    expect(
-      screen.getByText("The agent is picking up the next claim"),
-    ).toBeDefined();
-  });
-  expect(screen.queryByRole("status")).toBeNull();
-});
-
-it("ends on the agent's own summary", async () => {
-  backend(
-    [summary({ status: "decided", decision: "refer", payout: 0 })],
-    false,
-    ["CLM-1001"],
-    1,
-    "One claim referred for a third claim in twelve months.",
-  );
-  render(<LiveView />);
-  await wait(100);
-  expect(
-    screen.getByText("One claim referred for a third claim in twelve months."),
-  ).toBeDefined();
 });

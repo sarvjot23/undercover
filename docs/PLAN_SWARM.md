@@ -208,15 +208,15 @@ Success criteria, all on a stub model:
 
 Success criteria:
 
-- [ ] Tests check the service: a start answers at once, a second start is refused with a 409, and runs left `running` are marked stopped at startup.
-- [ ] A test shows `POST /api/dispatches` passes N to the service, and answers 503 with "The agent's service isn't running" when it can't be reached.
-- [ ] Vitest checks N defaults to 3 and is held between 1 and 25, and that the button is disabled while a run is running.
-- [ ] Vitest checks the run panel: the claims with their badges, the cost and the time, and the summary once it ends.
-- [ ] Vitest checks the live view board: several claims worked at once, each stamped as it ends, and the summary at the end.
-- [ ] An end-to-end test starts a dispatch at N=5 on the dashboard, and the stand-in receives `{"n": 5}`.
-- [ ] The end-to-end test that played a capped run out through the API now plays out a dispatch, and the panel shows the summary from the records. The to-do list's test is gone.
-- [ ] `npm run dev` starts all three on Windows, and `npm run seed` reseeds.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] Tests check the service: a start answers at once, a second start is refused with a 409, and runs left `running` are marked stopped at startup.
+- [x] A test shows `POST /api/dispatches` passes N to the service, and answers 503 with "The agent's service isn't running" when it can't be reached.
+- [x] Vitest checks N defaults to 3 and is held between 1 and 25, and that the button is disabled while a run is running.
+- [x] Vitest checks the run panel: the claims with their badges, the cost and the time, and the summary once it ends.
+- [x] Vitest checks the live view board: several claims worked at once, each stamped as it ends, and the summary at the end.
+- [x] An end-to-end test starts a dispatch at N=5 on the dashboard, and the stand-in receives `{"n": 5}`.
+- [x] The end-to-end test that played a capped run out through the API now plays out a dispatch, and the panel shows the summary from the records. The to-do list's test is gone.
+- [ ] `npm run dev` starts all three on Windows, and `npm run seed` reseeds. (Checked in phase 6: the new schema needs Supabase reseeded, and the plan reseeds once, before the live runs.)
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 4: evaluations
 

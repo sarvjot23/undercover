@@ -1,191 +1,65 @@
 import { expect, it } from "vitest";
-import type { ClaimSummary } from "./api";
-import type { LiveState } from "./live";
-import { outcomeOf, progress, reduce, START, tally } from "./live";
-import { summary } from "./testing";
+import { board, outcomeOf, tally } from "./live";
+import { runClaim, runRecord } from "./testing";
 
-function poll(
-  state: LiveState,
-  claims: ClaimSummary[],
-  running = true,
-  run: string[] = [],
-  total = run.length,
-) {
-  return reduce(state, {
-    type: "poll",
-    claims,
-    running,
-    run,
-    total,
-    summary: null,
-  });
-}
-
-const second = summary({ claim_id: "CLM-1002" });
-const waiting = [summary(), second];
-
-it("names the outcome of each kind of decision", () => {
-  const approved = { decision: "approve" as const, payout: 420 };
-  expect(outcomeOf(summary({ status: "decided", ...approved }))).toBe(
-    "approve",
-  );
-  expect(outcomeOf(summary({ status: "awaiting_sign_off", ...approved }))).toBe(
-    "sign_off",
-  );
+it("names the outcome of each kind of ending", () => {
+  expect(outcomeOf(runClaim({ status: "waiting" }))).toBeNull();
+  expect(outcomeOf(runClaim({ status: "awaiting_sign_off" }))).toBe("sign_off");
+  expect(outcomeOf(runClaim({ status: "needs_handler" }))).toBe("handler");
   expect(
-    outcomeOf(summary({ status: "decided", decision: "decline", payout: 0 })),
-  ).toBe("decline");
-  expect(
-    outcomeOf(summary({ status: "decided", decision: "refer", payout: 0 })),
+    outcomeOf(runClaim({ status: "decided", decision: "refer", payout: 0 })),
   ).toBe("refer");
-  expect(outcomeOf(summary({ status: "needs_handler" }))).toBe("handler");
-  expect(outcomeOf(summary({ status: "in_progress" }))).toBeNull();
-});
-
-it("follows a claim from in progress to its stamp, then moves on", () => {
-  let state = poll(START, waiting);
-  expect(state.focus).toBeNull();
-
-  state = poll(state, [summary({ status: "in_progress" }), second]);
-  expect(state).toMatchObject({ focus: "CLM-1001", stage: "working" });
-  expect(progress(state)).toEqual({ position: 1, total: 2, done: 0 });
-
-  const decided = summary({
-    status: "decided",
-    decision: "decline",
-    payout: 0,
-  });
-  state = poll(state, [decided, second]);
-  expect(state).toMatchObject({ stage: "stamped", finished: ["CLM-1001"] });
-  expect(progress(state)).toEqual({ position: 1, total: 2, done: 1 });
-
-  state = reduce(state, { type: "held" });
-  expect(state.stage).toBe("stamped");
-
-  const next = summary({ claim_id: "CLM-1002", status: "in_progress" });
-  state = poll(state, [decided, next]);
-  expect(state.stage).toBe("leaving");
-
-  state = reduce(state, { type: "left" });
-  expect(state).toMatchObject({ focus: "CLM-1002", stage: "working" });
-  expect(progress(state)).toEqual({ position: 2, total: 2, done: 1 });
-});
-
-it("leaves the last stamp once the queue run has ended", () => {
-  let state = poll(START, [summary({ status: "in_progress" })]);
-  const approved = summary({
-    status: "decided",
-    decision: "approve",
-    payout: 420,
-  });
-  state = poll(state, [approved]);
-  state = reduce(state, { type: "held" });
-  expect(state.stage).toBe("stamped");
-  state = poll(state, [approved], false);
-  expect(state.stage).toBe("leaving");
-  state = reduce(state, { type: "left" });
-  expect(state.focus).toBeNull();
-  expect(tally(state)).toEqual({
-    counts: { approve: 1, decline: 0, refer: 0, sign_off: 0, handler: 0 },
-    paid: 420,
-    awaiting: 0,
-  });
-});
-
-it("drops a claim whose run failed", () => {
-  let state = poll(START, [summary({ status: "in_progress" })]);
-  state = poll(state, [summary()]);
-  expect(state.focus).toBeNull();
-  expect(state.finished).toEqual([]);
-});
-
-it("counts payouts waiting for sign-off apart from those paid", () => {
-  const state: LiveState = {
-    ...START,
-    finished: ["CLM-1001", "CLM-1002"],
-    claims: [
-      summary({ status: "decided", decision: "approve", payout: 100 }),
-      summary({
-        claim_id: "CLM-1002",
-        status: "awaiting_sign_off",
-        decision: "approve",
-        payout: 1200,
-      }),
-      summary({
-        claim_id: "CLM-1003",
-        status: "decided",
-        decision: "approve",
-        payout: 999,
-      }),
-    ],
-  };
-  expect(tally(state)).toMatchObject({ paid: 100, awaiting: 1200 });
-});
-
-it("counts from the queue run, however late the view opens", () => {
-  const run = ["CLM-1001", "CLM-1002", "CLM-1003", "CLM-1004"];
-  const declined = summary({
-    status: "decided",
-    decision: "decline",
-    payout: 0,
-  });
-  const claims = [
-    declined,
-    summary({ claim_id: "CLM-1002", status: "in_progress" }),
-    summary({ claim_id: "CLM-1003" }),
-    summary({ claim_id: "CLM-1004" }),
-  ];
-  let state = poll(START, claims, true, run);
-  expect(state.focus).toBe("CLM-1002");
-  expect(progress(state)).toEqual({ position: 2, total: 4, done: 1 });
-  expect(tally(state).counts.decline).toBe(1);
-
-  state = poll(START, [declined], false, ["CLM-1001"]);
-  expect(progress(state)).toEqual({ position: 1, total: 1, done: 1 });
-});
-
-it("takes the total from the run, before the agent has taken every claim", () => {
-  const claims = [
-    summary({ status: "decided", decision: "refer", payout: 0 }),
-    summary({ claim_id: "CLM-1002", status: "in_progress" }),
-    summary({ claim_id: "CLM-1003" }),
-  ];
-  const state = poll(START, claims, true, ["CLM-1001", "CLM-1002"], 5);
-  expect(progress(state)).toEqual({ position: 2, total: 5, done: 1 });
-});
-
-it("counts a claim left for a handler", () => {
-  const state = poll(START, [summary({ status: "needs_handler" })], false, [
-    "CLM-1001",
-  ]);
-  expect(tally(state).counts.handler).toBe(1);
-});
-
-it("doesn't follow a signed-off claim that goes back to in progress", () => {
-  const held = {
-    status: "awaiting_sign_off" as const,
-    decision: "approve" as const,
-    payout: 1200,
-  };
-  let state = poll(START, [summary({ status: "in_progress" })]);
-  state = poll(state, [summary(held)]);
-  expect(state.stage).toBe("stamped");
-  state = reduce(state, { type: "held" });
-  state = reduce(state, { type: "left" });
-  state = poll(state, [summary({ ...held, status: "in_progress" })]);
-  expect(state.focus).toBeNull();
-  expect(tally(state).counts.sign_off).toBe(0);
-  state = poll(state, [summary({ ...held, status: "decided" })]);
-  expect(state.focus).toBeNull();
-  expect(tally(state).counts.approve).toBe(1);
-  expect(tally(state).paid).toBe(1200);
 });
 
 it("waits for the payment before stamping an approval", () => {
   const approved = { decision: "approve" as const, payout: 420 };
-  let state = poll(START, [summary({ status: "in_progress" })]);
-  state = poll(state, [summary({ status: "in_progress", ...approved })]);
-  expect(state.stage).toBe("working");
-  state = poll(state, [summary({ status: "decided", ...approved })]);
-  expect(state.stage).toBe("stamped");
+  expect(
+    outcomeOf(runClaim({ status: "in_progress", ...approved })),
+  ).toBeNull();
+  expect(outcomeOf(runClaim({ status: "decided", ...approved }))).toBe(
+    "approve",
+  );
+});
+
+it("puts the claims at work first and the waiting last, each in the dispatch's order", () => {
+  const run = runRecord({
+    claims: [
+      runClaim({ claim_id: "A", status: "waiting" }),
+      runClaim({ claim_id: "B", status: "decided", decision: "refer" }),
+      runClaim({ claim_id: "C", status: "in_progress" }),
+      runClaim({ claim_id: "D", status: "needs_handler" }),
+      runClaim({ claim_id: "E", status: "in_progress" }),
+    ],
+  });
+  expect(board(run).map((claim) => claim.claim_id)).toEqual([
+    "C",
+    "E",
+    "B",
+    "D",
+    "A",
+  ]);
+});
+
+it("counts payouts waiting for sign-off apart from those paid", () => {
+  const numbers = tally(
+    runRecord({
+      claims: [
+        runClaim({ status: "decided", decision: "approve", payout: 420 }),
+        runClaim({ status: "decided", decision: "approve", payout: 80 }),
+        runClaim({
+          status: "awaiting_sign_off",
+          decision: "approve",
+          payout: 2240,
+        }),
+        runClaim({ status: "in_progress" }),
+        runClaim({ status: "waiting" }),
+      ],
+    }),
+  );
+  expect(numbers.counts.approve).toBe(2);
+  expect(numbers.counts.sign_off).toBe(1);
+  expect(numbers.paid).toBe(500);
+  expect(numbers.awaiting).toBe(2240);
+  expect(numbers.done).toBe(3);
+  expect(numbers.working).toBe(1);
 });

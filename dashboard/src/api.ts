@@ -107,28 +107,54 @@ export interface Step {
   at: string;
 }
 
-export type TodoStatus = "to_do" | "in_progress" | "done" | "left_for_handler";
+export type SetName = "evaluation" | "held_out";
 
-/** One item on the agent's to-do list for a run. */
-export interface Todo {
+/** One of a run's claims: where it stands, its latest step, its cost and time. */
+export interface RunClaim {
   claim_id: string;
-  note: string;
-  status: TodoStatus;
+  /** For an evaluation's copy, the claim it was copied from. */
+  source_id: string | null;
+  status: Status;
+  attempts: number;
+  agent_working: boolean;
+  latest_step: string | null;
+  decision: Outcome | null;
+  payout: number | null;
+  reasons: string | null;
+  paid: boolean;
+  cost: number;
+  seconds: number;
+  started: string | null;
 }
 
-/** A queue run: its cap, the claims it took, its to-do list and its summary. */
+/** An ended run's summary, built from the records with no model. */
+export interface RunSummary {
+  approved: number;
+  declined: number;
+  referred: number;
+  awaiting_sign_off: { claim_id: string; payout: number }[];
+  left_for_handler: string[];
+  in_progress: string[];
+}
+
+/** A dispatch or an evaluation: its claims, cost and time, and its summary once ended. */
 export interface Run {
   run_id: number;
-  cap: number;
+  kind: "dispatch" | "evaluation";
+  n: number;
+  set_name: SetName | null;
+  tiny: boolean;
+  model: string;
+  reasoning: string;
   total: number;
-  status: "running" | "finished" | "failed";
-  /** Whether a worker holds the run now; a run still running but not active has stopped. */
-  active: boolean;
-  todos: Todo[];
-  summary: string | null;
-  claim_ids: string[];
+  status: "running" | "finished" | "stopped";
   started_at: string;
   finished_at: string | null;
+  claims: RunClaim[];
+  cost: number;
+  seconds: number;
+  elapsed: number;
+  summary: RunSummary | null;
 }
 
 export interface Handler {
@@ -151,4 +177,25 @@ export async function postJson<T>(path: string, body?: object): Promise<T> {
   });
   if (!response.ok) throw new Error(`${path}: ${String(response.status)}`);
   return (await response.json()) as T;
+}
+
+/** POST, and return the backend's reason when it refuses, or null when it accepts. */
+export async function postForRefusal(
+  path: string,
+  body: object,
+): Promise<string | null> {
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (response.ok) return null;
+    const refusal = (await response.json()) as { detail?: unknown };
+    return typeof refusal.detail === "string"
+      ? refusal.detail
+      : "The backend refused it.";
+  } catch {
+    return "The backend is not responding.";
+  }
 }

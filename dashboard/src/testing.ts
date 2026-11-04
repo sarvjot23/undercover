@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Claim, ClaimSummary, Run } from "./api";
+import type { Claim, ClaimSummary, Run, RunClaim } from "./api";
 
 export function pathOf(input: RequestInfo | URL): string {
   return input instanceof Request ? input.url : input.toString();
@@ -103,18 +103,43 @@ export function claim(overrides: Partial<Claim> = {}): Claim {
   };
 }
 
+export function runClaim(overrides: Partial<RunClaim> = {}): RunClaim {
+  return {
+    claim_id: "CLM-1001",
+    source_id: null,
+    status: "waiting",
+    attempts: 0,
+    agent_working: false,
+    latest_step: null,
+    decision: null,
+    payout: null,
+    reasons: null,
+    paid: false,
+    cost: 0,
+    seconds: 0,
+    started: null,
+    ...overrides,
+  };
+}
+
 export function runRecord(overrides: Partial<Run> = {}): Run {
   return {
     run_id: 1,
-    cap: 25,
+    kind: "dispatch",
+    n: 3,
+    set_name: null,
+    tiny: false,
+    model: "openai/gpt-6-luna",
+    reasoning: "low",
     total: 0,
     status: "running",
-    active: true,
-    todos: [],
-    summary: null,
-    claim_ids: [],
-    started_at: "2026-10-29T10:00:00+00:00",
+    started_at: "2026-11-04T10:00:00+00:00",
     finished_at: null,
+    claims: [],
+    cost: 0,
+    seconds: 0,
+    elapsed: 0,
+    summary: null,
     ...overrides,
   };
 }

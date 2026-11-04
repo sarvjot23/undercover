@@ -52,7 +52,10 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
 
   await expect(async () => {
     const received = await request.get("http://127.0.0.1:8003/received");
-    expect(await received.json()).toContain("/claims/CLM-1014/resume");
+    expect(await received.json()).toContainEqual({
+      path: "/claims/CLM-1014/resume",
+      body: {},
+    });
   }).toPass();
 
   await pay(request, "CLM-1014", 805);

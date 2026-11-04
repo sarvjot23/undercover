@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getJson, postJson } from "./api";
+import { getJson, postForRefusal } from "./api";
 
 export type Route =
   | { view: "queue" }
@@ -108,19 +108,38 @@ export function enterFullscreen(): void {
   document.documentElement.requestFullscreen().catch(() => undefined);
 }
 
-/** Start a queue run on up to `cap` claims and watch it in the live view. */
-export function runQueue(cap: number): void {
-  enterFullscreen();
-  postJson("/api/runs", { cap })
-    .catch(() => undefined)
-    .finally(() => {
-      window.location.hash = "#/live";
-    });
-}
-
-export function leaveLiveView(): void {
+export function exitFullscreen(): void {
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => undefined);
   }
+}
+
+export const DEFAULT_AGENTS = 3;
+export const MAX_AGENTS = 25;
+
+/** Hold a number of claim agents between 1 and 25. */
+export function agentsAtOnce(value: number): number {
+  return Number.isNaN(value)
+    ? DEFAULT_AGENTS
+    : Math.min(MAX_AGENTS, Math.max(1, Math.round(value)));
+}
+
+/**
+ * Start a dispatch with N claim agents at once and watch it in the live view.
+ * Return the reason if it was refused, such as the agent's service not running.
+ */
+export async function startDispatch(n: number): Promise<string | null> {
+  enterFullscreen();
+  const refusal = await postForRefusal("/api/dispatches", { n });
+  if (refusal) {
+    exitFullscreen();
+    return refusal;
+  }
+  window.location.hash = "#/live";
+  return null;
+}
+
+export function leaveLiveView(): void {
+  exitFullscreen();
   window.location.hash = "#/";
 }

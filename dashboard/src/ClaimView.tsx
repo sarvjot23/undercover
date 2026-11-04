@@ -6,6 +6,11 @@ import { useJson } from "./hooks";
 import { StatusBadge } from "./StatusBadge";
 import { Steps } from "./Steps";
 
+/** Where a claim stands; here, only whether it's an evaluation's copy. */
+interface Standing {
+  evaluation_id: number | null;
+}
+
 /** Follow a claim while the agent may still pick it up or is working on it. */
 function pollClaim(claim: Claim): number {
   if (claim.sign_off && !claim.payment) return 300;
@@ -21,6 +26,8 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
     `${path}/steps`,
     claim?.agent_working ? 1000 : 0,
   );
+  const { data: standing } = useJson<Standing>(`${path}/standing`);
+  const evaluationId = standing?.evaluation_id ?? null;
 
   if (error) return <p role="alert">There is no claim {claimId}.</p>;
   if (!claim) return <p>Loading the claim</p>;
@@ -47,13 +54,23 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
             {claim.attempts === 1 ? "attempt" : "attempts"}
           </span>
         )}
-        {claim.status === "waiting" && (
+        {claim.status === "waiting" && evaluationId === null && (
           <button type="button" onClick={run} disabled={starting}>
             Run the agent
           </button>
         )}
       </div>
       {problem && <p role="alert">{problem}</p>}
+      {evaluationId !== null && (
+        <p className="muted">
+          A copy for{" "}
+          <a href={`#/scoreboard/${String(evaluationId)}`}>
+            evaluation {evaluationId}
+          </a>
+          . Nobody signs off a copy: an approval held for sign-off counts as
+          finished.
+        </p>
+      )}
       <div className="claim-grid">
         <div className="claim-main">
           <ClaimStory claim={claim} />
@@ -63,7 +80,11 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
           </div>
         </div>
         <div className="claim-side">
-          <DecisionPanel claim={claim} onSignedOff={reload} />
+          <DecisionPanel
+            claim={claim}
+            isCopy={evaluationId !== null}
+            onSignedOff={reload}
+          />
           <Reads steps={steps.data ?? []} />
           <PolicyPanel claim={claim} />
         </div>
@@ -130,8 +151,9 @@ function ClaimStory({ claim }: Readonly<{ claim: Claim }>) {
 
 function DecisionPanel({
   claim,
+  isCopy,
   onSignedOff,
-}: Readonly<{ claim: Claim; onSignedOff: () => void }>) {
+}: Readonly<{ claim: Claim; isCopy: boolean; onSignedOff: () => void }>) {
   const { decision, payment } = claim;
   const { data: handlers } = useJson<Handler[]>("/api/handlers");
   if (!decision) {
@@ -156,7 +178,7 @@ function DecisionPanel({
       ) : (
         <SignedOff claim={claim} handlers={handlers} />
       )}
-      {claim.status === "awaiting_sign_off" && (
+      {claim.status === "awaiting_sign_off" && !isCopy && (
         <SignOff
           claimId={claim.claim_id}
           handlers={handlers}

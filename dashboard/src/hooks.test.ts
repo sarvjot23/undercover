@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { parseRoute, useJson, useRoute } from "./hooks";
+import { agentsAtOnce, parseRoute, useJson, useRoute } from "./hooks";
 import { stubBackend } from "./testing";
 
 afterEach(() => {
@@ -74,4 +74,10 @@ it("polls while the data asks for it", async () => {
   const calls = fetchMock.mock.calls.length;
   await new Promise((resolve) => setTimeout(resolve, 100));
   expect(fetchMock.mock.calls).toHaveLength(calls);
+});
+
+it("holds the claim agents at once between 1 and 25, or 3 when unreadable", () => {
+  expect(agentsAtOnce(Number.NaN)).toBe(3);
+  expect(agentsAtOnce(2.6)).toBe(3);
+  expect(agentsAtOnce(-4)).toBe(1);
 });

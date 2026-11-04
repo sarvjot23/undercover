@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { runRecord, stubBackend, summary } from "./testing";
+import { runClaim, runRecord, stubBackend, summary } from "./testing";
 
 afterEach(() => {
   cleanup();
@@ -72,17 +72,13 @@ it("says when the backend is down", async () => {
 it("shows the instructions read only", async () => {
   window.location.hash = "#/instructions";
   stubBackend({
-    "/api/instructions": {
-      queue: "You run the claims queue.",
-      claim: "You decide one claim.",
-    },
+    "/api/instructions": { claim: "You decide one claim." },
   });
   render(<App />);
-  expect(await screen.findByText("You run the claims queue.")).toBeDefined();
-  expect(screen.getByText("You decide one claim.")).toBeDefined();
+  expect(await screen.findByText("You decide one claim.")).toBeDefined();
   expect(
-    screen.getByRole("heading", { name: "Working the queue" }),
-  ).toBeDefined();
+    screen.queryByRole("heading", { name: "Working the queue" }),
+  ).toBeNull();
   expect(
     screen.getByRole("heading", { name: "Working a claim" }),
   ).toBeDefined();
@@ -101,33 +97,9 @@ it("says when the instructions can't load", async () => {
   expect(await screen.findByRole("alert")).toBeDefined();
 });
 
-it("runs the queue full screen in the live view", async () => {
-  const fetchMock = stubBackend({
-    "/api/claims": queue,
-    "POST /api/runs": runRecord({ total: 2 }),
-    "/api/runs/current": runRecord({ status: "finished", active: false }),
-  });
-  const fullscreen = vi.fn().mockResolvedValue(undefined);
-  document.documentElement.requestFullscreen = fullscreen;
-  vi.stubGlobal("matchMedia", () => ({ matches: false }));
-  render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "Run the queue" }));
-  expect(fullscreen).toHaveBeenCalled();
-  await waitFor(() => {
-    expect(window.location.hash).toBe("#/live");
-  });
-  const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-  expect(post?.[0]).toBe("/api/runs");
-  expect(post?.[1]?.body).toBe(JSON.stringify({ cap: 1 }));
-  expect(
-    await screen.findByRole("button", { name: "Leave (Esc)" }),
-  ).toBeDefined();
-});
-
 it("leaves the live view and full screen", async () => {
   window.location.hash = "#/live";
   stubBackend({
-    "/api/claims": queue,
     "/api/runs/current": null,
   });
   const exitFullscreen = vi.fn().mockResolvedValue(undefined);
@@ -146,131 +118,183 @@ it("leaves the live view and full screen", async () => {
   });
 });
 
-it("starts a trial run on the number of claims chosen", async () => {
-  const many = ["CLM-1001", "CLM-1002", "CLM-1003", "CLM-1004"].map((claimId) =>
-    summary({ claim_id: claimId }),
-  );
+function fullScreen() {
+  const enter = vi.fn().mockResolvedValue(undefined);
+  document.documentElement.requestFullscreen = enter;
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  return enter;
+}
+
+it("starts a dispatch with 3 claim agents at once, full screen in the live view", async () => {
   const fetchMock = stubBackend({
-    "/api/claims": many,
-    "POST /api/runs": runRecord({ total: 2, cap: 2 }),
+    "/api/claims": queue,
+    "POST /api/dispatches": { accepted: true },
+    "/api/runs/current": null,
+    "/api/runs/running": null,
   });
-  document.documentElement.requestFullscreen = vi
-    .fn()
-    .mockResolvedValue(undefined);
-  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  const enter = fullScreen();
   render(<App />);
-  const cap = await screen.findByRole("spinbutton", {
-    name: "Claims in this run",
+  const agents = await screen.findByRole("spinbutton", {
+    name: "Claim agents at once",
   });
-  expect((cap as HTMLInputElement).value).toBe("4");
-  fireEvent.change(cap, { target: { value: "2" } });
-  fireEvent.click(screen.getByRole("button", { name: "Run the queue" }));
+  expect((agents as HTMLInputElement).value).toBe("3");
+  fireEvent.click(screen.getByRole("button", { name: "Start a dispatch" }));
+  expect(enter).toHaveBeenCalled();
+  await waitFor(() => {
+    expect(window.location.hash).toBe("#/live");
+  });
   const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-  expect(post?.[1]?.body).toBe(JSON.stringify({ cap: 2 }));
+  expect(post?.[0]).toBe("/api/dispatches");
+  expect(post?.[1]?.body).toBe(JSON.stringify({ n: 3 }));
 });
 
-it("shows the agent's to-do list, ticked off as it goes", async () => {
+it.each([
+  ["7", "7"],
+  ["0", "1"],
+  ["40", "25"],
+])(
+  "holds the claim agents at once between 1 and 25: %s",
+  async (typed, held) => {
+    stubBackend({ "/api/claims": queue });
+    render(<App />);
+    const agents = await screen.findByRole("spinbutton", {
+      name: "Claim agents at once",
+    });
+    fireEvent.change(agents, { target: { value: typed } });
+    expect((agents as HTMLInputElement).value).toBe(held);
+  },
+);
+
+it("passes the chosen N to the dispatch", async () => {
+  const fetchMock = stubBackend({
+    "/api/claims": queue,
+    "POST /api/dispatches": { accepted: true },
+  });
+  fullScreen();
+  render(<App />);
+  const agents = await screen.findByRole("spinbutton", {
+    name: "Claim agents at once",
+  });
+  fireEvent.change(agents, { target: { value: "25" } });
+  fireEvent.click(screen.getByRole("button", { name: "Start a dispatch" }));
+  await waitFor(() => {
+    const post = fetchMock.mock.calls.find(
+      ([, init]) => init?.method === "POST",
+    );
+    expect(post?.[1]?.body).toBe(JSON.stringify({ n: 25 }));
+  });
+});
+
+it("says when the agent's service isn't running", async () => {
+  stubBackend({ "/api/claims": queue });
+  const backend = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === "POST"
+      ? Promise.resolve(
+          new Response(
+            JSON.stringify({ detail: "The agent's service isn't running" }),
+            { status: 503 },
+          ),
+        )
+      : backend(input, init),
+  );
+  fullScreen();
+  render(<App />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Start a dispatch" }),
+  );
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "The agent's service isn't running",
+  );
+  expect(window.location.hash).toBe("");
+});
+
+it("won't start a dispatch while a dispatch or evaluation is running", async () => {
+  stubBackend({
+    "/api/claims": queue,
+    "/api/runs/running": runRecord({ kind: "evaluation" }),
+  });
+  render(<App />);
+  expect(
+    await screen.findByText("A dispatch or evaluation is already running"),
+  ).toBeDefined();
+  const button = screen.getByRole("button", { name: "Start a dispatch" });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("shows the dispatch's claims with where each stands, its cost and its time", async () => {
   stubBackend({
     "/api/claims": queue,
     "/api/runs/current": runRecord({
       total: 3,
-      claim_ids: ["CLM-1003", "CLM-1001"],
-      todos: [
-        { claim_id: "CLM-1003", note: "Passport, $243", status: "done" },
-        { claim_id: "CLM-1001", note: "Trip delay", status: "in_progress" },
-        { claim_id: "CLM-1002", note: "Baggage", status: "to_do" },
+      claims: [
+        runClaim({
+          claim_id: "CLM-1003",
+          status: "decided",
+          decision: "refer",
+        }),
+        runClaim({ claim_id: "CLM-1001", status: "in_progress" }),
+        runClaim({ claim_id: "CLM-1002", status: "waiting" }),
       ],
+      cost: 0.0123,
+      seconds: 95,
+      elapsed: 40,
     }),
   });
   render(<App />);
-  const list = await screen.findByRole("region", {
-    name: "The agent’s to-do list",
+  const panel = await screen.findByRole("region", {
+    name: "The latest dispatch",
   });
-  const items = within(list).getAllByRole("listitem");
+  const items = within(panel).getAllByRole("listitem");
   expect(items.map((item) => item.textContent)).toEqual([
-    "CLM-1003Passport, $243Done",
-    "CLM-1001Trip delayIn progress",
-    "CLM-1002BaggageTo do",
+    "CLM-1003Decided",
+    "CLM-1001In progress",
+    "CLM-1002Waiting",
   ]);
-  expect(list.textContent).toContain("2 of 3 claims taken");
+  expect(
+    within(items[0])
+      .getByRole("link", { name: "CLM-1003" })
+      .getAttribute("href"),
+  ).toBe("#/claims/CLM-1003");
+  expect(panel.textContent).toContain(
+    "Running · 3 claim agents at once · 1 of 3 claims done",
+  );
+  expect(panel.textContent).toContain("Model cost$0.0123");
+  expect(panel.textContent).toContain("Agent time1m 35s");
+  expect(panel.textContent).toContain("Run time40s");
+  expect(within(panel).queryByText("Summary")).toBeNull();
 });
 
-it("shows the agent's summary when the run ends", async () => {
+it("shows the summary from the records once the dispatch ends", async () => {
   stubBackend({
     "/api/claims": queue,
     "/api/runs/current": runRecord({
       status: "finished",
-      summary: "Two approved, one left for a handler.",
-      todos: [
-        {
-          claim_id: "CLM-1002",
-          note: "Baggage",
-          status: "left_for_handler",
-        },
-      ],
+      summary: {
+        approved: 2,
+        declined: 1,
+        referred: 1,
+        awaiting_sign_off: [
+          { claim_id: "CLM-1008", payout: 2240 },
+          { claim_id: "CLM-1011", payout: 1150 },
+        ],
+        left_for_handler: ["CLM-1004"],
+        in_progress: ["CLM-1005"],
+      },
     }),
   });
   render(<App />);
-  expect(
-    await screen.findByText("Two approved, one left for a handler."),
-  ).toBeDefined();
-  expect(screen.getByText("The agent's summary")).toBeDefined();
-  expect(screen.getAllByText("Left for a handler").length).toBeGreaterThan(0);
-});
-
-it("says the agent is planning before the list is written", async () => {
-  stubBackend({ "/api/claims": queue, "/api/runs/current": runRecord() });
-  render(<App />);
-  expect(
-    await screen.findByText("The agent is planning the run."),
-  ).toBeDefined();
-});
-
-it("won't start a second run while one is in progress", async () => {
-  stubBackend({
-    "/api/claims": queue,
-    "/api/runs/current": runRecord({ active: true }),
+  const panel = await screen.findByRole("region", {
+    name: "The latest dispatch",
   });
-  render(<App />);
-  expect(await screen.findByText("A run is already in progress")).toBeDefined();
-  const button = screen.getByRole("button", { name: "Run the queue" });
-  expect((button as HTMLButtonElement).disabled).toBe(true);
-});
-
-it("offers to finish a run that stopped partway", async () => {
-  const fetchMock = stubBackend({
-    "/api/claims": queue,
-    "/api/runs/current": runRecord({ active: false, cap: 3 }),
-    "POST /api/runs": runRecord({ active: true, cap: 3 }),
-  });
-  document.documentElement.requestFullscreen = vi
-    .fn()
-    .mockResolvedValue(undefined);
-  vi.stubGlobal("matchMedia", () => ({ matches: false }));
-  render(<App />);
-  expect(
-    await screen.findByText(
-      "The last run stopped partway. Running the queue finishes it",
-    ),
-  ).toBeDefined();
-  const button = screen.getByRole("button", { name: "Run the queue" });
-  expect((button as HTMLButtonElement).disabled).toBe(false);
-  fireEvent.click(button);
-  await waitFor(() => {
-    expect(
-      fetchMock.mock.calls.some(([, init]) => init?.method === "POST"),
-    ).toBe(true);
-  });
-});
-
-it("lets a new run start after the last one finished", async () => {
-  stubBackend({
-    "/api/claims": queue,
-    "/api/runs/current": runRecord({ status: "finished", active: false }),
-  });
-  render(<App />);
-  await screen.findByRole("region", { name: "The agent’s to-do list" });
-  const button = screen.getByRole("button", { name: "Run the queue" });
-  expect((button as HTMLButtonElement).disabled).toBe(false);
-  expect(screen.queryByText("A run is already in progress")).toBeNull();
+  const summary = within(panel).getByText("Summary").parentElement;
+  expect(summary?.textContent).toContain(
+    "2 approved, 1 declined and 1 referred.",
+  );
+  expect(summary?.textContent).toContain(
+    "Waiting for a sign-off: CLM-1008 $2,240.00, CLM-1011 $1,150.00",
+  );
+  expect(summary?.textContent).toContain("Left for a handler: CLM-1004");
+  expect(summary?.textContent).toContain("Still in progress: CLM-1005");
+  expect(panel.textContent).toContain("Finished");
 });

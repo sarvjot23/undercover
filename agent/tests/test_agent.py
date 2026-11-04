@@ -134,7 +134,7 @@ def test_agent_reaches_only_the_backend_api(requests):
         decision("refer", 0),
         AIMessage(content="Referred."),
     )
-    assert "/api/instructions" in requests
+    assert "/api/configuration/current" in requests
     assert "/api/documents/policy_wording/sections" in requests
     assert all(path.startswith("/api/") for path in requests)
 

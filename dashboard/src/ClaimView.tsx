@@ -180,7 +180,11 @@ function DecisionPanel({
         <SignedOff claim={claim} handlers={handlers} />
       )}
       {claim.status === "awaiting_sign_off" && !isCopy && (
-        <SignOff claimId={claim.claim_id} onSignedOff={onSignedOff} />
+        <SignOff
+          claimId={claim.claim_id}
+          limit={decision.approval_limit}
+          onSignedOff={onSignedOff}
+        />
       )}
     </div>
   );
@@ -230,22 +234,23 @@ function PaymentLine({
 
 function SignOff({
   claimId,
+  limit,
   onSignedOff,
-}: Readonly<{ claimId: string; onSignedOff: () => void }>) {
+}: Readonly<{ claimId: string; limit: number; onSignedOff: () => void }>) {
   const handler = useHandler();
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
-  const limit = (
+  const why = (
     <p>
-      This payout is over $800.00, so the payment waits for a handler&rsquo;s
-      sign-off.
+      This payout is over the approval limit of {money(limit)}, so the payment
+      waits for a handler&rsquo;s sign-off.
     </p>
   );
 
   if (!handler?.can_approve_over_limit) {
     return (
       <div className="sign-off">
-        {limit}
+        {why}
         <p className="muted">{ONLY_APPROVERS} can sign this off.</p>
       </div>
     );
@@ -263,7 +268,7 @@ function SignOff({
 
   return (
     <div className="sign-off">
-      {limit}
+      {why}
       <button type="button" onClick={signOff} disabled={busy}>
         Sign off as {handler.name}
       </button>

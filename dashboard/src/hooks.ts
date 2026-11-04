@@ -4,7 +4,8 @@ import { getJson, postForRefusal } from "./api";
 export type Route =
   | { view: "queue" }
   | { view: "claim"; claimId: string }
-  | { view: "instructions" }
+  | { view: "configuration" }
+  | { view: "settings" }
   | { view: "scoreboard" }
   | { view: "evaluation"; runId: number }
   | { view: "live" };
@@ -12,7 +13,10 @@ export type Route =
 export function parseRoute(hash: string): Route {
   const claim = /^#\/claims\/([\w-]+)$/.exec(hash);
   if (claim?.[1]) return { view: "claim", claimId: claim[1] };
-  if (hash === "#/instructions") return { view: "instructions" };
+  // The Instructions page became the Configuration page.
+  if (hash === "#/configuration" || hash === "#/instructions")
+    return { view: "configuration" };
+  if (hash === "#/settings") return { view: "settings" };
   if (hash === "#/scoreboard") return { view: "scoreboard" };
   const evaluation = /^#\/scoreboard\/(\d+)$/.exec(hash);
   if (evaluation?.[1])

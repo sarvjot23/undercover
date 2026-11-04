@@ -14,15 +14,26 @@ test("the queue shows the 25 claims", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("the instructions are shown read only", async ({ page }) => {
+test("the configuration shows version 1 read only", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Instructions" }).click();
+  await page.getByRole("link", { name: "Configuration" }).click();
   await expect(
-    page.getByRole("heading", { name: "Working a claim" }),
+    page.getByRole("heading", { name: "Version 1, the current version" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Working the queue" }),
-  ).toHaveCount(0);
-  await expect(page.getByText(/You decide one claim/)).toBeVisible();
+    page.getByRole("table", { name: "Versions" }).getByRole("row"),
+  ).toHaveCount(2);
+  await expect(page.locator(".diff-add").first()).toContainText(
+    "You are the UnderCover Agent.",
+  );
   await expect(page.getByRole("textbox")).toHaveCount(0);
+});
+
+test("the old Instructions address opens the configuration", async ({
+  page,
+}) => {
+  await page.goto("/#/instructions");
+  await expect(
+    page.getByRole("heading", { name: "Configuration", exact: true }),
+  ).toBeVisible();
 });

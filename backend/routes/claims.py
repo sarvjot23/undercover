@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import Connection, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
-from backend import agent_service, db, leases
+from backend import agent_service, db, leases, settings
 from backend.auth import Approver
 from backend.db import (
     Db,
@@ -21,7 +21,6 @@ from backend.db import (
 from backend.db import claims as claim_table
 from backend.payout import Payout, work_out_payout
 from backend.rules import (
-    APPROVAL_LIMIT,
     add,
     fail,
     find_claim,
@@ -170,14 +169,15 @@ def calculate_payout(claim_id: str, request: PayoutRequest, conn: Db) -> Payout:
         request.benefit,
         request.lines,
         request.paid_by_others,
+        settings.current(conn).approval_limit,
     )
 
 
-def next_status(decision: Decision) -> str:
+def next_status(decision: Decision, limit: float) -> str:
     """Say where a decision leaves a claim: an approval stays in progress until paid."""
     if decision.decision != "approve":
         return "decided"
-    if decision.payout > APPROVAL_LIMIT:
+    if decision.payout > limit:
         return "awaiting_sign_off"
     return "in_progress"
 
@@ -194,7 +194,8 @@ def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, An
         if (recorded["decision"], recorded["payout"]) == (decision.decision, payout):
             return found
         raise HTTPException(409, f"Claim {claim_id} already has a different decision")
-    move(conn, claim_id, "in_progress", next_status(decision))
+    limit = settings.current(conn).approval_limit
+    move(conn, claim_id, "in_progress", next_status(decision, limit))
     insert_once(
         conn,
         decisions,
@@ -204,6 +205,7 @@ def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, An
         reasons=decision.reasons,
         policy_section=decision.policy_section,
         decided_at=db.now(),
+        approval_limit=limit,
     )
     recorded = standing(conn, claim_id)
     conn.commit()
@@ -255,10 +257,10 @@ def pay_claim(
             raise HTTPException(409, f"Claim {claim_id} is already paid")
     else:
         sign_off = found["sign_off"]
-        if decision["payout"] > APPROVAL_LIMIT and sign_off is None:
+        limit = decision["approval_limit"]
+        if decision["payout"] > limit and sign_off is None:
             raise HTTPException(
-                409,
-                f"A payout over ${APPROVAL_LIMIT:,.2f} waits for a handler's sign-off",
+                409, f"A payout over ${limit:,.2f} waits for a handler's sign-off"
             )
         if amount != decision["payout"]:
             raise HTTPException(

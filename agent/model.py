@@ -1,4 +1,4 @@
-"""The model behind the UnderCover Agent."""
+"""The model behind the UnderCover Agent, built from a version of its configuration."""
 
 import os
 
@@ -6,24 +6,20 @@ from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "openai/gpt-6-luna"
 TIMEOUT = 120
+# No reasoning effort set, which some models, Luna among them, call "none".
+DEFAULT = "default"
 
 
-def describe() -> dict[str, str]:
-    """Say which model the agent uses and its reasoning effort, as a run records it."""
-    name = os.getenv("MODEL_NAME")
-    return {"model": name or DEFAULT_MODEL, "reasoning": "none" if name else "low"}
-
-
-def model() -> ChatOpenAI:
-    """Return the model named in MODEL_NAME with no effort set, or the default."""
-    chosen = describe()
+def model(name: str, reasoning: str) -> ChatOpenAI:
+    """Return the model at this effort, or MODEL_NAME with no effort if it's set."""
+    free = os.getenv("MODEL_NAME")
+    effort = None if free or reasoning == DEFAULT else reasoning
     return ChatOpenAI(
-        model=chosen["model"],
+        model=free or name,
         base_url=OPENROUTER_BASE_URL,
         api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]),
-        reasoning_effort=None if chosen["reasoning"] == "none" else chosen["reasoning"],
+        reasoning_effort=effort,
         timeout=TIMEOUT,
         max_retries=0,
     )

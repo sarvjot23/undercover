@@ -10,7 +10,6 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from backend import db
-from backend.rules import APPROVAL_LIMIT
 
 PLAN_DATA = db.load("plans.json")
 PLANS = {plan["plan"]: plan for plan in PLAN_DATA["plans"]}
@@ -114,9 +113,16 @@ def benefit_maximum(policy: dict[str, Any], benefit: Benefit) -> float:
 
 
 def work_out_payout(
-    policy: dict[str, Any], benefit: Benefit, lines: list[Line], paid_by_others: float
+    policy: dict[str, Any],
+    benefit: Benefit,
+    lines: list[Line],
+    paid_by_others: float,
+    limit: float,
 ) -> Payout:
-    """Work out the payout on an approved claim, following section 10 of the wording."""
+    """Work out the payout on an approved claim, following section 10 of the wording.
+
+    It needs a sign-off when it's over the approval limit.
+    """
     calculation = [
         eligible_amount(line, policy) for line in lines if line.kind != "cash"
     ]
@@ -156,5 +162,5 @@ def work_out_payout(
     return {
         "calculation": calculation,
         "payout": payout,
-        "needs_sign_off": payout > APPROVAL_LIMIT,
+        "needs_sign_off": payout > limit,
     }

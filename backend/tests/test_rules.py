@@ -369,9 +369,9 @@ def test_agent_working_until_its_answer(client):
     assert not working()
 
 
-def test_the_limit_comes_from_our_settings():
-    assert db.load("company.json")["payout_approval_limit"] == rules.APPROVAL_LIMIT
-    assert rules.APPROVAL_LIMIT == 800.0
+def test_the_limit_starts_from_our_settings(client):
+    limit = client.get("/api/settings").json()["settings"]["approval_limit"]
+    assert limit == db.load("company.json")["payout_approval_limit"] == 800.0
 
 
 def fail(client, claim_id="CLM-1001"):

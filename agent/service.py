@@ -10,7 +10,7 @@ import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from agent import claim, client, dispatcher, graph, model, tracing
+from agent import claim, client, dispatcher, graph, tracing
 
 BACKEND_WAIT_TRIES = 30
 BACKEND_WAIT_SECONDS = 1.0
@@ -70,7 +70,7 @@ def pick_up_signed_off() -> None:
         return
     stop_leftover_run()
     config = tracing.config("warm-up", graph.RECURSION_LIMIT, None)
-    claim.build(None).get_state(config)
+    claim.build(None, None).get_state(config)
     for found in claims:
         if found["status"] == "in_progress" and found["signed_off"]:
             claim.carry_on(found["claim_id"])
@@ -91,7 +91,13 @@ def work_run(record: dict[str, Any], n: int) -> None:
     try:
         with client.backend() as backend:
             created = backend.post("/api/runs", json=record).json()
-        dispatcher.dispatch({"run_id": created["run_id"], "kind": record["kind"]}, n)
+        run: tracing.Run = {
+            "run_id": created["run_id"],
+            "kind": created["kind"],
+            "version": created["version"],
+            "round_id": created["round_id"],
+        }
+        dispatcher.dispatch(run, n)
     finally:
         busy.release()
 
@@ -99,10 +105,11 @@ def work_run(record: dict[str, Any], n: int) -> None:
 def start(
     record: dict[str, Any], n: int, background_tasks: BackgroundTasks
 ) -> dict[str, Any]:
-    """Take on a run at once and work it in the background, or refuse with a 409."""
+    """Take on a run on the current version and work it in the background, or 409."""
     if not busy.acquire(blocking=False):
         raise HTTPException(409, ALREADY_RUNNING)
-    background_tasks.add_task(work_run, {**record, "n": n, **model.describe()}, n)
+    begin = {**record, "n": n, "version": None, "round_id": None}
+    background_tasks.add_task(work_run, begin, n)
     return {"accepted": True}
 
 

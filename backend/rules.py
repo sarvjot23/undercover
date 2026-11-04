@@ -1,4 +1,4 @@
-"""The claims rules: where a claim stands, how it moves, and the approval limit."""
+"""The claims rules: where a claim stands and how it moves."""
 
 import json
 import uuid
@@ -11,7 +11,6 @@ from sqlalchemy.dialects.postgresql import insert
 from backend import db
 from backend.db import claims, decisions, payments, sign_offs, steps
 
-APPROVAL_LIMIT = float(db.load("company.json")["payout_approval_limit"])
 MAX_ATTEMPTS = 2
 
 LOOKUPS: dict[str, tuple[Table, str]] = {

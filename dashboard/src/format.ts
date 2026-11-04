@@ -1,4 +1,4 @@
-import type { Outcome, SetName, Status } from "./api";
+import type { Handler, Outcome, SetName, Status } from "./api";
 
 const dollars = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -81,4 +81,14 @@ export const SET_LABELS: Record<SetName, string> = {
 /** Which claims of the set an evaluation works: all of them, or the five tiny ones. */
 export function claimsLabel(tiny: boolean): string {
   return tiny ? "Five tiny claims" : "The whole set";
+}
+
+/** Who proposed or approved a version: a handler by name, the improver or the seed. */
+export function byWhom(
+  who: string | null,
+  handlers: Handler[] | undefined,
+): string {
+  if (who === null || who === "seed") return "Seeded";
+  if (who === "improver") return "The improver";
+  return handlers?.find((handler) => handler.handler_id === who)?.name ?? who;
 }

@@ -31,11 +31,21 @@ def fail(claim_id: str, reason: str) -> str:
     return f"{claim_id}: failed ({reason}), {where}"
 
 
-def build(llm: BaseChatModel | None) -> Any:
-    """Build the claim graph with the instructions the backend holds."""
+def build(llm: BaseChatModel | None, version: int | None) -> Any:
+    """Build the claim graph from a version of its configuration, or the current one."""
+    path = "current" if version is None else f"versions/{version}"
     with client.backend() as backend:
-        instructions = backend.get("/api/instructions").json()["claim"]
-    return graph.build(lambda: llm or model(), instructions, checkpoints.saver())
+        config = backend.get(f"/api/configuration/{path}").json()
+    return graph.build(
+        lambda: llm or model(config["model"], config["reasoning"]),
+        config["instructions"],
+        checkpoints.saver(),
+    )
+
+
+def version_of(run: Run | None) -> int | None:
+    """The version a run works on; outside a run, the current one."""
+    return run["version"] if run else None
 
 
 def first_input(claim_id: str, thread_id: str) -> dict[str, Any]:
@@ -109,7 +119,8 @@ def run(
         if not started.is_success:
             return f"{claim_id}: not started, {client.reply(started)}"
         start = first_input(claim_id, thread_id)
-        return invoke(build(llm), claim_id, thread_id, start, in_run)
+        claim_graph = build(llm, version_of(in_run))
+        return invoke(claim_graph, claim_id, thread_id, start, in_run)
 
 
 def carry_on(
@@ -123,7 +134,7 @@ def carry_on(
         if claim["status"] != "in_progress":
             return graph.report(claim)
         thread_id = claim["thread_id"]
-        claim_graph = build(llm)
+        claim_graph = build(llm, version_of(in_run))
         saved = claim_graph.get_state({"configurable": {"thread_id": thread_id}})
         if saved.values and not saved.next:
             return fail(claim_id, NO_DECISION)

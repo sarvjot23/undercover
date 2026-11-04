@@ -80,34 +80,6 @@ it("says when the backend is down", async () => {
   );
 });
 
-it("shows the instructions read only", async () => {
-  window.location.hash = "#/instructions";
-  stubBackend({
-    "/api/instructions": { claim: "You decide one claim." },
-  });
-  render(<App />);
-  expect(await screen.findByText("You decide one claim.")).toBeDefined();
-  expect(
-    screen.queryByRole("heading", { name: "Working the queue" }),
-  ).toBeNull();
-  expect(
-    screen.getByRole("heading", { name: "Working a claim" }),
-  ).toBeDefined();
-  expect(screen.queryByRole("textbox")).toBeNull();
-  expect(
-    screen
-      .getByRole("link", { name: "Instructions" })
-      .getAttribute("aria-current"),
-  ).toBe("page");
-});
-
-it("says when the instructions can't load", async () => {
-  window.location.hash = "#/instructions";
-  stubBackend({});
-  render(<App />);
-  expect(await screen.findByRole("alert")).toBeDefined();
-});
-
 it("leaves the live view and full screen", async () => {
   window.location.hash = "#/live";
   stubBackend({

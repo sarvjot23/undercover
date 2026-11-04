@@ -9,10 +9,12 @@ from langfuse.langchain import CallbackHandler
 
 
 class Run(TypedDict):
-    """The dispatch or evaluation a claim is worked in."""
+    """The dispatch or evaluation a claim is worked in, on a version of the agent."""
 
     run_id: int
     kind: str
+    version: int
+    round_id: int | None
 
 
 def enabled() -> bool:
@@ -21,10 +23,12 @@ def enabled() -> bool:
 
 
 def config(thread_id: str, recursion_limit: int, run: Run | None) -> RunnableConfig:
-    """Return the config: its thread and run, and its Langfuse session and tag."""
+    """Return the config: its thread and run, and its Langfuse session and tags."""
     metadata: dict[str, Any] = {"langfuse_session_id": thread_id}
     if run:
         metadata["langfuse_tags"] = [f"{run['kind']}-{run['run_id']}"]
+        if run["round_id"] is not None:
+            metadata["langfuse_tags"].append(f"round-{run['round_id']}")
     return {
         "configurable": {
             "thread_id": thread_id,

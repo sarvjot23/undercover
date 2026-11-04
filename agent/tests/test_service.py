@@ -65,7 +65,7 @@ def test_every_operation_is_documented_with_no_optional_inputs():
         assert set(model["properties"]) == set(model.get("required", []))
 
 
-def test_a_dispatch_is_taken_on_at_once_with_n_and_the_model(held, monkeypatch):
+def test_a_dispatch_is_taken_on_at_once_on_the_current_version(held, monkeypatch):
     monkeypatch.delenv("MODEL_NAME", raising=False)
     started = agent_service().post("/dispatches", json={"n": 5})
     assert started.status_code == 202
@@ -76,19 +76,18 @@ def test_a_dispatch_is_taken_on_at_once_with_n_and_the_model(held, monkeypatch):
             "set_name": None,
             "tiny": False,
             "n": 5,
-            "model": "openai/gpt-6-luna",
-            "reasoning": "low",
+            "version": None,
+            "round_id": None,
         }
     ]
 
 
 def test_an_evaluation_is_taken_on_with_its_set(held, monkeypatch):
-    monkeypatch.setenv("MODEL_NAME", "openrouter/free")
     body = {"set_name": "held_out", "tiny": True, "n": 5}
     assert agent_service().post("/evaluations", json=body).status_code == 202
     assert held[0]["set_name"] == "held_out"
     assert held[0]["tiny"] is True
-    assert held[0]["reasoning"] == "none"
+    assert held[0]["version"] is None
 
 
 def test_a_second_start_is_refused_while_a_run_is_going(held):
@@ -111,7 +110,7 @@ def test_a_dispatch_is_created_through_the_backend_and_worked(requests, monkeypa
     monkeypatch.setattr(
         claim,
         "model",
-        lambda: script(
+        lambda name, reasoning: script(
             call(
                 "record_decision",
                 claim_id="CLM-1002",
@@ -144,8 +143,8 @@ def test_the_service_is_freed_when_a_run_breaks(requests, monkeypatch):
                 "n": 1,
                 "set_name": None,
                 "tiny": False,
-                "model": "m",
-                "reasoning": "low",
+                "version": None,
+                "round_id": None,
             },
             1,
         )
@@ -200,8 +199,8 @@ def test_at_startup_signed_off_claims_are_paid_and_a_leftover_run_stopped(
         "n": 3,
         "set_name": None,
         "tiny": False,
-        "model": "m",
-        "reasoning": "low",
+        "version": None,
+        "round_id": None,
     }
     run_id = backend().post("/api/runs", json=record).json()["run_id"]
     service.pick_up_signed_off()

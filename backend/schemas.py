@@ -76,14 +76,17 @@ class EvaluationStart(BaseModel):
 
 
 class RunRecord(BaseModel):
-    """A dispatch or an evaluation, as the agent's service starts it."""
+    """A dispatch or an evaluation, as the agent's service starts it.
+
+    With no version it uses the current one; a round's evaluation names its own.
+    """
 
     kind: Literal["dispatch", "evaluation"]
     n: int = Field(ge=1, le=MAX_AGENTS)
     set_name: SetName | None
     tiny: bool
-    model: str
-    reasoning: str
+    version: int | None
+    round_id: int | None
 
 
 class Usage(BaseModel):

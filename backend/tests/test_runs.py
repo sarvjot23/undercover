@@ -8,8 +8,8 @@ DISPATCH = {
     "n": 3,
     "set_name": None,
     "tiny": False,
-    "model": "openai/gpt-6-luna",
-    "reasoning": "low",
+    "version": None,
+    "round_id": None,
 }
 EVALUATION = {**DISPATCH, "kind": "evaluation", "set_name": "evaluation", "tiny": True}
 

@@ -15,8 +15,8 @@ def evaluate(client, set_name="evaluation", tiny=True):
             "n": 5,
             "set_name": set_name,
             "tiny": tiny,
-            "model": "openai/gpt-6-luna",
-            "reasoning": "low",
+            "version": None,
+            "round_id": None,
         },
     ).json()
 
@@ -179,8 +179,8 @@ def test_a_dispatch_is_not_an_evaluation(client):
             "n": 3,
             "set_name": None,
             "tiny": False,
-            "model": "m",
-            "reasoning": "low",
+            "version": None,
+            "round_id": None,
         },
     ).json()["run_id"]
     assert client.get(f"/api/evaluations/{run_id}").status_code == 404

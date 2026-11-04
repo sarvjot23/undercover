@@ -12,7 +12,7 @@ from backend.api import app
 from backend.tests.signing import as_handler
 
 CLAIM = "CLM-1001"
-RUN: tracing.Run = {"run_id": 12, "kind": "dispatch"}
+RUN: tracing.Run = {"run_id": 12, "kind": "dispatch", "version": 1, "round_id": None}
 
 
 def priced(message, number, cost=0.002):
@@ -52,20 +52,22 @@ def rows(table):
         return [dict(row) for row in conn.execute(select(table)).mappings()]
 
 
-def test_the_default_model_is_gpt_6_luna_with_low_effort(monkeypatch):
+def test_a_version_chooses_the_model_and_its_effort(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)
-    assert model.model().model_name == "openai/gpt-6-luna"
-    assert model.model().reasoning_effort == "low"
-    assert model.describe() == {"model": "openai/gpt-6-luna", "reasoning": "low"}
+    built = model.model("openai/gpt-6-luna", "low")
+    assert built.model_name == "openai/gpt-6-luna"
+    assert built.reasoning_effort == "low"
+    assert model.model("openai/gpt-6-luna", "none").reasoning_effort == "none"
+    assert model.model("openai/gpt-6-luna", "default").reasoning_effort is None
 
 
 def test_model_name_chooses_another_model_with_no_effort(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("MODEL_NAME", "openrouter/free")
-    assert model.model().model_name == "openrouter/free"
-    assert model.model().reasoning_effort is None
-    assert model.describe() == {"model": "openrouter/free", "reasoning": "none"}
+    built = model.model("openai/gpt-6-luna", "low")
+    assert built.model_name == "openrouter/free"
+    assert built.reasoning_effort is None
 
 
 def test_each_replys_tokens_and_cost_are_recorded_once(requests):

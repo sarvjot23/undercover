@@ -21,8 +21,8 @@ RECORD = {
     "n": 1,
     "set_name": None,
     "tiny": False,
-    "model": "openai/gpt-6-luna",
-    "reasoning": "low",
+    "version": None,
+    "round_id": None,
 }
 
 
@@ -95,7 +95,12 @@ def models(monkeypatch):
 
 def new_run() -> tracing.Run:
     created = api().post("/api/runs", json=RECORD).json()
-    return {"run_id": created["run_id"], "kind": "dispatch"}
+    return {
+        "run_id": created["run_id"],
+        "kind": "dispatch",
+        "version": 1,
+        "round_id": None,
+    }
 
 
 def test_never_more_than_n_claims_are_worked_at_once(requests, monkeypatch):
@@ -308,7 +313,12 @@ def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, m
     }
     for source, answer in answers.items():
         models(copies[source], script(answer))
-    run: tracing.Run = {"run_id": created["run_id"], "kind": "evaluation"}
+    run: tracing.Run = {
+        "run_id": created["run_id"],
+        "kind": "evaluation",
+        "version": 1,
+        "round_id": None,
+    }
     dispatcher.dispatch(run, 1)
 
     assert api().get("/api/claims").json() == before

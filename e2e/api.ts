@@ -38,8 +38,8 @@ export async function createDispatch(
       n,
       set_name: null,
       tiny: false,
-      model: "openai/gpt-6-luna",
-      reasoning: "low",
+      version: null,
+      round_id: null,
     },
   });
   expect(response.ok()).toBe(true);

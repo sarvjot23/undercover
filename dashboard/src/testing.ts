@@ -135,6 +135,8 @@ export function runRecord(overrides: Partial<Run> = {}): Run {
     tiny: false,
     model: "openai/gpt-6-luna",
     reasoning: "low",
+    version: 1,
+    round_id: null,
     total: 0,
     status: "running",
     started_at: "2026-11-04T10:00:00+00:00",

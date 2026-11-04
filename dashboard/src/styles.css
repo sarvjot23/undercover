@@ -17,8 +17,9 @@
   color-scheme: light dark;
 }
 
+/* Dark as the computer is, unless a handler chose light; or dark by choice. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ink: #f5f1e8;
     --page: #0a0a0a;
     --panel: #000000;
@@ -26,6 +27,20 @@
     --muted: #a9a49a;
     --soft: #1c1a16;
   }
+}
+
+:root[data-theme="dark"] {
+  --ink: #f5f1e8;
+  --page: #0a0a0a;
+  --panel: #000000;
+  --accent-text: #e9cd6f;
+  --muted: #a9a49a;
+  --soft: #1c1a16;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {
@@ -926,4 +941,233 @@ tr.miss td {
 
 .sign-in-panel button {
   justify-self: start;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+button.secondary {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.note {
+  margin: 0 0 12px;
+  font-weight: 500;
+}
+
+/* A diff: additions and removals in color, with a mark that doesn't rely on it. */
+:root {
+  --add: #e3f0dc;
+  --add-ink: #24511a;
+  --remove: #f6e0dc;
+  --remove-ink: #7a2618;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --add: #18301a;
+    --add-ink: #b9e3a9;
+    --remove: #3a1b16;
+    --remove-ink: #f2b7aa;
+  }
+}
+
+:root[data-theme="dark"] {
+  --add: #18301a;
+  --add-ink: #b9e3a9;
+  --remove: #3a1b16;
+  --remove-ink: #f2b7aa;
+}
+
+.diff {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  border-radius: 10px;
+  overflow: auto;
+  background: var(--page);
+  padding: 8px 0;
+}
+
+.diff-line {
+  display: flex;
+  gap: 10px;
+  padding: 0 14px;
+  text-decoration: none;
+  white-space: pre-wrap;
+}
+
+.diff-mark {
+  flex: none;
+  width: 1ch;
+  color: var(--muted);
+}
+
+.diff-add {
+  background: var(--add);
+  color: var(--add-ink);
+}
+
+.diff-add .diff-mark,
+.diff-remove .diff-mark {
+  color: inherit;
+  font-weight: 600;
+}
+
+.diff-remove {
+  background: var(--remove);
+  color: var(--remove-ink);
+}
+
+.diff-gap {
+  color: var(--muted);
+}
+
+.model-change {
+  margin: 0 0 8px;
+}
+
+.model-change ins {
+  background: var(--add);
+  color: var(--add-ink);
+  text-decoration: none;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.model-change del {
+  background: var(--remove);
+  color: var(--remove-ink);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+tr.chosen td {
+  background: var(--soft);
+}
+
+.current-version {
+  margin-bottom: 20px;
+}
+
+/* The dashboard's own confirmation. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 10;
+}
+
+.dialog {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.dialog h2 {
+  margin-top: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.dialog textarea {
+  width: 100%;
+  min-height: 90px;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--soft);
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* Settings */
+.settings-form fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px 24px;
+}
+
+.settings-form legend {
+  font-weight: 600;
+  color: var(--accent-text);
+  margin-bottom: 10px;
+}
+
+.setting {
+  display: grid;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.setting-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.setting-input input {
+  width: 9em;
+  font: inherit;
+  font-family: var(--mono);
+  text-align: right;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--soft);
+  background: var(--page);
+  color: var(--ink);
+}
+
+.unit {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
+.help {
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.settings-facts {
+  grid-template-columns: max-content 1fr;
+}
+
+.themes {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.theme-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spaced {
+  margin-top: 20px;
 }

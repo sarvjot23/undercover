@@ -1,14 +1,15 @@
 import type { Handler } from "./api";
 import { signOut, useSession } from "./auth";
 import { ClaimView } from "./ClaimView";
+import { Configuration } from "./Configuration";
 import { EvaluationView } from "./EvaluationView";
 import { HandlerContext } from "./handler";
 import type { Route } from "./hooks";
 import { useJson, useRoute } from "./hooks";
-import { Instructions } from "./Instructions";
 import { LiveView } from "./LiveView";
 import { Queue } from "./Queue";
 import { Scoreboard } from "./Scoreboard";
+import { Settings } from "./Settings";
 import { SignIn } from "./SignIn";
 
 export function App() {
@@ -48,8 +49,10 @@ function Page({ route }: Readonly<{ route: Route }>) {
       return <Scoreboard />;
     case "evaluation":
       return <EvaluationView key={route.runId} runId={route.runId} />;
-    case "instructions":
-      return <Instructions />;
+    case "configuration":
+      return <Configuration />;
+    case "settings":
+      return <Settings />;
     default:
       return <Queue />;
   }
@@ -75,8 +78,11 @@ function Masthead({
         <a href="#/scoreboard" aria-current={here("scoreboard", "evaluation")}>
           Scoreboard
         </a>
-        <a href="#/instructions" aria-current={here("instructions")}>
-          Instructions
+        <a href="#/configuration" aria-current={here("configuration")}>
+          Configuration
+        </a>
+        <a href="#/settings" aria-current={here("settings")}>
+          Settings
         </a>
       </nav>
       <div className="who">

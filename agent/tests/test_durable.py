@@ -45,7 +45,7 @@ def texts():
 
 
 def saved_state():
-    graph_built = claim_agent.build(script())
+    graph_built = claim_agent.build(script(), None)
     return graph_built.get_state({"configurable": {"thread_id": THREAD}})
 
 

@@ -56,11 +56,13 @@ def test_policy_wording(client):
     assert text.startswith("# UnderCover Travel Insurance: Policy Wording")
 
 
-def test_instructions(client):
-    instructions = client.get("/api/instructions").json()
-    assert instructions["claim"].startswith("You are the UnderCover Agent.")
-    assert set(instructions) == {"claim"}
-    assert "data/evals" not in instructions["claim"]
+def test_version_1_is_the_claim_agent_as_it_was(client):
+    current = client.get("/api/configuration/current").json()
+    assert current["version"] == 1
+    assert current["instructions"].startswith("You are the UnderCover Agent.")
+    assert (current["model"], current["reasoning"]) == ("openai/gpt-6-luna", "low")
+    assert set(current) == {"version", "instructions", "model", "reasoning"}
+    assert "data/evals" not in current["instructions"]
 
 
 def test_handlers(client):

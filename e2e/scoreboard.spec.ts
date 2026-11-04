@@ -40,8 +40,8 @@ test("an evaluation played out through the API shows on the scoreboard with its 
       n: 5,
       set_name: "evaluation",
       tiny: true,
-      model: "openai/gpt-6-luna",
-      reasoning: "low",
+      version: null,
+      round_id: null,
     },
   });
   expect(created.ok()).toBe(true);

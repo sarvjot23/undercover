@@ -32,6 +32,7 @@ const approval = {
   reasons: "Covered by the wording.",
   policy_section: "5. Baggage and Personal Effects",
   decided_at: "2026-10-21T12:00:00+00:00",
+  approval_limit: 800,
 };
 
 function calls(fetchMock: ReturnType<typeof stubBackend>, path: string) {

@@ -31,6 +31,9 @@ from sqlalchemy import (
 from sqlalchemy.pool import NullPool
 
 DATA = Path(__file__).parent.parent / "data"
+INSTRUCTIONS = Path(__file__).parent / "instructions"
+DEFAULT_MODEL = "openai/gpt-6-luna"
+DEFAULT_REASONING = "low"
 ANSWER_KEY = {"evaluation": "decisions.json", "held_out": "held_out_decisions.json"}
 SCHEMA = "undercover"
 MAX_CONNECTIONS = 4
@@ -83,6 +86,8 @@ decisions = Table(
     Column("reasons", Text, nullable=False),
     Column("policy_section", Text, nullable=False),
     Column("decided_at", Text, nullable=False),
+    # The limit the decision was made under: a new limit applies to later decisions.
+    Column("approval_limit", Float, nullable=False),
 )
 sign_offs = Table(
     "sign_offs",
@@ -108,6 +113,8 @@ runs = Table(
     Column("n", Integer, nullable=False),
     Column("set_name", Text),
     Column("tiny", Boolean, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("round_id", Integer),
     Column("model", Text, nullable=False),
     Column("reasoning", Text, nullable=False),
     Column("total", Integer, nullable=False),
@@ -173,6 +180,47 @@ steps = Table(
     Column("key", Text, nullable=False),
     Column("at", Text, nullable=False),
     UniqueConstraint("claim_id", "key"),
+)
+# The claim agent's configuration, in versions: exactly one is current.
+config_versions = Table(
+    "config_versions",
+    metadata,
+    Column("version", Integer, primary_key=True),
+    Column("instructions", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("reasoning", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("proposed_by", Text, nullable=False),
+    Column("approved_by", Text),
+    Column("approved_at", Text, nullable=False),
+    Column("current", Boolean, nullable=False),
+)
+# The improver's recipe, in versions: the latest is the one it follows.
+recipe_versions = Table(
+    "recipe_versions",
+    metadata,
+    Column("version", Integer, primary_key=True),
+    Column("recipe", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("proposed_by", Text, nullable=False),
+    Column("approved_by", Text),
+    Column("approved_at", Text, nullable=False),
+)
+settings = Table(
+    "settings",
+    metadata,
+    Column("name", Text, primary_key=True),
+    Column("value", Float, nullable=False),
+)
+setting_changes = Table(
+    "setting_changes",
+    metadata,
+    Column("change_id", Integer, primary_key=True, autoincrement=True),
+    Column("name", Text, nullable=False),
+    Column("before", Float, nullable=False),
+    Column("after", Float, nullable=False),
+    Column("handler_id", Text, nullable=False),
+    Column("changed_at", Text, nullable=False),
 )
 
 
@@ -278,6 +326,59 @@ def seed(conn: Connection) -> None:
         ],
     )
     seed_answer_key(conn)
+    seed_versions(conn)
+    seed_settings(conn)
+
+
+def seed_versions(conn: Connection) -> None:
+    """Version 1 of the claim agent's configuration and of the improver's recipe.
+
+    With MODEL_NAME set, as on the free route, version 1 uses that model.
+    """
+    free = os.getenv("MODEL_NAME")
+    seeded = {"proposed_by": "seed", "approved_by": None, "approved_at": now()}
+    conn.execute(
+        config_versions.insert().values(
+            version=1,
+            instructions=(INSTRUCTIONS / "claim.md").read_text(encoding="utf-8"),
+            model=free or DEFAULT_MODEL,
+            reasoning="default" if free else DEFAULT_REASONING,
+            reason="The claim agent as it was before the improver.",
+            current=True,
+            **seeded,
+        )
+    )
+    conn.execute(
+        recipe_versions.insert().values(
+            version=1,
+            recipe=(INSTRUCTIONS / "recipe.md").read_text(encoding="utf-8"),
+            reason="The first recipe, from our team's lab.",
+            **seeded,
+        )
+    )
+
+
+def flatten(values: dict[str, Any], prefix: str = "") -> dict[str, float]:
+    """Settings as names and numbers, such as noise.accuracy."""
+    flat: dict[str, float] = {}
+    for name, value in values.items():
+        if isinstance(value, dict):
+            flat |= flatten(value, f"{prefix}{name}.")
+        else:
+            flat[f"{prefix}{name}"] = float(value)
+    return flat
+
+
+def seed_settings(conn: Connection) -> None:
+    """The approval limit from company.json, the other settings from settings.json."""
+    values = {
+        "approval_limit": load("company.json")["payout_approval_limit"],
+        **load("settings.json"),
+    }
+    conn.execute(
+        settings.insert(),
+        [{"name": name, "value": value} for name, value in flatten(values).items()],
+    )
 
 
 def seed_answer_key(conn: Connection) -> None:

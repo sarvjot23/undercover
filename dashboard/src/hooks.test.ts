@@ -17,7 +17,9 @@ it("parses each route", () => {
     view: "claim",
     claimId: "CLM-1001",
   });
-  expect(parseRoute("#/instructions")).toEqual({ view: "instructions" });
+  expect(parseRoute("#/configuration")).toEqual({ view: "configuration" });
+  expect(parseRoute("#/instructions")).toEqual({ view: "configuration" });
+  expect(parseRoute("#/settings")).toEqual({ view: "settings" });
   expect(parseRoute("#/live")).toEqual({ view: "live" });
   expect(parseRoute("#/scoreboard")).toEqual({ view: "scoreboard" });
   expect(parseRoute("#/scoreboard/7")).toEqual({
@@ -30,10 +32,10 @@ it("parses each route", () => {
 it("follows the hash", async () => {
   const { result } = renderHook(() => useRoute());
   act(() => {
-    window.location.hash = "#/instructions";
+    window.location.hash = "#/settings";
   });
   await waitFor(() => {
-    expect(result.current).toEqual({ view: "instructions" });
+    expect(result.current).toEqual({ view: "settings" });
   });
 });
 

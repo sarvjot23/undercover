@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import Connection, RowMapping, func, select
 from sqlalchemy.exc import IntegrityError
 
-from backend import db, evaluations
+from backend import db, evaluations, versions
 from backend.db import claims, run_claims, runs, steps, usage, work_sessions
 from backend.rules import standing_of, standing_query
 from backend.schemas import RunRecord
@@ -37,11 +37,22 @@ def dispatch_claims(conn: Connection) -> list[str]:
 
 
 def start(conn: Connection, record: RunRecord) -> int:
-    """Create a run and fix its claims; refuse it while another run is going."""
+    """Create a run on a version and fix its claims; refuse it while another runs."""
+    version = (
+        versions.current(conn)
+        if record.version is None
+        else versions.find(conn, record.version)
+    )
     try:
         result = conn.execute(
             runs.insert().values(
-                **record.model_dump(), total=0, status="running", started_at=db.now()
+                **record.model_dump(exclude={"version"}),
+                version=version["version"],
+                model=version["model"],
+                reasoning=version["reasoning"],
+                total=0,
+                status="running",
+                started_at=db.now(),
             )
         )
     except IntegrityError:

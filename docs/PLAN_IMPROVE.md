@@ -252,16 +252,16 @@ Success criteria:
 
 Success criteria:
 
-- [ ] A test shows a dispatch and an evaluation each record the version they used, and the claim agent built with that version's instructions, model and effort.
-- [ ] A test shows `GET /api/configuration/versions/1` holds no score, and the claim agent's client and tools still name none of the scores, evaluations, rounds or handlers' decisions.
-- [ ] A test shows a version's scores counting only the whole-set evaluations its rounds ran.
-- [ ] A test shows a new approval limit applying to the next decision, a payout already held staying held, and the change recorded with who and when.
-- [ ] A test shows a settings change refused for Marcus with a 403, and for anyone signed out with a 401.
-- [ ] A test of `difflib`'s diff on two versions.
-- [ ] With `MODEL_NAME` set, a test shows that model is the only one allowed, at `default` with a price of 0.
-- [ ] Vitest checks the Configuration page (versions, the diff in colour), the Settings page (Dana edits after a confirmation, Marcus reads), and the theme switch setting `data-theme` and remembering it.
-- [ ] An end-to-end test changes a setting and switches the theme.
-- [ ] `npm run check` passes with `.env` moved out of the way.
+- [x] A test shows a dispatch and an evaluation each record the version they used, and the claim agent built with that version's instructions, model and effort.
+- [x] A test shows `GET /api/configuration/versions/1` holds no score, and the claim agent's client and tools still name none of the scores, evaluations, rounds or handlers' decisions.
+- [x] A test shows a version's scores counting only the whole-set evaluations its rounds ran.
+- [x] A test shows a new approval limit applying to the next decision, a payout already held staying held, and the change recorded with who and when.
+- [x] A test shows a settings change refused for Marcus with a 403, and for anyone signed out with a 401.
+- [x] A test of `difflib`'s diff on two versions.
+- [x] With `MODEL_NAME` set, a test shows that model is the only one allowed, at `default` with a price of 0.
+- [x] Vitest checks the Configuration page (versions, the diff in colour), the Settings page (Dana edits after a confirmation, Marcus reads), and the theme switch setting `data-theme` and remembering it.
+- [x] An end-to-end test changes a setting and switches the theme.
+- [x] `npm run check` passes with `.env` moved out of the way.
 
 ### Phase 3: the judge
 

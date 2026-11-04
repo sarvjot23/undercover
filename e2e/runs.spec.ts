@@ -68,8 +68,8 @@ test("a dispatch can't start while one is running", async ({
           n: 3,
           set_name: null,
           tiny: false,
-          model: "m",
-          reasoning: "low",
+          version: null,
+          round_id: null,
         },
       })
     ).status(),

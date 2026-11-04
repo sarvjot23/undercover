@@ -4,6 +4,8 @@ import pytest
 
 from backend.payout import Line, work_out_payout
 
+LIMIT = 800.0
+
 
 def line(amount, kind: Any = "item", quantity=1, nights=0, hours=0):
     return Line(
@@ -26,7 +28,7 @@ def policy(plan="premium", add_ons=(), travelers=1, trip_cost=9000.0):
 
 
 def payout(lines, benefit: Any = "emergency_medical", paid=0.0, **settings):
-    return work_out_payout(policy(**settings), benefit, lines, paid)["payout"]
+    return work_out_payout(policy(**settings), benefit, lines, paid, LIMIT)["payout"]
 
 
 @pytest.mark.parametrize(
@@ -84,13 +86,15 @@ def test_nothing_left_to_pay():
 
 
 def test_the_calculation_is_shown():
-    found = work_out_payout(policy(), "baggage", [line(480)], 0)
+    found = work_out_payout(policy(), "baggage", [line(480)], 0, LIMIT)
     assert [entry["amount"] for entry in found["calculation"]] == [300, -50]
 
 
 @pytest.mark.parametrize(("amount", "expected"), [(800.0, False), (800.01, True)])
 def test_the_sign_off_follows_our_settings(amount, expected):
-    found = work_out_payout(policy(), "trip_cancellation", [line(amount, "expense")], 0)
+    found = work_out_payout(
+        policy(), "trip_cancellation", [line(amount, "expense")], 0, LIMIT
+    )
     assert found["payout"] == amount
     assert found["needs_sign_off"] is expected
 

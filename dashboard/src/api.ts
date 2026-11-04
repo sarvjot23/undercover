@@ -47,6 +47,8 @@ export interface Decision {
   reasons: string;
   policy_section: string;
   decided_at: string;
+  /** The approval limit the decision was made under. */
+  approval_limit: number;
 }
 
 export interface Payment {
@@ -146,6 +148,8 @@ export interface Run {
   n: number;
   set_name: SetName | null;
   tiny: boolean;
+  version: number;
+  round_id: number | null;
   model: string;
   reasoning: string;
   total: number;
@@ -188,6 +192,94 @@ export type EvaluationSummary = Omit<Run, "claims"> & { scores: Scores | null };
 export interface Evaluation extends Run {
   claims: ScoredClaim[];
   scores: Scores | null;
+}
+
+/** One line of a diff: kept, added, removed, or a gap for unchanged lines left out. */
+export interface DiffLine {
+  kind: "same" | "add" | "remove" | "gap";
+  text: string;
+}
+
+/** A version's scores on a set: the averages of the evaluations rounds ran on it. */
+export type VersionScores = Partial<Scores> & {
+  runs: number;
+  grade?: number | null;
+};
+
+/** A version of the claim agent's configuration. */
+export interface ConfigVersion {
+  version: number;
+  instructions: string;
+  model: string;
+  reasoning: string;
+  reason: string;
+  proposed_by: string;
+  approved_by: string | null;
+  approved_at: string;
+  current: boolean;
+  changed: string[];
+  scores: { evaluation: VersionScores | null; held_out: VersionScores | null };
+}
+
+export interface VersionDiff {
+  version: number;
+  before: number | null;
+  instructions: DiffLine[];
+  model: [string | null, string];
+  reasoning: [string | null, string];
+}
+
+export interface RecipeVersion {
+  version: number;
+  recipe: string;
+  reason: string;
+  proposed_by: string;
+  approved_by: string | null;
+  approved_at: string;
+}
+
+export interface RecipeDiff {
+  version: number;
+  before: number | null;
+  recipe: DiffLine[];
+}
+
+export interface Margins {
+  accuracy: number;
+  grade: number;
+  cost_per_claim: number;
+  seconds_per_claim: number;
+}
+
+export interface PlatformSettings {
+  approval_limit: number;
+  objectives: { accuracy: number; grade: number };
+  noise: Margins;
+  tolerance: Margins;
+  round_spending_limit: number;
+  agents_at_once: number;
+}
+
+export interface SettingChange {
+  change_id: number;
+  name: string;
+  before: number;
+  after: number;
+  handler_id: string;
+  changed_at: string;
+}
+
+export interface AllowedModel {
+  model: string;
+  reasoning_efforts: string[];
+  input_price: number;
+  output_price: number;
+}
+
+export interface SettingsRecord {
+  settings: PlatformSettings;
+  changes: SettingChange[];
+  models: AllowedModel[];
 }
 
 export interface Handler {

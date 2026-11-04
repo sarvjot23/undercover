@@ -4,18 +4,23 @@ import { date, label, money, STATUS_LABELS } from "./format";
 import { agentsAtOnce, DEFAULT_AGENTS, startDispatch, useJson } from "./hooks";
 import { RunPanel } from "./RunPanel";
 import { StatusBadge } from "./StatusBadge";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
 
 const STATUSES = Object.keys(STATUS_LABELS) as Status[];
 
 export function Queue() {
-  const { data: claims, error } = useJson<ClaimSummary[]>("/api/claims", 3000);
+  const {
+    data: claims,
+    error,
+    reload,
+  } = useJson<ClaimSummary[]>("/api/claims", 3000);
   const { data: run } = useJson<Run | null>("/api/runs/current", 1500);
   const { data: running } = useJson<Run | null>("/api/runs/running", 1500);
   const [agents, setAgents] = useState(DEFAULT_AGENTS);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  if (error) return <p role="alert">The backend is not responding.</p>;
-  if (!claims) return <p>Loading the queue</p>;
+  if (error) return <ErrorState onRetry={reload} />;
+  if (!claims) return <LoadingState what="the queue" />;
 
   const busy = Boolean(running);
   const start = () => {
@@ -25,14 +30,22 @@ export function Queue() {
 
   return (
     <section aria-labelledby="queue-heading">
-      <div className="queue-head">
-        <h2 id="queue-heading">The claims queue</h2>
-        <a href="#/live">Watch live</a>
-        <AgentsAtOnce value={agents} onChange={setAgents} />
-        <button type="button" onClick={start} disabled={busy}>
-          Start a dispatch
-        </button>
-      </div>
+      <PageHeader
+        title="The claims queue"
+        id="queue-heading"
+        actions={
+          <>
+            <a href="#/live">Watch live</a>
+            <AgentsAtOnce value={agents} onChange={setAgents} />
+            <button type="button" onClick={start} disabled={busy}>
+              Start a dispatch
+            </button>
+          </>
+        }
+      >
+        Every claim and where it stands. A dispatch works the claims waiting and
+        in progress, oldest first, with up to 25 claim agents at once.
+      </PageHeader>
       {busy && <p role="status">A dispatch or evaluation is already running</p>}
       {refusal && <p role="alert">{refusal}</p>}
       <RunPanel run={run} />
@@ -46,6 +59,11 @@ export function Queue() {
           </li>
         ))}
       </ul>
+      {claims.length === 0 && (
+        <EmptyState title="The queue is empty.">
+          New claims appear here as customers submit them.
+        </EmptyState>
+      )}
       <div className="panel table-panel">
         <table>
           <thead>

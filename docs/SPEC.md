@@ -25,6 +25,23 @@ The tokens and cost of every model call, as OpenRouter reports them, and the tim
 
 An evaluation works copies of one of our two labelled sets, whole or just its five tiny claims, through the same dispatcher and claim agent, and scores the agent against our handlers' decisions. The copies never reach the queue, and nobody signs them off: an approval held for sign-off counts as finished.
 
+## Improving the agent
+
+The claim agent's instructions, model and reasoning effort make up its configuration, kept in versions. Each version records what changed, the reason, who proposed it and who approved it and when. A dispatch and an evaluation each record the version they used: a dispatch, an evaluation started on the Scoreboard and a run of the agent on one claim always use the current version.
+
+A second agent, the improver, improves the claim agent in rounds, following a recipe that it improves at the end of each round. A handler who can sign off payouts over the limit starts a round, can stop it, and approves or rejects each of the improver's proposals: nothing it proposes takes effect until then, and a rejection carries the handler's reason back to it. A round works to the settings as they stood when it started.
+
+- A version's scores are the averages of the whole-set evaluations that rounds ran on it. A round first runs any the current version is missing: one on the evaluation set, two on the held-out set.
+- The improver reads the current version and its scores, the claims it got wrong on the evaluation set and the five right ones it explained least well, with our handlers' decisions and reasons beside the agent's and the judge's grade, the earlier rounds, our objectives, noise, tolerance and rule, what's left of the round's spending limit and the models allowed. From the held-out set it sees the scores only.
+- An approved change is evaluated once on the evaluation set and twice on the held-out set. It is kept when its held-out average meets our objectives, at least one measure improves by more than its noise and none gets worse by more than its tolerance; otherwise it is rolled back, as is a version with no grade, one whose evaluations were stopped, or one the round can't afford. A kept version becomes the current version.
+- A judge, Jev, grades each of an evaluation's explanations against the handler's reason and reference, from F to A, with whether the agent gave the same grounds and the same section. A claim the agent didn't decide gets an F.
+- Each round has a spending limit that covers the improver, all its evaluations and the judge. An evaluation likely to cost more than what's left is refused, and once the limit is spent no new claim starts in its evaluations.
+- The improver can't change our objectives, the noise and tolerance, the spending limit, the models allowed, the approval limit, the evaluation sets or the judge.
+
+## Settings
+
+The approval limit, the business objectives (floors on held-out accuracy and the judge's grade), the noise and tolerance for accuracy, the grade, cost per claim and time per claim, a round's spending limit and the claim agents at once in its evaluations are the platform's settings. Every handler can see them, and a handler who can sign off payouts over the limit can change them. Each change records who made it and when. The models the claim agent may use, with their reasoning efforts and prices, are set by our IT team and can't be changed on the page.
+
 ## What the team needs to see
 
 - The queue, with where each claim stands: waiting, in progress, waiting for sign-off, decided or left for a handler.
@@ -33,13 +50,17 @@ An evaluation works copies of one of our two labelled sets, whole or just its fi
 - Each claim in full, with the agent's decision and its reasons.
 - What the agent is doing on a claim while it works, step by step, and the sections of the wording and the manual it read.
 - A scoreboard of the evaluations, newest first, with decision accuracy, accuracy, the cost of mistakes, the straight-through rate, model cost per claim, time per claim and the time for the whole run, each opening to its claims with the handler's decision and payout beside the agent's.
-- The claim agent's instructions, read only.
+- The claim agent's configuration: the current version, every version with its held-out scores, and what any version changed from the one before.
+- The improvement of the agent: where a round has got to as it happens, the proposal waiting with its changes, the rounds so far with their scores before and after, verdicts, approvals and cost, a chart of each version tried, and the recipe's versions.
+- The settings, and who changed what.
+- Every page needs a handler signed in with their email and password. The header shows who is signed in, with a way to sign out.
 
 ## Rules
 
-- A payout over $800 needs a handler's sign-off. The agent can approve such a claim, but the payment waits until a handler signs off. The system must block the payment until then, even if the agent tries to pay.
+- A payout over the approval limit, a setting that starts at $800, needs a handler's sign-off. The agent can approve such a claim, but the payment waits until a handler signs off. The system must block the payment until then, even if the agent tries to pay. A new limit applies to the decisions recorded after it.
+- Only a handler who can sign off payouts over the limit may sign one off, start or stop a round, approve or reject the improver's proposals or change a setting. Today that is Dana Whitfield; Marcus Oyelaran and Priya Raman can't. The pages say what they can't do and why, and the system refuses it too.
 - Decisions follow the policy wording, and the claims manual where the wording leaves a question open.
-- Our handlers' own decisions on these claims are in `data/evals/`. We use them to check the agent's work. The agent must never see them.
+- Our handlers' own decisions on these claims are in `data/evals/`. We use them to check the agent's work. The claim agent must never see them. The improver reads our handlers' decisions and reasons on the evaluation set, and nothing in the agent reads the held-out set's.
 - Amounts are in US dollars.
 
 ## Our records
@@ -48,6 +69,5 @@ Everything is in `data/`, described in `data/README.md`: the claims queue, the p
 
 ## Not for now
 
-- No sign-in. Everyone who uses the screens sees everything.
 - No real payments.
 - No messages to customers.

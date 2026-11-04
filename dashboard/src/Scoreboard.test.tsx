@@ -312,9 +312,11 @@ it("says when an evaluation stopped partway", async () => {
     "/api/evaluations/7": { ...evaluation, status: "stopped", scores: null },
   });
   render(<App />);
-  expect((await screen.findByRole("status")).textContent).toContain(
-    "Stopped partway, so it has no measures",
-  );
+  expect(
+    (
+      await screen.findByText(/Stopped partway, so it has no measures/)
+    ).getAttribute("role"),
+  ).toBe("status");
   expect(screen.queryByText("Decision accuracy")).toBeNull();
 });
 

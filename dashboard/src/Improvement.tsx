@@ -8,7 +8,16 @@ import { useJson } from "./hooks";
 import { Recipes } from "./Recipes";
 import { RoundProposal } from "./RoundProposal";
 import { ROUND_STATUS, isOpen, shownStage, STAGES, VERDICTS } from "./rounds";
+import type { Tone } from "./ui";
+import { Badge, EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
 import { VersionChart } from "./VersionChart";
+
+const ROUND_TONES: Record<Round["status"], Tone> = {
+  working: "gold",
+  waiting: "burnished",
+  finished: "antique",
+  stopped: "steel",
+};
 
 /** Follow the rounds closely while one is open. */
 function pollRounds(rounds: Round[]): number {
@@ -42,12 +51,11 @@ export function Improvement() {
 
   return (
     <section aria-labelledby="improvement-heading">
-      <h2 id="improvement-heading">Improvement</h2>
-      <p className="muted">
+      <PageHeader title="Improvement" id="improvement-heading">
         The improver reads the claim agent&rsquo;s results and proposes changes.
         Nothing takes effect until a handler approves it, and our rule keeps a
         new version only if it does better on claims the improver never sees.
-      </p>
+      </PageHeader>
       <div className="queue-head">
         {canAct ? (
           <>
@@ -80,8 +88,8 @@ export function Improvement() {
         )}
       </div>
       {refusal && <p role="alert">{refusal}</p>}
-      {error && <p role="alert">The backend is not responding.</p>}
-      {!error && !rounds && <p className="placeholder">Loading the rounds</p>}
+      {error && <ErrorState onRetry={reload} />}
+      {!error && !rounds && <LoadingState what="the rounds" />}
       {open && <OpenRound round={open} onDecided={reload} />}
       {rounds && (
         <>
@@ -138,9 +146,9 @@ function OpenRound({
       <section className="panel spaced" aria-labelledby="open-round-heading">
         <h3 id="open-round-heading">
           Round {round.round_id}{" "}
-          <span className={`badge badge-round-${round.status}`}>
+          <Badge tone={ROUND_TONES[round.status]}>
             {ROUND_STATUS[round.status]}
-          </span>
+          </Badge>
         </h3>
         <ol className="stages" aria-label="Where the round has got to">
           {STAGES.map(([stage, label], index) => (
@@ -201,10 +209,9 @@ function RoundsTable({
     handlers?.find((handler) => handler.handler_id === id)?.name ?? id;
   if (rounds.length === 0) {
     return (
-      <p className="muted spaced">
-        No rounds yet. Start a round to have the improver propose its first
-        change.
-      </p>
+      <EmptyState title="No rounds yet.">
+        Start a round to have the improver propose its first change.
+      </EmptyState>
     );
   }
   return (
@@ -239,9 +246,9 @@ function RoundsTable({
                 </div>
               </td>
               <td>
-                <span className={`badge badge-round-${round.status}`}>
+                <Badge tone={ROUND_TONES[round.status]}>
                   {ROUND_STATUS[round.status]}
-                </span>
+                </Badge>
               </td>
               <td>
                 {round.tried ? (
@@ -273,9 +280,11 @@ function RoundsTable({
               <td>
                 {round.verdict ? (
                   <>
-                    <span className={`badge badge-verdict-${round.verdict}`}>
+                    <Badge
+                      tone={round.verdict === "kept" ? "antique" : "steel"}
+                    >
                       {VERDICTS[round.verdict]}
-                    </span>
+                    </Badge>
                     <div className="summary">{round.why}</div>
                   </>
                 ) : (

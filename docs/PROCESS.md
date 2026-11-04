@@ -6,9 +6,9 @@
 
 - Python: ruff (lint and format), pyright, and pytest with 80% coverage
 - TypeScript: ESLint, Prettier, tsc, and vitest with 80% coverage
-- Playwright end-to-end tests, with a stand-in for the agent's service on port 8003
+- Playwright end-to-end tests, with stand-ins for the agent's service on port 8003, Supabase Auth on port 8004 (it signs tokens with a key of its own) and the judge on port 8005. Every spec signs in as a handler first.
 
-`npm run check` needs no Supabase, Langfuse or OpenRouter, and passes with `.env` moved out of the way. The tests run on SQLite.
+`npm run check` needs no Supabase, Langfuse or OpenRouter, and passes with `.env` moved out of the way. The tests run on SQLite, and never call a model, the judge or Supabase Auth.
 
 The pre-commit hook runs the format, lint, type and unit test checks on every commit.
 
@@ -34,7 +34,7 @@ When the last phase is done, run `npm run check` and report the results.
 ## Rules
 
 - Add tests with each change. Tests never call a model; use a stub model.
-- For live runs with the real model, reseed first with `npm run seed`, then keep to the runs the plan names, such as a dispatch or an evaluation of the five `tiny` claims.
+- For live runs with the real model, reseed first with `npm run seed`, then keep to the runs the plan names, such as a dispatch or an evaluation of the five `tiny` claims. For browser checks, sign in as a handler with `HANDLER_PASSWORD` from `.env`, and never print it.
 - Outside a plan, commit each change once you have checked it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.

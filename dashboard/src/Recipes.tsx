@@ -3,6 +3,7 @@ import type { Handler, RecipeDiff, RecipeVersion } from "./api";
 import { DiffView } from "./DiffView";
 import { byWhom, dateTime } from "./format";
 import { useJson } from "./hooks";
+import { LoadingState } from "./ui";
 
 /** The improver's recipe in its versions, each shown against the one before. */
 export function Recipes() {
@@ -42,7 +43,7 @@ export function Recipes() {
           ))}
         </ul>
       ) : (
-        <p className="placeholder">Loading the recipe</p>
+        <LoadingState what="the recipe" />
       )}
       {shown !== null && <RecipeChanges key={shown} version={shown} />}
     </section>
@@ -53,7 +54,7 @@ function RecipeChanges({ version }: Readonly<{ version: number }>) {
   const { data: diff } = useJson<RecipeDiff>(
     `/api/recipes/${String(version)}/diff`,
   );
-  if (!diff) return <p className="placeholder">Loading the changes</p>;
+  if (!diff) return <LoadingState what="the changes" />;
   return (
     <>
       <h4>

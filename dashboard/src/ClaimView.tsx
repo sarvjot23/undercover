@@ -6,6 +6,7 @@ import { ONLY_APPROVERS, useHandler } from "./handler";
 import { useJson } from "./hooks";
 import { StatusBadge } from "./StatusBadge";
 import { Steps } from "./Steps";
+import { ErrorState, LoadingState } from "./ui";
 
 /** Where a claim stands; here, only whether it's an evaluation's copy. */
 interface Standing {
@@ -30,8 +31,14 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
   const { data: standing } = useJson<Standing>(`${path}/standing`);
   const evaluationId = standing?.evaluation_id ?? null;
 
-  if (error) return <p role="alert">There is no claim {claimId}.</p>;
-  if (!claim) return <p>Loading the claim</p>;
+  if (error) {
+    return (
+      <ErrorState message={`There is no claim ${claimId}.`}>
+        <a href="#/">Back to the queue</a> to choose another.
+      </ErrorState>
+    );
+  }
+  if (!claim) return <LoadingState what="the claim" />;
 
   const run = () => {
     setStarting(true);

@@ -1289,3 +1289,75 @@ tr.chosen td {
   min-height: 3em;
   color: var(--muted);
 }
+
+/* The pieces every page shares */
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.page-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+.page-header p {
+  margin: 0;
+  max-width: 70ch;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.state {
+  min-height: 6rem;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.state p {
+  margin: 0 0 6px;
+}
+
+.state-title {
+  font-weight: 600;
+}
+
+.state-loading {
+  color: var(--muted);
+}
+
+.state-empty,
+.state-error {
+  margin-top: 20px;
+}
+
+.tone-gold {
+  background: var(--gold);
+}
+
+.tone-champagne {
+  background: var(--champagne);
+}
+
+.tone-antique {
+  background: var(--antique);
+}
+
+.tone-steel {
+  background: var(--steel);
+  color: #ffffff;
+}
+
+.tone-burnished {
+  background: var(--burnished);
+}

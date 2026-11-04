@@ -5,6 +5,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { dateTime } from "./format";
 import { ONLY_APPROVERS, useCanApprove } from "./handler";
 import { useJson } from "./hooks";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
 import type { Field } from "./settingFields";
 import { FIELDS, GROUPS, read, shown, stored, write } from "./settingFields";
 import type { Theme } from "./theme";
@@ -18,14 +19,13 @@ export function Settings() {
 
   return (
     <section aria-labelledby="settings-heading">
-      <h2 id="settings-heading">Settings</h2>
-      <p className="muted">
+      <PageHeader title="Settings" id="settings-heading">
         The rules the claim agent and the improver work to. A handler who can
         sign off payouts over the limit can change them, and each change is
         recorded.
-      </p>
-      {error && <p role="alert">The backend is not responding.</p>}
-      {!error && !data && <p>Loading the settings</p>}
+      </PageHeader>
+      {error && <ErrorState onRetry={reload} />}
+      {!error && !data && <LoadingState what="the settings" />}
       {data && (
         <>
           {canChange ? (
@@ -198,9 +198,9 @@ function Changes({
     <section className="panel spaced" aria-labelledby="changes-heading">
       <h3 id="changes-heading">Changes</h3>
       {record.changes.length === 0 ? (
-        <p className="muted">
-          No changes yet: the settings are as they started.
-        </p>
+        <EmptyState title="No changes yet.">
+          The settings are as they started.
+        </EmptyState>
       ) : (
         <table>
           <thead>

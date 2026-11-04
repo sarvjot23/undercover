@@ -4,11 +4,13 @@ The data behind UnderCover Travel Insurance, a fictional insurer. Everything her
 
 ## The insurer's systems
 
-- `company.json`: company settings, including the $1,000 payout approval limit.
+- `company.json`: company settings, including the payout approval limit, $800, which seeds the approval limit setting. Handlers change it on the Settings page, which keeps it in the database.
+- `settings.json`: the first values of the improvement settings, from our team's lab: the business objectives on the held-out set, the noise and tolerance for each measure, a round's spending limit and the claim agents at once in its evaluations.
+- `models.json`: the models the claim agent may use, with their reasoning efforts and their prices in US dollars per million input and output tokens. Only our IT team changes it.
 - `plans.json`: the three plans (Economy, Premium, First) with their limits, waiting periods and deductibles, and the three add-ons.
 - `policies.json`: one policy per trip, with the plan, the add-ons, the purchase date, the trip and the travelers.
 - `customers.json`: contact details and claim history, with the date and a one line summary of each earlier claim. This is personal data.
-- `handlers.json`: the claims handlers.
+- `handlers.json`: the claims handlers, with the email they sign in with and whether they can sign off payouts over the limit. Dana Whitfield can; Marcus Oyelaran and Priya Raman can't.
 - `claims.json`: the claims queue, twenty-five claims. Each has the customer's story, the items claimed and the supporting documents as text.
 
 ## The documents

@@ -12,6 +12,7 @@ import {
   SET_LABELS,
 } from "./format";
 import { useJson } from "./hooks";
+import { Badge, ErrorState, LoadingState, PageHeader } from "./ui";
 
 /** Follow an evaluation while it runs. */
 function pollEvaluation(evaluation: Evaluation): number {
@@ -31,8 +32,14 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
     pollEvaluation,
   );
 
-  if (error) return <p role="alert">There is no evaluation {runId}.</p>;
-  if (!evaluation) return <p>Loading the evaluation</p>;
+  if (error) {
+    return (
+      <ErrorState message={`There is no evaluation ${String(runId)}.`}>
+        <a href="#/scoreboard">Back to the scoreboard</a> to choose another.
+      </ErrorState>
+    );
+  }
+  if (!evaluation) return <LoadingState what="the evaluation" />;
 
   const { scores } = evaluation;
   const misses = evaluation.claims.filter((claim) => !claim.right).length;
@@ -40,14 +47,17 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
   return (
     <section aria-labelledby="evaluation-heading">
       <a href="#/scoreboard">Back to the scoreboard</a>
-      <h2 id="evaluation-heading">Evaluation {evaluation.run_id}</h2>
-      <p className="muted">
+      <PageHeader
+        title={`Evaluation ${String(evaluation.run_id)}`}
+        id="evaluation-heading"
+      >
         {evaluation.set_name ? SET_LABELS[evaluation.set_name] : ""},{" "}
         {claimsLabel(evaluation.tiny).toLowerCase()}, with{" "}
         <span className="mono">{evaluation.n}</span> claim agents at once on{" "}
         <span className="mono">{evaluation.model}</span> (reasoning{" "}
-        {evaluation.reasoning})
-      </p>
+        {evaluation.reasoning}), version{" "}
+        <span className="mono">{evaluation.version}</span>
+      </PageHeader>
       {evaluation.status === "running" && (
         <p role="status">Running: the measures follow when it finishes.</p>
       )}
@@ -151,11 +161,9 @@ function ClaimRow({ claim }: Readonly<{ claim: ScoredClaim }>) {
           : "Not decided, counted as a referral"}
       </td>
       <td>
-        <span
-          className={`badge ${claim.right ? "badge-decided" : "badge-miss"}`}
-        >
+        <Badge tone={claim.right ? "steel" : "burnished"}>
           {claim.right ? "Right" : "Miss"}
-        </span>
+        </Badge>
       </td>
       <td className="mono">{grade(claim.letter, claim.grade)}</td>
       <td>{check(claim.same_grounds)}</td>

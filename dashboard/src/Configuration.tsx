@@ -3,6 +3,7 @@ import type { ConfigVersion, Handler, VersionDiff, VersionScores } from "./api";
 import { DiffView } from "./DiffView";
 import { byWhom, dateTime, percent } from "./format";
 import { useJson } from "./hooks";
+import { Badge, ErrorState, LoadingState, PageHeader } from "./ui";
 
 function score(found: VersionScores | null, name: "accuracy" | "grade") {
   const value = found?.[name];
@@ -12,27 +13,27 @@ function score(found: VersionScores | null, name: "accuracy" | "grade") {
 
 /** The claim agent's configuration: the current version, every version, and its diff. */
 export function Configuration() {
-  const { data: versions, error } = useJson<ConfigVersion[]>(
-    "/api/configuration/versions",
-    5000,
-  );
+  const {
+    data: versions,
+    error,
+    reload,
+  } = useJson<ConfigVersion[]>("/api/configuration/versions", 5000);
   const { data: handlers } = useJson<Handler[]>("/api/handlers");
   const [chosen, setChosen] = useState<number | null>(null);
 
-  if (error) return <p role="alert">The backend is not responding.</p>;
-  if (!versions) return <p>Loading the configuration</p>;
+  if (error) return <ErrorState onRetry={reload} />;
+  if (!versions) return <LoadingState what="the configuration" />;
 
   const current = versions.find((version) => version.current);
   const shown = chosen ?? current?.version ?? 1;
 
   return (
     <section aria-labelledby="configuration-heading">
-      <h2 id="configuration-heading">Configuration</h2>
-      <p className="muted">
+      <PageHeader title="Configuration" id="configuration-heading">
         The claim agent&rsquo;s instructions, model and reasoning effort, kept
         in versions. Read only: a new version comes from the improver, once a
         handler approves it.
-      </p>
+      </PageHeader>
       {current && (
         <div className="panel current-version">
           <h3>Version {current.version}, the current version</h3>
@@ -81,9 +82,7 @@ export function Configuration() {
               >
                 <td className="mono">
                   {version.version}
-                  {version.current && (
-                    <span className="badge badge-decided">Current</span>
-                  )}
+                  {version.current && <Badge tone="gold">Current</Badge>}
                 </td>
                 <td>
                   <span className="mono">{version.model}</span>{" "}
@@ -158,7 +157,7 @@ function VersionChanges({ version }: Readonly<{ version: number }>) {
           />
         </>
       ) : (
-        <p className="muted placeholder">Loading the changes</p>
+        <LoadingState what="the changes" />
       )}
     </section>
   );

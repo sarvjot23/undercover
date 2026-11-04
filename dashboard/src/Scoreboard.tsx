@@ -12,6 +12,7 @@ import {
 } from "./format";
 import { DEFAULT_AGENTS, useJson } from "./hooks";
 import { AgentsAtOnce } from "./Queue";
+import { EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
 
 const STATUS_LABELS: Record<Run["status"], string> = {
   running: "Running",
@@ -32,8 +33,8 @@ export function Scoreboard() {
   const [agents, setAgents] = useState(DEFAULT_AGENTS);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  if (error) return <p role="alert">The backend is not responding.</p>;
-  if (!evaluations) return <p>Loading the scoreboard</p>;
+  if (error) return <ErrorState onRetry={reload} />;
+  if (!evaluations) return <LoadingState what="the scoreboard" />;
 
   const start = () => {
     setRefusal(null);
@@ -49,12 +50,11 @@ export function Scoreboard() {
 
   return (
     <section aria-labelledby="scoreboard-heading">
-      <h2 id="scoreboard-heading">Scoreboard</h2>
-      <p className="muted">
+      <PageHeader title="Scoreboard" id="scoreboard-heading">
         Each evaluation works copies of a labelled set&rsquo;s claims and scores
-        the agent against our handlers&rsquo; decisions. The copies never reach
-        the queue.
-      </p>
+        the agent against our handlers&rsquo; decisions, with the judge&rsquo;s
+        grade on its explanations. The copies never reach the queue.
+      </PageHeader>
       <div className="panel evaluation-form">
         <label className="cap">
           Labelled set
@@ -90,7 +90,9 @@ export function Scoreboard() {
       )}
       {refusal && <p role="alert">{refusal}</p>}
       {evaluations.length === 0 ? (
-        <p className="muted">No evaluations yet.</p>
+        <EmptyState title="No evaluations yet.">
+          Start one above to score the agent against our handlers.
+        </EmptyState>
       ) : (
         <div className="panel table-panel">
           <table>

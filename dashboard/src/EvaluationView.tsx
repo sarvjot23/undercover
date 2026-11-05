@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Evaluation, Outcome, ScoredClaim } from "./api";
 import {
   averageGrade,
@@ -19,10 +20,13 @@ function pollEvaluation(evaluation: Evaluation): number {
   return evaluation.status === "running" ? 2000 : 0;
 }
 
-function answer(decision: Outcome, payout: number): string {
-  return decision === "approve"
-    ? `${OUTCOME_LABELS[decision]} ${money(payout)}`
-    : OUTCOME_LABELS[decision];
+function answer(decision: Outcome, payout: number): ReactNode {
+  if (decision !== "approve") return <>{OUTCOME_LABELS[decision]}</>;
+  return (
+    <>
+      {OUTCOME_LABELS[decision]} <span className="mono">{money(payout)}</span>
+    </>
+  );
 }
 
 /** One evaluation: its measures, and each claim with the handler's answer beside the agent's. */
@@ -46,7 +50,9 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
 
   return (
     <section aria-labelledby="evaluation-heading">
-      <a href="#/scoreboard">Back to the scoreboard</a>
+      <a className="back" href="#/scoreboard">
+        Back to the scoreboard
+      </a>
       <PageHeader
         title={`Evaluation ${String(evaluation.run_id)}`}
         id="evaluation-heading"
@@ -169,7 +175,11 @@ function ClaimRow({ claim }: Readonly<{ claim: ScoredClaim }>) {
       <td>{check(claim.same_grounds)}</td>
       <td>{check(claim.same_section)}</td>
       <td className="mono number">
-        {claim.right ? "" : money(claim.mistake_cost)}
+        {claim.right ? (
+          <span className="muted">{money(0)}</span>
+        ) : (
+          money(claim.mistake_cost)
+        )}
       </td>
       <td className="mono number">{cost(claim.cost)}</td>
       <td className="mono number">{duration(claim.seconds)}</td>

@@ -7,6 +7,12 @@ from sqlalchemy import Connection, RowMapping, select
 from backend import runs, scoring
 from backend.db import handler_decisions, judgements
 
+# An ended evaluation never changes, so its measures are worked out once: each takes
+# several round trips to Supabase, and the scoreboard and the versions list them all.
+# The key names the database and the run's start, so a reseed or a test's fresh
+# database never meets another's.
+ENDED: dict[tuple[str, int, str], dict[str, Any]] = {}
+
 
 def answer_key(conn: Connection, set_name: str) -> dict[str, dict[str, Any]]:
     """The handlers' decisions on a labelled set, by claim."""
@@ -20,11 +26,8 @@ def grades(conn: Connection, run_id: int) -> dict[str, dict[str, Any]]:
     return {row["claim_id"]: dict(row) for row in conn.execute(query).mappings()}
 
 
-def evaluation(conn: Connection, row: RowMapping) -> dict[str, Any]:
-    """An evaluation with each claim scored, and its measures once it has finished.
-
-    A stopped evaluation shows the claims it got through and no measures.
-    """
+def work_out(conn: Connection, row: RowMapping) -> dict[str, Any]:
+    """An evaluation's claims scored and its measures, from the records."""
     run = runs.describe(conn, row)
     rows = scoring.score_rows(
         run["claims"],
@@ -37,3 +40,16 @@ def evaluation(conn: Connection, row: RowMapping) -> dict[str, Any]:
         "claims": rows,
         "scores": scoring.run_scores(rows, run["elapsed"]) if finished else None,
     }
+
+
+def evaluation(conn: Connection, row: RowMapping) -> dict[str, Any]:
+    """An evaluation with each claim scored, and its measures once it has finished.
+
+    A stopped evaluation shows the claims it got through and no measures.
+    """
+    if row["status"] == "running":
+        return work_out(conn, row)
+    key = (str(conn.engine.url), row["run_id"], row["started_at"])
+    if key not in ENDED:
+        ENDED[key] = work_out(conn, row)
+    return ENDED[key]

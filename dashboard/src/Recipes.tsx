@@ -34,9 +34,10 @@ export function Recipes() {
                 Recipe {recipe.version}
               </button>{" "}
               <span className="muted">
-                {byWhom(recipe.proposed_by, handlers)}, approved by{" "}
-                {byWhom(recipe.approved_by, handlers)} on{" "}
-                <span className="mono">{dateTime(recipe.approved_at)}</span>.{" "}
+                {recipe.proposed_by === "seed"
+                  ? "Seeded"
+                  : `Proposed by the improver, approved by ${byWhom(recipe.approved_by, handlers)}`}{" "}
+                on <span className="mono">{dateTime(recipe.approved_at)}</span>.{" "}
                 {recipe.reason}
               </span>
             </li>
@@ -62,7 +63,11 @@ function RecipeChanges({ version }: Readonly<{ version: number }>) {
           ? `Recipe ${String(version)} against recipe ${String(diff.before)}`
           : `Recipe ${String(version)}, the first`}
       </h4>
-      <DiffView lines={diff.recipe} label={`Recipe ${String(version)}`} />
+      <DiffView
+        lines={diff.recipe}
+        label={`Recipe ${String(version)}`}
+        first={diff.before === null}
+      />
     </>
   );
 }

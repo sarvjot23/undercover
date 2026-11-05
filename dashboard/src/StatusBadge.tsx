@@ -3,13 +3,14 @@ import { STATUS_LABELS } from "./format";
 import type { Tone } from "./ui";
 import { Badge } from "./ui";
 
-// Gold, Champagne and Antique side by side, then Steel and Burnished, as BRAND.md has it.
+// The same colors the live view gives a claim waiting for sign-off (Burnished, the
+// alert) and one left for a handler (Champagne), on every page.
 const TONES: Record<Status, Tone> = {
-  waiting: "gold",
-  in_progress: "champagne",
-  awaiting_sign_off: "antique",
+  waiting: "antique",
+  in_progress: "gold",
+  awaiting_sign_off: "burnished",
   decided: "steel",
-  needs_handler: "burnished",
+  needs_handler: "champagne",
 };
 
 export function StatusBadge({ status }: Readonly<{ status: Status }>) {

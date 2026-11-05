@@ -7,11 +7,20 @@ const MARKS: Record<DiffLine["kind"], string> = {
   gap: "⋯",
 };
 
-/** What a version changed, line by line: additions and removals in color. */
+/** What a version changed, line by line: additions and removals in color. A
+ * first version, with nothing before it, is shown as plain text. */
 export function DiffView({
   lines,
   label,
-}: Readonly<{ lines: DiffLine[]; label: string }>) {
+  first = false,
+}: Readonly<{ lines: DiffLine[]; label: string; first?: boolean }>) {
+  if (first) {
+    return (
+      <pre className="instructions" aria-label={label}>
+        {lines.map((line) => line.text).join("\n")}
+      </pre>
+    );
+  }
   if (lines.length === 0) {
     return <p className="muted">No change to the text.</p>;
   }

@@ -7,7 +7,15 @@ import { ONLY_APPROVERS, useCanApprove } from "./handler";
 import { useJson } from "./hooks";
 import { EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
 import type { Field } from "./settingFields";
-import { FIELDS, GROUPS, read, shown, stored, write } from "./settingFields";
+import {
+  editable,
+  FIELDS,
+  GROUPS,
+  read,
+  shown,
+  stored,
+  write,
+} from "./settingFields";
 import type { Theme } from "./theme";
 import { chooseTheme, savedTheme } from "./theme";
 
@@ -79,7 +87,7 @@ function SettingsForm({
   const [problem, setProblem] = useState("");
 
   const valueOf = (field: Field) =>
-    draft[field.name] ?? String(stored(field, read(settings, field.name)));
+    draft[field.name] ?? editable(field, read(settings, field.name));
   const changed = FIELDS.filter(
     (field) =>
       Number(valueOf(field)) !== stored(field, read(settings, field.name)),
@@ -199,7 +207,8 @@ function Changes({
       <h3 id="changes-heading">Changes</h3>
       {record.changes.length === 0 ? (
         <EmptyState title="No changes yet.">
-          The settings are as they started.
+          The settings are as they started. A change made above is listed here,
+          with who made it and when.
         </EmptyState>
       ) : (
         <table>

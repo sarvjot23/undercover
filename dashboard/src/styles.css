@@ -1361,3 +1361,166 @@ tr.chosen td {
 .tone-burnished {
   background: var(--burnished);
 }
+
+/* From the design review: one masthead line, tables that line up, alike buttons. */
+.masthead {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.masthead nav {
+  flex-wrap: nowrap;
+}
+
+.who {
+  align-items: center;
+  gap: 14px;
+  margin-left: 8px;
+  padding-left: 16px;
+  white-space: nowrap;
+}
+
+.who-name {
+  display: grid;
+  line-height: 1.2;
+}
+
+.who-name .muted {
+  font-size: 0.8rem;
+}
+
+td {
+  vertical-align: top;
+}
+
+td.mono,
+td .mono,
+td.number {
+  white-space: nowrap;
+}
+
+.tagline {
+  white-space: nowrap;
+}
+
+/* On a laptop screen the tagline gives way, so the nav and the handler fit. */
+@media (max-width: 1500px) {
+  .tagline {
+    display: none;
+  }
+}
+
+td.summary {
+  min-width: 24ch;
+}
+
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--antique);
+}
+
+button.secondary[aria-pressed="true"] {
+  background: var(--champagne);
+  color: #121212;
+  box-shadow: none;
+}
+
+tr.chosen td {
+  background: color-mix(in srgb, var(--champagne) 22%, transparent);
+}
+
+.cap input {
+  box-shadow: inset 0 0 0 1px var(--soft);
+  background: var(--page);
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+/* Settings: each unit inside its field, in one style. */
+.setting-input {
+  width: fit-content;
+  border-radius: 10px;
+  background: var(--page);
+  box-shadow: inset 0 0 0 1px var(--soft);
+  padding: 0 10px;
+}
+
+.setting-input input {
+  border: none;
+  background: transparent;
+  padding: 6px 0;
+  width: 7em;
+}
+
+.setting-input .unit {
+  font-size: 0.85rem;
+}
+
+input[type="radio"] {
+  accent-color: var(--accent-text);
+}
+
+.panel .state {
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+}
+
+/* Dark mode: soft tints, ivory text, the strong color only on the mark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --add: rgb(110 190 90 / 16%);
+    --add-ink: var(--ink);
+    --remove: rgb(230 110 90 / 16%);
+    --remove-ink: var(--ink);
+  }
+
+  :root:not([data-theme="light"]) .diff-add .diff-mark {
+    color: #8fd17a;
+  }
+
+  :root:not([data-theme="light"]) .diff-remove .diff-mark {
+    color: #f19a88;
+  }
+
+  :root:not([data-theme="light"]) tr.miss td {
+    background: color-mix(in srgb, var(--burnished) 10%, transparent);
+  }
+}
+
+:root[data-theme="dark"] {
+  --add: rgb(110 190 90 / 16%);
+  --add-ink: var(--ink);
+  --remove: rgb(230 110 90 / 16%);
+  --remove-ink: var(--ink);
+}
+
+:root[data-theme="dark"] .diff-add .diff-mark {
+  color: #8fd17a;
+}
+
+:root[data-theme="dark"] .diff-remove .diff-mark {
+  color: #f19a88;
+}
+
+:root[data-theme="dark"] tr.miss td {
+  background: color-mix(in srgb, var(--burnished) 10%, transparent);
+}
+
+button {
+  white-space: nowrap;
+}

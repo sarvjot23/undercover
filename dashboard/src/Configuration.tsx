@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ConfigVersion, Handler, VersionDiff, VersionScores } from "./api";
 import { DiffView } from "./DiffView";
-import { byWhom, dateTime, percent } from "./format";
+import { byWhom, dateTime, percent, shortModel } from "./format";
 import { useJson } from "./hooks";
 import { Badge, ErrorState, LoadingState, PageHeader } from "./ui";
 
@@ -61,8 +61,7 @@ export function Configuration() {
               <th scope="col">Model and effort</th>
               <th scope="col">What changed</th>
               <th scope="col">Reason</th>
-              <th scope="col">Proposed by</th>
-              <th scope="col">Approved</th>
+              <th scope="col">Proposed and approved</th>
               <th scope="col" className="number">
                 Held-out accuracy
               </th>
@@ -85,7 +84,9 @@ export function Configuration() {
                   {version.current && <Badge tone="gold">Current</Badge>}
                 </td>
                 <td>
-                  <span className="mono">{version.model}</span>{" "}
+                  <span className="mono" title={version.model}>
+                    {shortModel(version.model)}
+                  </span>{" "}
                   {version.reasoning}
                 </td>
                 <td>
@@ -93,11 +94,23 @@ export function Configuration() {
                     ? version.changed.join(", ")
                     : "The first version"}
                 </td>
-                <td className="summary">{version.reason}</td>
-                <td>{byWhom(version.proposed_by, handlers)}</td>
+                <td className="summary">
+                  <span className="clamp" title={version.reason}>
+                    {version.reason}
+                  </span>
+                </td>
                 <td>
-                  {byWhom(version.approved_by, handlers)},{" "}
-                  <span className="mono">{dateTime(version.approved_at)}</span>
+                  {version.proposed_by === "seed" ? (
+                    "Seeded"
+                  ) : (
+                    <>
+                      {byWhom(version.proposed_by, handlers)}, approved by{" "}
+                      {byWhom(version.approved_by, handlers)}
+                    </>
+                  )}
+                  <div className="mono muted">
+                    {dateTime(version.approved_at)}
+                  </div>
                 </td>
                 <td className="mono number">
                   {score(version.scores.held_out, "accuracy")}
@@ -154,6 +167,7 @@ function VersionChanges({ version }: Readonly<{ version: number }>) {
           <DiffView
             lines={diff.instructions}
             label={`The instructions in version ${String(version)}`}
+            first={diff.before === null}
           />
         </>
       ) : (

@@ -51,42 +51,46 @@ export function Improvement() {
 
   return (
     <section aria-labelledby="improvement-heading">
-      <PageHeader title="Improvement" id="improvement-heading">
+      <PageHeader
+        title="Improvement"
+        id="improvement-heading"
+        actions={
+          canAct ? (
+            <>
+              <button
+                type="button"
+                disabled={!rounds || Boolean(open)}
+                onClick={() => {
+                  setConfirming("start");
+                }}
+              >
+                Start a round
+              </button>
+              {open && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setConfirming("stop");
+                  }}
+                >
+                  Stop the round
+                </button>
+              )}
+            </>
+          ) : undefined
+        }
+      >
         The improver reads the claim agent&rsquo;s results and proposes changes.
         Nothing takes effect until a handler approves it, and our rule keeps a
         new version only if it does better on claims the improver never sees.
       </PageHeader>
-      <div className="queue-head">
-        {canAct ? (
-          <>
-            <button
-              type="button"
-              disabled={!rounds || Boolean(open)}
-              onClick={() => {
-                setConfirming("start");
-              }}
-            >
-              Start a round
-            </button>
-            {open && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setConfirming("stop");
-                }}
-              >
-                Stop the round
-              </button>
-            )}
-          </>
-        ) : (
-          <p className="note">
-            {ONLY_APPROVERS} can start or stop a round, or approve or reject the
-            improver&rsquo;s proposals.
-          </p>
-        )}
-      </div>
+      {!canAct && (
+        <p className="note">
+          {ONLY_APPROVERS} can start or stop a round, or approve or reject the
+          improver&rsquo;s proposals.
+        </p>
+      )}
       {refusal && <p role="alert">{refusal}</p>}
       {error && <ErrorState onRetry={reload} />}
       {!error && !rounds && <LoadingState what="the rounds" />}
@@ -258,7 +262,9 @@ function RoundsTable({
                       {round.tried.model}, {round.tried.reasoning}
                     </div>
                     {round.reason && (
-                      <div className="summary">{round.reason}</div>
+                      <div className="summary clamp" title={round.reason}>
+                        {round.reason}
+                      </div>
                     )}
                   </>
                 ) : (

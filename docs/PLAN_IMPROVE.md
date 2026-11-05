@@ -315,19 +315,19 @@ Success criteria:
 
 Success criteria:
 
-- [ ] Vitest checks the loading, empty and error states on each page, and that a refresh keeps the layout's space.
-- [ ] Signed in as Dana through the Playwright MCP server (or a script on Playwright's library if the server won't connect), two rounds run from the Improvement page:
-  - [ ] the first proposal rejected with a reason, then the next approved, and the rest approved
-  - [ ] each stage shown as it happens
-  - [ ] afterwards, the scores before and after, the verdict and the cost
-- [ ] The Configuration page shows the versions and their diffs.
-- [ ] Through Langfuse's API, each round's improver traces are found in one session.
-- [ ] The report says how far version 1's two held-out runs differed on each measure, beside the noise and the tolerance.
-- [ ] A dispatch at N=25 runs on the current version.
-- [ ] Signed in as Marcus, a payout waiting for sign-off can't be signed off and the settings can't be changed. Signed in as Dana, the same payout is signed off and paid.
-- [ ] Screenshots of every page in light and dark. A fresh subagent reviews them once, as a senior product designer would, against `docs/BRAND.md` and point 8 of the brief, and what it finds is fixed.
-- [ ] The report says what the live checks spent, which should be under $1.
-- [ ] `docs/SPEC.md`, `docs/TECH_STACK.md`, `docs/PROCESS.md`, `docs/CODE_STANDARDS.md` (decision 2), `docs/STATUS.md` and `data/README.md` describe the product as it now is.
-- [ ] `npm run check` passes with `.env` moved out of the way, and the results are reported.
+- [x] Vitest checks the loading, empty and error states on each page, and that a refresh keeps the layout's space.
+- [x] Signed in as Dana through the Playwright MCP server (or a script on Playwright's library if the server won't connect), two rounds run from the Improvement page:
+  - [x] the first proposal rejected with a reason, then the next approved, and the rest approved
+  - [x] each stage shown as it happens
+  - [x] afterwards, the scores before and after, the verdict and the cost
+- [x] The Configuration page shows the versions and their diffs.
+- [x] Through Langfuse's API, each round's improver traces are found in one session.
+- [x] The report says how far version 1's two held-out runs differed on each measure, beside the noise and the tolerance.
+- [x] A dispatch at N=25 runs on the current version.
+- [x] Signed in as Marcus, a payout waiting for sign-off can't be signed off and the settings can't be changed. Signed in as Dana, the same payout is signed off and paid.
+- [x] Screenshots of every page in light and dark. A fresh subagent reviews them once, as a senior product designer would, against `docs/BRAND.md` and point 8 of the brief, and what it finds is fixed.
+- [x] The report says what the live checks spent, which should be under $1.
+- [x] `docs/SPEC.md`, `docs/TECH_STACK.md`, `docs/PROCESS.md`, `docs/CODE_STANDARDS.md` (decision 2), `docs/STATUS.md` and `data/README.md` describe the product as it now is.
+- [x] `npm run check` passes with `.env` moved out of the way, and the results are reported.
 
 Moving `.env` out of the way is a rename and back, and nothing reads it. Throughout, keys and the handlers' password stay in the environment of the processes that need them and are never printed.

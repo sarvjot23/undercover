@@ -129,3 +129,9 @@ export function shown(field: Field, value: number): string {
   if (field.unit === "agents") return String(number);
   return `${String(number)} points`;
 }
+
+/** The value as it starts in its input: money with two decimals, as $800.00. */
+export function editable(field: Field, value: number): string {
+  const number = stored(field, value);
+  return field.unit === "$" ? number.toFixed(2) : String(number);
+}

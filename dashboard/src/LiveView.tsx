@@ -5,6 +5,7 @@ import { leaveLiveView, useCountUp, useJson } from "./hooks";
 import type { LiveOutcome } from "./live";
 import { board, LIVE_OUTCOMES, outcomeOf, tally } from "./live";
 import { SummaryOfRun } from "./RunPanel";
+import { LoadingState } from "./ui";
 
 const OUTCOMES = Object.keys(LIVE_OUTCOMES) as LiveOutcome[];
 
@@ -29,6 +30,7 @@ export function LiveView() {
         {run && run.status !== "running" && <LiveSummary run={run} />}
         {run && <Board run={run} />}
         {run === null && <LiveIdle />}
+        {run === undefined && <LoadingState what="the latest dispatch" />}
       </div>
     </div>
   );

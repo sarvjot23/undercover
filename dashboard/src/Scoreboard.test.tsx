@@ -88,7 +88,7 @@ it("lists the evaluations, newest first, with every measure", async () => {
     "Evaluation set",
     "Five tiny claims",
     "5",
-    "openai/gpt-6-luna (low)",
+    "gpt-6-luna · low",
     "Finished",
     "80%",
     "60%",
@@ -108,7 +108,7 @@ it("lists the evaluations, newest first, with every measure", async () => {
     "Held-out set",
     "The whole set",
     "25",
-    "openai/gpt-6-luna (low)",
+    "gpt-6-luna · low",
     "Stopped",
   ]);
   expect(stopped.slice(6).every((cell) => cell === "")).toBe(true);
@@ -255,7 +255,7 @@ it("shows an evaluation's claims, the handler's answer beside the agent's", asyn
       "B (2.10)",
       "Yes",
       "No",
-      "",
+      "$0.00",
       "$0.012",
       "30s",
     ],

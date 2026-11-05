@@ -109,3 +109,8 @@ export function check(probability: number | null): string {
 export function averageGrade(score: number | null): string {
   return score === null ? "Not graded" : score.toFixed(2);
 }
+
+/** A model without its provider, such as gpt-6-luna for openai/gpt-6-luna. */
+export function shortModel(model: string): string {
+  return model.slice(model.indexOf("/") + 1);
+}

@@ -92,9 +92,9 @@ function Masthead({
         </a>
       </nav>
       <div className="who">
-        <span>
+        <span className="who-name">
           <strong>{handler?.name ?? email}</strong>
-          {handler && <span className="muted"> {handler.role}</span>}
+          {handler && <span className="muted">{handler.role}</span>}
         </span>
         <button
           type="button"

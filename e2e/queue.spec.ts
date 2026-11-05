@@ -26,7 +26,7 @@ test("the configuration shows version 1 read only", async ({ page }) => {
       .getByRole("row")
       .filter({ hasText: "The first version" }),
   ).toContainText("Seeded");
-  await expect(page.locator(".diff-add").first()).toContainText(
+  await expect(page.getByLabel("The instructions in version 1")).toContainText(
     "You are the UnderCover Agent.",
   );
   await expect(page.getByRole("textbox")).toHaveCount(0);

@@ -1,6 +1,6 @@
 import pytest
 
-from backend import agent_service, scoring
+from backend import agent_service, measures, scoring
 from backend.tests.signing import as_handler
 
 TINY = ["CLM-1007", "CLM-1015", "CLM-1017", "CLM-1020", "CLM-1021"]
@@ -200,3 +200,19 @@ def test_an_evaluation_is_asked_of_the_agents_service(client, monkeypatch):
         == 202
     )
     assert asked == [("/evaluations", body)]
+
+
+def test_an_ended_evaluations_measures_are_worked_out_once(client, monkeypatch):
+    run = evaluate(client)
+    worked = []
+    original = measures.work_out
+    monkeypatch.setattr(
+        measures, "work_out", lambda conn, row: worked.append(1) or original(conn, row)
+    )
+    for _ in range(2):
+        client.get(f"/api/evaluations/{run['run_id']}")
+    assert len(worked) == 2
+    client.post(f"/api/runs/{run['run_id']}/finish")
+    for _ in range(2):
+        client.get(f"/api/evaluations/{run['run_id']}")
+    assert len(worked) == 3

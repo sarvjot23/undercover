@@ -75,7 +75,7 @@ it("lets Dana change a setting after a confirmation", async () => {
   const limit = await screen.findByRole("spinbutton", {
     name: /Approval limit/,
   });
-  expect((limit as HTMLInputElement).value).toBe("800");
+  expect((limit as HTMLInputElement).value).toBe("800.00");
   const accuracy = screen.getAllByRole("spinbutton", { name: /Accuracy/ })[0];
   expect((accuracy as HTMLInputElement).value).toBe("10");
 

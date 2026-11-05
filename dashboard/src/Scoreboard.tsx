@@ -4,6 +4,7 @@ import { postForRefusal } from "./api";
 import {
   averageGrade,
   claimsLabel,
+  shortModel,
   cost,
   duration,
   money,
@@ -12,12 +13,19 @@ import {
 } from "./format";
 import { DEFAULT_AGENTS, useJson } from "./hooks";
 import { AgentsAtOnce } from "./Queue";
-import { EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
+import type { Tone } from "./ui";
+import { Badge, EmptyState, ErrorState, LoadingState, PageHeader } from "./ui";
 
 const STATUS_LABELS: Record<Run["status"], string> = {
   running: "Running",
   finished: "Finished",
   stopped: "Stopped",
+};
+
+const STATUS_TONES: Record<Run["status"], Tone> = {
+  running: "gold",
+  finished: "antique",
+  stopped: "steel",
 };
 
 /** The Scoreboard: start an evaluation, and every evaluation's measures. */
@@ -164,10 +172,14 @@ function EvaluationRow({
       <td>{evaluation.set_name ? SET_LABELS[evaluation.set_name] : ""}</td>
       <td>{claimsLabel(evaluation.tiny)}</td>
       <td className="mono number">{evaluation.n}</td>
-      <td className="mono">
-        {evaluation.model} ({evaluation.reasoning})
+      <td className="mono" title={evaluation.model}>
+        {shortModel(evaluation.model)} · {evaluation.reasoning}
       </td>
-      <td>{STATUS_LABELS[evaluation.status]}</td>
+      <td>
+        <Badge tone={STATUS_TONES[evaluation.status]}>
+          {STATUS_LABELS[evaluation.status]}
+        </Badge>
+      </td>
       <Measures scores={scores} />
     </tr>
   );

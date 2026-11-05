@@ -50,7 +50,9 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
 
   return (
     <section aria-labelledby="claim-heading" className="claim">
-      <a href="#/">Back to the queue</a>
+      <a className="back" href="#/">
+        Back to the queue
+      </a>
       <div className="claim-head">
         <h2 id="claim-heading">
           <span className="mono">{claim.claim_id}</span> {claim.summary}

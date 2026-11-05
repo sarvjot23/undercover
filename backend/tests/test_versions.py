@@ -165,3 +165,17 @@ def test_with_model_name_set_that_model_is_the_only_one_allowed(tmp_path, monkey
     with db.engine().connect() as conn:
         first = conn.execute(select(db.config_versions)).mappings().one()
     assert (first["model"], first["reasoning"]) == ("openrouter/free", "default")
+
+
+def test_each_removed_line_sits_above_the_line_that_replaced_it():
+    old = "Intro.\n1. Read.\n2. Think.\n3. Act.\nEnd."
+    new = "Intro.\n1. Read it all.\n2. Think hard.\n3. Act.\nEnd."
+    assert [(line["kind"], line["text"]) for line in diffs.lines(old, new)] == [
+        ("same", "Intro."),
+        ("remove", "1. Read."),
+        ("add", "1. Read it all."),
+        ("remove", "2. Think."),
+        ("add", "2. Think hard."),
+        ("same", "3. Act."),
+        ("same", "End."),
+    ]

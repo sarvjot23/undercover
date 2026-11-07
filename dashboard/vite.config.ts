@@ -4,9 +4,10 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  // npm run dev reads the repo's .env; the unit and end-to-end tests set their own.
+  // npm run dev and npm run build read the repo's .env when there is one, and the
+  // environment otherwise; the unit and end-to-end tests set their own.
   envDir:
-    mode === "development"
+    mode === "development" || mode === "production"
       ? fileURLToPath(new URL("..", import.meta.url))
       : false,
   server: {

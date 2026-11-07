@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from backend import agent_api, db
+from backend import agent_api, db, static
 from backend.routes import (
     claims,
     configuration,
@@ -49,3 +49,6 @@ app.include_router(agent_api.router)
 def health() -> dict[str, str]:
     """Check that the backend is running."""
     return {"status": "ok"}
+
+
+static.serve_dashboard(app)

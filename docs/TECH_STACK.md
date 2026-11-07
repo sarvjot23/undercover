@@ -18,3 +18,14 @@
 - `data/`: the business data the backend starts from: `company.json` gives the approval limit its first value, `settings.json` the improvement settings, and `models.json` the models the claim agent may use, with their reasoning efforts and prices per million tokens. `data/evals/` holds the answer key: seeding stores the held-out claims and the handlers' decisions, with their reasons and references, in tables of their own, which no claim operation reads. Only the scoring of an evaluation, the judge and the improver's view use them, and the improver's view holds nothing of the held-out set but its scores. The claim agent never sees them.
 
 Python 3.12 with uv, all in the root `pyproject.toml`. Node 26. In `.env`: `OPENROUTER_API_KEY`, `DATABASE_URL` (the Supabase session pooler string), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL`, `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, and `HANDLER_PASSWORD`, the handlers' password for the browser checks.
+
+## Deployment
+
+The backend and the dashboard go to AWS Lambda as one package behind a Function URL, with the database on Supabase. The same app also runs as an ordinary web server.
+
+- `npm run build` builds the dashboard into `dashboard/dist`, with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` built in, read from `.env` when there is one and otherwise from the environment.
+- When `dashboard/dist` exists, the backend serves it at `/` (`backend/static.py`): its files at their own paths, and `index.html` for any other path outside `/api/`. Without it, the backend serves only the API, as with `npm run dev`.
+- The package holds `backend/`, `data/` and `dashboard/dist/`, with the packages of the `server` dependency group in `pyproject.toml`, installed for Linux and Python 3.12. At run time the backend imports nothing from outside the package, reads only its own files and writes none. `npm run check:server` imports the backend with only that group installed, in a temporary environment.
+- Lambda runs the handler `backend.main.handler`, Mangum with the startup hook off, so nothing seeds the database. A web server runs `backend.main:app`.
+- The function's environment is `DATABASE_URL` (Supabase's transaction pooler, on port 6543), `VITE_SUPABASE_URL` and `UNDERCOVER_API_KEY`. Everything else the backend reads has a default, or is needed only by work that can't start without the agent's service, which stays on the laptop.
+- When `AWS_LAMBDA_FUNCTION_NAME` is set, as Lambda sets it, the backend opens a database connection for each request and keeps none (`NullPool`), with prepared statements off (`prepare_threshold=None`), since each copy of the function handles one request at a time and the transaction pooler can't prepare statements.

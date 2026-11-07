@@ -158,12 +158,12 @@ The check reads the claim's own fields as JSON, the way the agent's `get_claim` 
   - `OPENROUTER_API_KEY` is needed only by the judge, at the end of an evaluation, which can't start on Lambda without the agent's service.
 - **`docs/TECH_STACK.md`** gets a Deployment section: `npm run build` writes `dashboard/dist`; the package holds `backend/`, `data/`, `dashboard/dist/` and the `server` group; the Lambda handler is `backend.main.handler`; a web server runs `backend.main:app`; and the environment holds the three variables.
 
-- [ ] A test calls `handler` with a Function URL event (version 2.0) for `/api/health` and gets 200 `{"status": "ok"}`.
-- [ ] With a stand-in `dist` folder holding `index.html` and `assets/app.js`, a test gets `index.html` for `/` and `/scoreboard/4`, gets the JS file at its path, and gets a 404 in JSON for `/api/nope`.
-- [ ] A test with `AWS_LAMBDA_FUNCTION_NAME` set, and a Postgres URL on port 6543, finds a `NullPool` engine with `prepare_threshold` set to `None`, using a fresh `build_engine` and no real connection. Without the setting, the pool of 4 is unchanged.
-- [ ] `npm run build` passes with no warnings, and `npm run check:server` passes inside `npm run check`.
-- [ ] A test checks that importing `backend.main` loads no module from `agent`.
-- [ ] `npm run check` passes with `.env` moved out of the way. `docs/STATUS.md` is updated, and the phase is committed.
+- [x] A test calls `handler` with a Function URL event (version 2.0) for `/api/health` and gets 200 `{"status": "ok"}`.
+- [x] With a stand-in `dist` folder holding `index.html` and `assets/app.js`, a test gets `index.html` for `/` and `/scoreboard/4`, gets the JS file at its path, and gets a 404 in JSON for `/api/nope`.
+- [x] A test with `AWS_LAMBDA_FUNCTION_NAME` set, and a Postgres URL on port 6543, finds a `NullPool` engine with `prepare_threshold` set to `None`, using a fresh `build_engine` and no real connection. Without the setting, the pool of 4 is unchanged.
+- [x] `npm run build` passes with no warnings, and `npm run check:server` passes inside `npm run check`.
+- [x] A test checks that importing `backend.main` loads no module from `agent`.
+- [x] `npm run check` passes with `.env` moved out of the way. `docs/STATUS.md` is updated, and the phase is committed.
 
 ## Phase 5: The live checks and the handover
 

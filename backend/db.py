@@ -283,16 +283,34 @@ def database_url() -> str | None:
     return os.getenv("DATABASE_URL") or None
 
 
+def on_lambda() -> bool:
+    """Whether the backend runs on AWS Lambda, which sets this for every function."""
+    return bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+
+
 def postgres_engine(url: str) -> Engine:
-    """Connect to Postgres with at most 4 connections, in our own schema."""
-    engine = create_engine(
-        url.replace("postgresql://", "postgresql+psycopg://", 1),
-        pool_size=MAX_CONNECTIONS,
-        max_overflow=0,
-        pool_timeout=POOL_TIMEOUT,
-        pool_recycle=1800,
-        connect_args={"options": f"-c search_path={SCHEMA}", "prepare_threshold": 0},
-    )
+    """Connect to Postgres with at most 4 connections, in our own schema.
+
+    On Lambda each copy of the function opens a connection for each request and
+    keeps none, through the transaction pooler, which can't prepare statements.
+    """
+    driver_url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    options = f"-c search_path={SCHEMA}"
+    if on_lambda():
+        engine = create_engine(
+            driver_url,
+            poolclass=NullPool,
+            connect_args={"options": options, "prepare_threshold": None},
+        )
+    else:
+        engine = create_engine(
+            driver_url,
+            pool_size=MAX_CONNECTIONS,
+            max_overflow=0,
+            pool_timeout=POOL_TIMEOUT,
+            pool_recycle=1800,
+            connect_args={"options": options, "prepare_threshold": 0},
+        )
 
     @event.listens_for(engine, "do_connect")
     def create_schema(dialect: Any, _: Any, args: Any, params: Any) -> Any:

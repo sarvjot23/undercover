@@ -35,7 +35,7 @@ export default defineConfig({
       url: `${JUDGE}/health`,
     },
     {
-      command: "uv run -m uvicorn backend.api:app --port 8001",
+      command: "uv run -m uvicorn backend.main:app --port 8001",
       url: "http://127.0.0.1:8001/api/health",
       env: {
         UNDERCOVER_DB: database,

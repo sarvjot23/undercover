@@ -6,13 +6,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from backend import db
+from backend import agent_api, db
 from backend.routes import (
     claims,
     configuration,
     documents,
     evaluations,
     library,
+    records,
     rounds,
     runs,
     settings,
@@ -40,6 +41,8 @@ app.include_router(evaluations.router)
 app.include_router(configuration.router)
 app.include_router(settings.router)
 app.include_router(rounds.router)
+app.include_router(records.router)
+app.include_router(agent_api.router)
 
 
 @app.get("/api/health", operation_id="health")

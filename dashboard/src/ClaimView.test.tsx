@@ -125,7 +125,7 @@ it("says when the agent can't start", async () => {
   );
 });
 
-it("signs off a payout over the limit as the handler signed in", async () => {
+it("signs off a payout over the limit as the handler signed in, which pays it", async () => {
   const routes: Record<string, unknown> = {
     "/api/claims/CLM-1001": claim({
       status: "awaiting_sign_off",
@@ -133,7 +133,7 @@ it("signs off a payout over the limit as the handler signed in", async () => {
     }),
     "/api/claims/CLM-1001/steps": [step],
     "/api/handlers": handlers,
-    "POST /api/claims/CLM-1001/sign-off": { status: "in_progress" },
+    "POST /api/claims/CLM-1001/sign-off": { status: "decided" },
   };
   const fetchMock = stubBackend(routes);
   renderAs(dana, <ClaimView claimId="CLM-1001" />);
@@ -147,16 +147,6 @@ it("signs off a payout over the limit as the handler signed in", async () => {
     signed_off_at: "2026-10-21T12:04:00+00:00",
   };
   routes["/api/claims/CLM-1001"] = claim({
-    status: "in_progress",
-    agent_working: true,
-    decision: approval,
-    sign_off: signed,
-  });
-  fireEvent.click(button);
-  expect(await screen.findByText(/The agent\s+is paying it/)).toBeDefined();
-  expect(screen.getByText("In progress")).toBeDefined();
-
-  routes["/api/claims/CLM-1001"] = claim({
     status: "decided",
     decision: approval,
     sign_off: signed,
@@ -164,9 +154,10 @@ it("signs off a payout over the limit as the handler signed in", async () => {
       amount: 1200,
       signed_off_by: "HND-01",
       signed_off_at: signed.signed_off_at,
-      paid_at: "2026-10-21T12:05:00+00:00",
+      paid_at: signed.signed_off_at,
     },
   });
+  fireEvent.click(button);
   expect(
     await screen.findByText(/signed off by Dana Whitfield/, undefined, {
       timeout: 3000,

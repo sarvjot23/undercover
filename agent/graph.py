@@ -185,7 +185,7 @@ def after_tools(state: ClaimState) -> Literal["agent", "sign_off", "pay", "close
 
 
 def sign_off(state: ClaimState) -> dict[str, Any]:
-    """Wait for a handler. Nothing else here: this runs again on resume."""
+    """Wait for a handler, whose sign-off pays the claim. This runs again on resume."""
     answer = interrupt({"claim_id": state["claim_id"]})
     return {"signed_off_by": answer["handler_id"]}
 
@@ -267,7 +267,7 @@ def build(
     builder.add_conditional_edges(
         "tools", after_tools, ["agent", "sign_off", "pay", "close"]
     )
-    builder.add_edge("sign_off", "pay")
+    builder.add_edge("sign_off", "close")
     builder.add_edge("pay", "close")
     builder.add_edge("close", END)
     return builder.compile(checkpointer=saver)

@@ -4,8 +4,7 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from sqlalchemy import Connection, literal, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Connection, select
 
 from backend import agent_service, db, keys, leases, settings
 from backend.auth import Approver
@@ -222,24 +221,6 @@ def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, An
     return recorded
 
 
-def add_sign_off(conn: Connection, signed: dict[str, str]) -> None:
-    """Save a sign-off on a claim that's waiting for one, in one statement."""
-    values = select(
-        literal(signed["claim_id"]),
-        literal(signed["handler_id"]),
-        literal(signed["signed_off_at"]),
-    ).where(
-        claim_table.c.claim_id == signed["claim_id"],
-        claim_table.c.status == "awaiting_sign_off",
-    )
-    statement = (
-        insert(sign_offs)
-        .from_select(["claim_id", "handler_id", "signed_off_at"], values)
-        .on_conflict_do_nothing()
-    )
-    conn.execute(statement)
-
-
 def settle_payment(conn: Connection, claim_id: str) -> None:
     """Mark a paid claim decided; run again after a restart, it changes nothing."""
     conn.execute(
@@ -256,6 +237,11 @@ def pay_claim(
     claim_id: str, payment: Payment, conn: SingleStatementDb
 ) -> dict[str, Any]:
     """Pay an approved payout, once, and only after any sign-off it needs."""
+    limit_now = settings.current(conn).approval_limit
+    if payment.amount > limit_now:
+        raise HTTPException(
+            403, f"A payment over the approval limit of ${limit_now:,.2f} is refused"
+        )
     found = standing(conn, claim_id)
     decision = found["decision"]
     if decision is None or decision["decision"] != "approve":
@@ -294,21 +280,37 @@ def sign_off(
     claim_id: str,
     handler: Approver,
     background_tasks: BackgroundTasks,
-    conn: SingleStatementDb,
+    conn: Db,
 ) -> dict[str, Any]:
-    """Record the signed-in handler's sign-off on a payout; the agent pays it."""
+    """Record the signed-in handler's sign-off on a payout, and pay it."""
     if find_claim(conn, claim_id)["evaluation_id"] is not None:
         raise HTTPException(409, f"Claim {claim_id} is a copy for an evaluation")
+    # Only a claim waiting for a sign-off moves, so a second sign-off is refused.
+    move(conn, claim_id, "awaiting_sign_off", "decided")
+    now = db.now()
     signed = {
         "claim_id": claim_id,
         "handler_id": handler["handler_id"],
-        "signed_off_at": db.now(),
+        "signed_off_at": now,
     }
-    # The sign-off goes first: if we stop here, the claim still waits to be signed off.
-    add_sign_off(conn, signed)
-    move(conn, claim_id, "awaiting_sign_off", "in_progress")
+    paid = {
+        "claim_id": claim_id,
+        "amount": standing(conn, claim_id)["decision"]["payout"],
+        "signed_off_by": handler["handler_id"],
+        "signed_off_at": now,
+        "paid_at": now,
+    }
+    insert_once(conn, sign_offs, **signed)
+    insert_once(conn, payments, **paid)
+    conn.commit()
+    # The agent closes its paused work without paying; if it's away, nothing waits.
     background_tasks.add_task(agent_service.resume, claim_id)
-    return {"claim_id": claim_id, "status": "in_progress", "sign_off": signed}
+    return {
+        "claim_id": claim_id,
+        "status": "decided",
+        "sign_off": signed,
+        "payment": paid,
+    }
 
 
 @router.post("/{claim_id}/fail", operation_id="fail_claim", dependencies=keys.AGENT)

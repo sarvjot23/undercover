@@ -125,14 +125,14 @@ The check reads the claim's own fields as JSON, the way the agent's `get_claim` 
   - `carry_on` and `pick_up_signed_off` resume a signed-off claim's paused thread even though the claim is already decided.
   - An approval within the limit is still paid by the `pay` node, as today.
 
-- [ ] A test checks the document's operation ids are exactly the eight, that it has no `servers` and no `X-API-Key` parameter anywhere, that `pay_claim`'s body has `amount`, and that each operation's description is its docstring.
-- [ ] A test checks the document gives 401 with neither a key nor a handler.
-- [ ] A test checks that a payment of $5,000 on a claim that was never approved gets a 403 naming $800.
-- [ ] A test checks that Dana's sign-off pays the claim once: the claim is decided, and a second sign-off or a payment call is refused, with one payment row.
-- [ ] An agent test checks that a claim paused for sign-off, then signed off and resumed, makes no payment call and ends with a `close` answer.
-- [ ] `get_policy` and `get_claim_history` return what `get_claim` already shows for CLM-1001.
-- [ ] The end-to-end specs follow the new sign-off: after Dana signs off, the claim shows as paid with no step from the agent.
-- [ ] `npm run check` passes. `docs/STATUS.md` is updated, and the phase is committed.
+- [x] A test checks the document's operation ids are exactly the eight, that it has no `servers` and no `X-API-Key` parameter anywhere, that `pay_claim`'s body has `amount`, and that each operation's description is its docstring.
+- [x] A test checks the document gives 401 with neither a key nor a handler.
+- [x] A test checks that a payment of $5,000 on a claim that was never approved gets a 403 naming $800.
+- [x] A test checks that Dana's sign-off pays the claim once: the claim is decided, and a second sign-off or a payment call is refused, with one payment row.
+- [x] An agent test checks that a claim paused for sign-off, then signed off and resumed, makes no payment call and ends with a `close` answer.
+- [x] `get_policy` and `get_claim_history` return what `get_claim` already shows for CLM-1001.
+- [x] The end-to-end specs follow the new sign-off: after Dana signs off, the claim shows as paid with no step from the agent.
+- [x] `npm run check` passes. `docs/STATUS.md` is updated, and the phase is committed.
 
 ## Phase 4: Ready for Lambda
 

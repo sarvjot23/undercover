@@ -198,15 +198,12 @@ def test_a_claim_that_fails_twice_is_left_for_a_handler(requests, only, models):
     assert summary["left_for_handler"] == ["CLM-1001"]
 
 
-def test_a_claim_being_resumed_after_a_sign_off_is_skipped(requests, only, models):
+def test_a_claim_paid_by_its_sign_off_is_left_out_of_the_next_dispatch(requests, only):
     claim_agent.run("CLM-1008", "CLM-1008-first", script(approve("CLM-1008", 2240.0)))
     api().post("/api/claims/CLM-1008/sign-off", headers=as_handler())
-    api().post("/api/claims/CLM-1008/lease", json={"worker": "the-service"})
     only("CLM-1008")
-    models("CLM-1008", script())
-    results = dispatcher.dispatch(new_run(), 1)
-    assert results == ["CLM-1008: not picked up, another worker is on it"]
-    assert claim("CLM-1008")["payment"] is None
+    assert dispatcher.dispatch(new_run(), 1) == []
+    assert claim("CLM-1008")["payment"]["signed_off_by"] == "HND-01"
 
 
 def test_a_broken_dispatcher_stops_its_run(requests, monkeypatch):

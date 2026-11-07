@@ -101,7 +101,7 @@ def halt_leftover_round() -> None:
 
 
 def pick_up_signed_off() -> None:
-    """Stop what was left running, pay what was signed off, and warm up for the next.
+    """Stop what was left running, close what was signed off, and warm up for the next.
 
     The queue leaves out evaluation copies, so none is ever picked up here.
     """
@@ -113,7 +113,7 @@ def pick_up_signed_off() -> None:
     config = tracing.config("warm-up", graph.RECURSION_LIMIT, None)
     claim.build(None, None).get_state(config)
     for found in claims:
-        if found["status"] == "in_progress" and found["signed_off"]:
+        if found["signed_off"]:
             claim.carry_on(found["claim_id"])
 
 

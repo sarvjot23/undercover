@@ -15,7 +15,6 @@ interface Standing {
 
 /** Follow a claim while the agent may still pick it up or is working on it. */
 function pollClaim(claim: Claim): number {
-  if (claim.sign_off && !claim.payment) return 300;
   return claim.status === "waiting" || claim.agent_working ? 1000 : 0;
 }
 
@@ -183,11 +182,7 @@ function DecisionPanel({
       </p>
       <p>{decision.reasons}</p>
       <p className="muted">Policy: {decision.policy_section}</p>
-      {payment ? (
-        <PaymentLine claim={claim} handlers={handlers} />
-      ) : (
-        <SignedOff claim={claim} handlers={handlers} />
-      )}
+      {payment && <PaymentLine claim={claim} handlers={handlers} />}
       {claim.status === "awaiting_sign_off" && !isCopy && (
         <SignOff
           claimId={claim.claim_id}
@@ -196,25 +191,6 @@ function DecisionPanel({
         />
       )}
     </div>
-  );
-}
-
-/** A sign-off the agent hasn't paid yet: it's picking the claim back up. */
-function SignedOff({
-  claim,
-  handlers,
-}: Readonly<{ claim: Claim; handlers: Handler[] | undefined }>) {
-  const signOff = claim.sign_off;
-  if (!signOff) return null;
-  const signer = handlers?.find(
-    (handler) => handler.handler_id === signOff.handler_id,
-  );
-  return (
-    <p className="muted">
-      Signed off by {signer?.name} on{" "}
-      <span className="mono">{dateTime(signOff.signed_off_at)}</span>. The agent
-      is paying it.
-    </p>
   );
 }
 

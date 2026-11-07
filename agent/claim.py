@@ -126,21 +126,27 @@ def run(
 def carry_on(
     claim_id: str, llm: BaseChatModel | None = None, in_run: Run | None = None
 ) -> str:
-    """Pick up a stopped or signed-off claim from its last step, on the same thread."""
+    """Pick up a stopped claim from its last step, on the same thread.
+
+    A signed-off claim is already paid: its paused work only closes.
+    """
     with lease.holding(f"/api/claims/{claim_id}/lease") as held:
         if not held:
             return f"{claim_id}: not picked up, another worker is on it"
         claim = graph.standing(claim_id)
-        if claim["status"] != "in_progress":
+        signed_off = claim["sign_off"] is not None
+        if claim["status"] != "in_progress" and not signed_off:
             return graph.report(claim)
         thread_id = claim["thread_id"]
         claim_graph = build(llm, version_of(in_run))
         saved = claim_graph.get_state({"configurable": {"thread_id": thread_id}})
-        if saved.values and not saved.next:
-            return fail(claim_id, NO_DECISION)
         start: Any = None
-        if saved.interrupts:
+        if signed_off:
+            if not saved.interrupts:
+                return graph.report(claim)
             start = Command(resume=claim["sign_off"])
+        elif saved.values and not saved.next:
+            return fail(claim_id, NO_DECISION)
         elif not saved.values:
             start = first_input(claim_id, thread_id)
         return invoke(claim_graph, claim_id, thread_id, start, in_run)

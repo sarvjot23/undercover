@@ -30,7 +30,7 @@ test("an approval under $800 is decided and paid", async ({
   await expect(page.locator(".paid")).toContainText("Paid $123.00");
 });
 
-test("an approval over $800 waits for sign-off before it is paid", async ({
+test("an approval over $800 waits for a sign-off, which pays it", async ({
   page,
   request,
 }) => {
@@ -38,7 +38,7 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
   const refused = await request.post("/api/claims/CLM-1014/payment", {
     data: { amount: 805 },
   });
-  expect(refused.status()).toBe(409);
+  expect(refused.status()).toBe(403);
 
   await page.goto("/#/claims/CLM-1014");
   await expect(page.locator(".claim-head .badge")).toHaveText(
@@ -48,9 +48,13 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
   await page
     .getByRole("button", { name: "Sign off as Dana Whitfield" })
     .click();
-  await expect(page.locator(".claim-head .badge")).toHaveText("In progress");
-  await expect(page.getByText(/The agent\s+is paying it/)).toBeVisible();
+  await expect(page.locator(".claim-head .badge")).toHaveText("Decided");
+  await expect(page.locator(".paid")).toContainText("Paid $805.00 on");
+  await expect(page.locator(".paid")).toContainText(
+    "signed off by Dana Whitfield",
+  );
 
+  // The agent is only told to close its paused work: it pays nothing.
   await expect(async () => {
     const received = await request.get("http://127.0.0.1:8003/received");
     expect(await received.json()).toContainEqual({
@@ -58,13 +62,6 @@ test("an approval over $800 waits for sign-off before it is paid", async ({
       body: {},
     });
   }).toPass();
-
-  await pay(request, "CLM-1014", 805);
-  await expect(page.locator(".claim-head .badge")).toHaveText("Decided");
-  await expect(page.locator(".paid")).toContainText("Paid $805.00 on");
-  await expect(page.locator(".paid")).toContainText(
-    "signed off by Dana Whitfield",
-  );
 });
 
 test("Marcus sees why he can't sign off a held payout", async ({

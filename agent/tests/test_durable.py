@@ -76,16 +76,16 @@ def test_an_approval_over_the_limit_stops_and_waits(requests):
     assert not claim()["agent_working"]
 
 
-def test_a_sign_off_resumes_the_claim_and_pays_it_once(requests):
+def test_a_sign_off_pays_and_the_resumed_agent_closes_without_paying(requests):
     hold()
-    assert sign_off().json()["status"] == "in_progress"
-    # A broken model proves no model call is needed to pay.
+    assert sign_off().json()["status"] == "decided"
+    assert claim()["payment"]["amount"] == 1200.0
+    requests.clear()
+    # A broken model proves no model call is needed to close.
     answer = claim_agent.carry_on(CLAIM, BrokenModel(messages=iter([])))
     assert answer == "CLM-1001: approve $1,200.00"
-    assert claim()["status"] == "decided"
-    assert claim()["payment"]["amount"] == 1200.0
-    assert claim()["payment"]["signed_off_by"] == "HND-01"
-    assert claim()["payment"]["signed_off_at"] == claim()["sign_off"]["signed_off_at"]
+    assert not [path for path in requests if path.endswith("/payment")]
+    assert steps()[-1]["text"] == answer
     assert saved_state().next == ()
 
 

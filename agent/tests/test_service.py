@@ -177,7 +177,8 @@ def test_a_claim_held_by_another_worker_is_left_alone(requests, monkeypatch):
     sign_off()
     backend().post("/api/claims/CLM-1001/lease", json={"worker": "other"})
     agent_service().post("/claims/CLM-1001/resume")
-    assert backend().get("/api/claims/CLM-1001").json()["payment"] is None
+    found = backend().get("/api/claims/CLM-1001/steps").json()
+    assert "answer" not in {step["kind"] for step in found}
 
 
 def test_the_service_starts_one_claim(monkeypatch):
@@ -187,7 +188,7 @@ def test_the_service_starts_one_claim(monkeypatch):
     assert started == [("CLM-1001", "CLM-1001-x")]
 
 
-def test_at_startup_signed_off_claims_are_paid_and_a_leftover_run_stopped(
+def test_at_startup_signed_off_claims_are_closed_and_a_leftover_run_stopped(
     requests, monkeypatch
 ):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")

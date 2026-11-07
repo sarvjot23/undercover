@@ -1,5 +1,5 @@
 import pytest
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 from fastapi.testclient import TestClient
 
 from backend import auth, keys
@@ -87,7 +87,9 @@ def rules_of(route: APIRoute) -> set[str]:
 
 
 def test_every_route_has_exactly_one_rule():
-    routes = [route for route in app.routes if isinstance(route, APIRoute)]
+    contexts = iter_route_contexts(app.routes)
+    routes = [c.route for c in contexts if isinstance(c.route, APIRoute)]
+    assert len(routes) > 50
     open_routes = [route.path for route in routes if not rules_of(route)]
     assert open_routes == ["/api/health"]
     assert all(len(rules_of(route)) <= 1 for route in routes)

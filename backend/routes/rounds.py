@@ -6,7 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend import agent_service, db, improver_view, rounds, versions
+from backend import agent_service, db, improver_view, keys, rounds, versions
 from backend.auth import over_the_limit
 from backend.db import Db, SingleStatementDb
 from backend.routes.runs import ask_to_start
@@ -41,20 +41,20 @@ def describe_round(round_id: int, conn: Any) -> dict[str, Any]:
 # The dashboard's reads and a handler's actions.
 
 
-@router.get("", operation_id="list_rounds")
+@router.get("", operation_id="list_rounds", dependencies=keys.HANDLER)
 def list_rounds(conn: SingleStatementDb) -> list[dict[str, Any]]:
     """List the rounds of improvement, newest first."""
     return rounds.listing(conn)
 
 
-@router.get("/open", operation_id="get_open_round")
+@router.get("/open", operation_id="get_open_round", dependencies=keys.READ)
 def get_open_round(conn: SingleStatementDb) -> dict[str, Any] | None:
     """Get the round that is open, working or waiting for a handler, if one is."""
     row = rounds.open_round(conn)
     return rounds.describe(conn, row) if row else None
 
 
-@router.get("/{round_id}", operation_id="get_round")
+@router.get("/{round_id}", operation_id="get_round", dependencies=keys.READ)
 def get_round(round_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """Get a round: where it has got to, its proposal, verdict and cost."""
     return describe_round(round_id, conn)
@@ -94,7 +94,7 @@ def decide_on_proposal(
 # The agent's service records a round's work.
 
 
-@router.post("/records", operation_id="create_round")
+@router.post("/records", operation_id="create_round", dependencies=keys.AGENT)
 def create_round(start: RoundStart, conn: Db) -> dict[str, Any]:
     """Open a round on a copy of the settings, for the agent's service."""
     row = rounds.create(conn, start.handler_id)
@@ -102,7 +102,11 @@ def create_round(start: RoundStart, conn: Db) -> dict[str, Any]:
     return rounds.describe(conn, row)
 
 
-@router.get("/{round_id}/instructions", operation_id="get_improver_instructions")
+@router.get(
+    "/{round_id}/instructions",
+    operation_id="get_improver_instructions",
+    dependencies=keys.AGENT,
+)
 def get_improver_instructions(round_id: int, conn: SingleStatementDb) -> dict[str, str]:
     """Get the improver's instructions, wrapped around the round's recipe."""
     row = rounds.find(conn, round_id)
@@ -111,13 +115,19 @@ def get_improver_instructions(round_id: int, conn: SingleStatementDb) -> dict[st
     return {"instructions": text}
 
 
-@router.get("/{round_id}/view", operation_id="read_round_results")
+@router.get(
+    "/{round_id}/view", operation_id="read_round_results", dependencies=keys.AGENT
+)
 def read_round_results(round_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """Get what the improver reads: the current version, its scores and mistakes."""
     return improver_view.view(conn, rounds.find(conn, round_id))
 
 
-@router.get("/{round_id}/first-evaluations", operation_id="list_first_evaluations")
+@router.get(
+    "/{round_id}/first-evaluations",
+    operation_id="list_first_evaluations",
+    dependencies=keys.AGENT,
+)
 def list_first_evaluations(round_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """List the whole-set evaluations the current version still needs."""
     rounds.find(conn, round_id)
@@ -127,13 +137,19 @@ def list_first_evaluations(round_id: int, conn: SingleStatementDb) -> dict[str, 
     }
 
 
-@router.get("/{round_id}/spending", operation_id="get_round_spending")
+@router.get(
+    "/{round_id}/spending", operation_id="get_round_spending", dependencies=keys.AGENT
+)
 def get_round_spending(round_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """Get a round's limit, what it has spent, what's left and the next estimate."""
     return rounds.round_spending(conn, rounds.find(conn, round_id))
 
 
-@router.post("/{round_id}/progress", operation_id="record_round_progress")
+@router.post(
+    "/{round_id}/progress",
+    operation_id="record_round_progress",
+    dependencies=keys.AGENT,
+)
 def record_round_progress(
     round_id: int, step: RoundProgress, conn: Db
 ) -> dict[str, Any]:
@@ -143,7 +159,11 @@ def record_round_progress(
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/proposals/change", operation_id="propose_change")
+@router.post(
+    "/{round_id}/proposals/change",
+    operation_id="propose_change",
+    dependencies=keys.AGENT,
+)
 def propose_change(round_id: int, proposal: ChangeProposal, conn: Db) -> dict[str, Any]:
     """Record a change the improver proposes, to wait for a handler."""
     rounds.propose(conn, round_id, {"kind": "change", **proposal.model_dump()})
@@ -151,7 +171,11 @@ def propose_change(round_id: int, proposal: ChangeProposal, conn: Db) -> dict[st
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/proposals/recipe", operation_id="propose_recipe")
+@router.post(
+    "/{round_id}/proposals/recipe",
+    operation_id="propose_recipe",
+    dependencies=keys.AGENT,
+)
 def propose_recipe(round_id: int, proposal: RecipeProposal, conn: Db) -> dict[str, Any]:
     """Record a new recipe the improver proposes, to wait for a handler."""
     rounds.propose(conn, round_id, {"kind": "recipe", **proposal.model_dump()})
@@ -159,7 +183,11 @@ def propose_recipe(round_id: int, proposal: RecipeProposal, conn: Db) -> dict[st
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/decisions", operation_id="record_decision_on_proposal")
+@router.post(
+    "/{round_id}/decisions",
+    operation_id="record_decision_on_proposal",
+    dependencies=keys.AGENT,
+)
 def record_decision_on_proposal(
     round_id: int, decision: RecordedDecision, conn: Db
 ) -> dict[str, Any]:
@@ -171,7 +199,9 @@ def record_decision_on_proposal(
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/verdict", operation_id="judge_round_version")
+@router.post(
+    "/{round_id}/verdict", operation_id="judge_round_version", dependencies=keys.AGENT
+)
 def judge_round_version(round_id: int, verdict: Verdict, conn: Db) -> dict[str, Any]:
     """Keep the version tried or roll it back by our rule."""
     rounds.judge_version(conn, round_id, verdict.unaffordable)
@@ -179,7 +209,7 @@ def judge_round_version(round_id: int, verdict: Verdict, conn: Db) -> dict[str, 
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/finish", operation_id="finish_round")
+@router.post("/{round_id}/finish", operation_id="finish_round", dependencies=keys.AGENT)
 def finish_round(round_id: int, conn: Db) -> dict[str, Any]:
     """Mark a round finished once the improver has done."""
     rounds.end(conn, round_id, "finished")
@@ -187,7 +217,7 @@ def finish_round(round_id: int, conn: Db) -> dict[str, Any]:
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/halt", operation_id="halt_round")
+@router.post("/{round_id}/halt", operation_id="halt_round", dependencies=keys.AGENT)
 def halt_round(round_id: int, conn: Db) -> dict[str, Any]:
     """Mark a round stopped, as the agent's service does with one left working."""
     rounds.end(conn, round_id, "stopped")
@@ -195,7 +225,9 @@ def halt_round(round_id: int, conn: Db) -> dict[str, Any]:
     return describe_round(round_id, conn)
 
 
-@router.post("/{round_id}/usage", operation_id="record_improver_usage")
+@router.post(
+    "/{round_id}/usage", operation_id="record_improver_usage", dependencies=keys.AGENT
+)
 def record_improver_usage(
     round_id: int, reply: RoundUsage, conn: SingleStatementDb
 ) -> dict[str, Any]:

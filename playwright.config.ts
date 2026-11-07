@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
+import { AGENT_KEY } from "./e2e/api";
 
 // The end-to-end run has its own ports and a fresh database each time.
 // Workers load this file again, so they take the path the main process chose.
@@ -41,6 +42,7 @@ export default defineConfig({
         UNDERCOVER_AGENT: "http://127.0.0.1:8003",
         VITE_SUPABASE_URL: SUPABASE,
         JUDGE_URL: JUDGE,
+        UNDERCOVER_API_KEY: AGENT_KEY,
         OPENROUTER_API_KEY: "e2e-key",
         MODEL_NAME: "",
         DATABASE_URL: "",

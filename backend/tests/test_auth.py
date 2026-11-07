@@ -71,7 +71,7 @@ def test_a_sign_off_records_the_signed_in_handler(client):
 
 
 def test_the_handlers_are_found_by_email(client):
-    handlers = client.get("/api/handlers").json()
+    handlers = client.get("/api/handlers", headers=as_handler()).json()
     assert [h["can_approve_over_limit"] for h in handlers] == [True, False, False]
     assert auth.find_handler(MARCUS) == handlers[1]
     assert auth.find_handler("nobody@example.com") is None

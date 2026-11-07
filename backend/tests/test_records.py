@@ -8,6 +8,7 @@ from sqlalchemy.schema import CreateTable
 
 from backend import db
 from backend.api import app
+from backend.tests.signing import as_handler
 
 
 def test_queue_is_seeded_waiting(client):
@@ -52,7 +53,7 @@ def test_unknown_claim(client):
 
 
 def test_policy_wording(client):
-    text = client.get("/api/policy-wording").json()["text"]
+    text = client.get("/api/policy-wording", headers=as_handler()).json()["text"]
     assert text.startswith("# UnderCover Travel Insurance: Policy Wording")
 
 
@@ -66,7 +67,10 @@ def test_version_1_is_the_claim_agent_as_it_was(client):
 
 
 def test_handlers(client):
-    names = [handler["name"] for handler in client.get("/api/handlers").json()]
+    names = [
+        handler["name"]
+        for handler in client.get("/api/handlers", headers=as_handler()).json()
+    ]
     assert names == ["Dana Whitfield", "Marcus Oyelaran", "Priya Raman"]
 
 

@@ -113,7 +113,9 @@ def test_a_proposal_changes_nothing_until_it_is_approved(client):
     assert {"kind": "add", "text": CHANGE["instructions"]} in waiting["proposal"][
         "diff"
     ]
-    assert len(client.get("/api/configuration/versions").json()) == 1
+    assert (
+        len(client.get("/api/configuration/versions", headers=as_handler()).json()) == 1
+    )
 
     client.post(
         f"/api/rounds/{round_id}/decisions",
@@ -158,7 +160,7 @@ def test_a_recipe_approved_becomes_the_next_rounds_recipe(client):
         json={"decision": "approve", "message": "", "handler_id": "HND-01"},
     )
     client.post(f"/api/rounds/{round_id}/finish")
-    recipes = client.get("/api/recipes").json()
+    recipes = client.get("/api/recipes", headers=as_handler()).json()
     assert recipes[0]["version"] == 2
     assert recipes[0]["approved_by"] == "HND-01"
     following = start(client)
@@ -333,7 +335,7 @@ def test_rounds_are_listed_newest_first(client):
     first = start(client)["round_id"]
     client.post(f"/api/rounds/{first}/finish")
     second = start(client)["round_id"]
-    listed = client.get("/api/rounds").json()
+    listed = client.get("/api/rounds", headers=as_handler()).json()
     assert [found["round_id"] for found in listed] == [second, first]
     assert client.get("/api/rounds/open").json()["round_id"] == second
 

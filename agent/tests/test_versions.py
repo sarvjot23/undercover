@@ -6,6 +6,7 @@ from agent import claim, client, dispatcher, graph, tools
 from agent.tests.stubs import call, script
 from backend import db
 from backend.api import app
+from backend.tests.signing import as_agent
 
 # What only the scoreboard, the rounds and the improver may read.
 NEVER = ("/api/evaluations", "/api/rounds", "scores", "handler_decisions", "/view")
@@ -56,7 +57,7 @@ def test_the_claim_agent_is_built_from_its_runs_version(requests, monkeypatch):
     monkeypatch.setattr(claim, "model", model)
     monkeypatch.setattr(dispatcher, "FIRST_WAIT", 0.0)
     created = (
-        TestClient(app)
+        TestClient(app, headers=as_agent())
         .post(
             "/api/runs",
             json={

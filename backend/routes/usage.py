@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from backend import keys
 from backend.db import SingleStatementDb, usage, work_sessions
 from backend.rules import find_claim, insert_once
 from backend.schemas import Usage, WorkSession
@@ -11,7 +12,7 @@ from backend.schemas import Usage, WorkSession
 router = APIRouter(prefix="/api/claims")
 
 
-@router.post("/{claim_id}/usage", operation_id="record_usage")
+@router.post("/{claim_id}/usage", operation_id="record_usage", dependencies=keys.AGENT)
 def record_usage(
     claim_id: str, reply: Usage, conn: SingleStatementDb
 ) -> dict[str, Any]:
@@ -21,7 +22,7 @@ def record_usage(
     return {"claim_id": claim_id, "key": reply.key}
 
 
-@router.post("/{claim_id}/work", operation_id="record_work")
+@router.post("/{claim_id}/work", operation_id="record_work", dependencies=keys.AGENT)
 def record_work(
     claim_id: str, session: WorkSession, conn: SingleStatementDb
 ) -> dict[str, Any]:

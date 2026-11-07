@@ -6,7 +6,7 @@ from agent import claim, client, dispatcher, service
 from agent.tests.stubs import call, script
 from backend import runs
 from backend.api import app as backend_app
-from backend.tests.signing import as_handler
+from backend.tests.signing import as_agent, as_handler
 
 
 def agent_service():
@@ -14,7 +14,7 @@ def agent_service():
 
 
 def backend():
-    return TestClient(backend_app)
+    return TestClient(backend_app, headers=as_agent())
 
 
 def hold(claim_id="CLM-1001"):
@@ -123,7 +123,7 @@ def test_a_dispatch_is_created_through_the_backend_and_worked(requests, monkeypa
     )
     monkeypatch.setattr(dispatcher, "FIRST_WAIT", 0.0)
     assert agent_service().post("/dispatches", json={"n": 2}).status_code == 202
-    run = backend().get("/api/runs/current").json()
+    run = backend().get("/api/runs/current", headers=as_handler()).json()
     assert run["status"] == "finished"
     assert run["n"] == 2
     assert [entry["claim_id"] for entry in run["claims"]] == ["CLM-1002"]

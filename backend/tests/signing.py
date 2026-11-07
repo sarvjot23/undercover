@@ -16,6 +16,8 @@ KID = "test-key"
 DANA = "dana.whitfield@undercover.example"
 MARCUS = "marcus.oyelaran@undercover.example"
 PRIYA = "priya.raman@undercover.example"
+# The agent's API key in the tests, never the one in .env.
+AGENT_KEY = "test-agent-key-0123456789abcdefghijklmnop"
 
 
 class TestKeys(jwt.PyJWKClient):
@@ -30,8 +32,14 @@ class TestKeys(jwt.PyJWKClient):
 
 
 def install(monkeypatch: Any) -> None:
-    """Point the backend's JWKS client at the test key."""
+    """Point the backend's JWKS client at the test key, and set the agent's key."""
     monkeypatch.setattr(auth, "keys", TestKeys)
+    monkeypatch.setenv("UNDERCOVER_API_KEY", AGENT_KEY)
+
+
+def as_agent() -> dict[str, str]:
+    """The headers of a request from the agent's side."""
+    return {"X-API-Key": AGENT_KEY}
 
 
 def token(email: str = DANA, *, expires_in: int = 3600, key: Any = KEY) -> str:

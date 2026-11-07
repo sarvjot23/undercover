@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test as base, expect } from "@playwright/test";
+import { AGENT_KEY } from "./api";
 
 // The handlers' password at the stand-in for Supabase Auth.
 export const PASSWORD = "e2e-password";
@@ -22,11 +23,22 @@ export async function switchTo(page: Page, email: string) {
   await signIn(page, email);
 }
 
-/** Every spec's page starts signed in as Dana Whitfield. */
+/**
+ * Every spec's page starts signed in as Dana Whitfield, and its `request` plays
+ * the agent's side, with the agent's API key.
+ */
 export const test = base.extend({
   page: async ({ page }, use) => {
     await signIn(page, DANA);
     await use(page);
+  },
+  request: async ({ playwright, baseURL }, use) => {
+    const agent = await playwright.request.newContext({
+      baseURL,
+      extraHTTPHeaders: { "X-API-Key": AGENT_KEY },
+    });
+    await use(agent);
+    await agent.dispose();
   },
 });
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import Connection, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
-from backend import agent_service, db, leases, settings
+from backend import agent_service, db, keys, leases, settings
 from backend.auth import Approver
 from backend.db import (
     Db,
@@ -45,7 +45,7 @@ from backend.schemas import (
 router = APIRouter(prefix="/api/claims")
 
 
-@router.get("", operation_id="list_claims")
+@router.get("", operation_id="list_claims", dependencies=keys.READ)
 def list_claims(conn: SingleStatementDb) -> list[dict[str, Any]]:
     """List the claims queue with where each claim stands, leaving out copies."""
     names = {
@@ -82,7 +82,7 @@ def list_claims(conn: SingleStatementDb) -> list[dict[str, Any]]:
     return claims
 
 
-@router.get("/{claim_id}", operation_id="get_claim")
+@router.get("/{claim_id}", operation_id="get_claim", dependencies=keys.READ)
 def get_claim(claim_id: str, conn: SingleStatementDb) -> dict[str, Any]:
     """Get a claim with its policy, plan, customer, decision and payment."""
     row = find_standing(conn, claim_id)
@@ -105,13 +105,13 @@ def get_claim(claim_id: str, conn: SingleStatementDb) -> dict[str, Any]:
     }
 
 
-@router.get("/{claim_id}/standing", operation_id="get_standing")
+@router.get("/{claim_id}/standing", operation_id="get_standing", dependencies=keys.READ)
 def get_standing(claim_id: str, conn: SingleStatementDb) -> dict[str, Any]:
     """Get where a claim stands, with its decision, sign-off and payment."""
     return standing(conn, claim_id)
 
 
-@router.get("/{claim_id}/steps", operation_id="list_steps")
+@router.get("/{claim_id}/steps", operation_id="list_steps", dependencies=keys.READ)
 def list_steps(claim_id: str, conn: SingleStatementDb) -> list[dict[str, Any]]:
     """List the steps of the agent's work on a claim, in order."""
     find_claim(conn, claim_id)
@@ -119,7 +119,9 @@ def list_steps(claim_id: str, conn: SingleStatementDb) -> list[dict[str, Any]]:
     return [dict(row) for row in conn.execute(query).mappings()]
 
 
-@router.post("/{claim_id}/lease", operation_id="take_claim_lease")
+@router.post(
+    "/{claim_id}/lease", operation_id="take_claim_lease", dependencies=keys.AGENT
+)
 def take_claim_lease(
     claim_id: str, lease: Lease, conn: SingleStatementDb
 ) -> dict[str, str]:
@@ -130,7 +132,11 @@ def take_claim_lease(
     return {"claim_id": claim_id, "worker": lease.worker}
 
 
-@router.post("/{claim_id}/lease/release", operation_id="release_claim_lease")
+@router.post(
+    "/{claim_id}/lease/release",
+    operation_id="release_claim_lease",
+    dependencies=keys.AGENT,
+)
 def release_claim_lease(
     claim_id: str, lease: Lease, conn: SingleStatementDb
 ) -> dict[str, str]:
@@ -139,7 +145,7 @@ def release_claim_lease(
     return {"claim_id": claim_id}
 
 
-@router.post("/{claim_id}/start", operation_id="start_claim")
+@router.post("/{claim_id}/start", operation_id="start_claim", dependencies=keys.AGENT)
 def start_claim(claim_id: str, start: ClaimStart, conn: Db) -> dict[str, str]:
     """Mark a waiting claim as in progress on a thread."""
     move(conn, claim_id, "waiting", "in_progress")
@@ -152,7 +158,7 @@ def start_claim(claim_id: str, start: ClaimStart, conn: Db) -> dict[str, str]:
     return {"claim_id": claim_id, "status": "in_progress"}
 
 
-@router.post("/{claim_id}/steps", operation_id="add_step")
+@router.post("/{claim_id}/steps", operation_id="add_step", dependencies=keys.AGENT)
 def add_step(claim_id: str, step: Step, conn: SingleStatementDb) -> dict[str, str]:
     """Record one step of the agent's work on a claim, once for each key."""
     if not add(conn, claim_id, step.kind, step.text, step.key):
@@ -160,7 +166,9 @@ def add_step(claim_id: str, step: Step, conn: SingleStatementDb) -> dict[str, st
     return {"claim_id": claim_id, "kind": step.kind}
 
 
-@router.post("/{claim_id}/payout", operation_id="calculate_payout")
+@router.post(
+    "/{claim_id}/payout", operation_id="calculate_payout", dependencies=keys.AGENT
+)
 def calculate_payout(claim_id: str, request: PayoutRequest, conn: Db) -> Payout:
     """Work out the payout on an approved claim with our payout rules."""
     policy_id = json.loads(find_claim(conn, claim_id)["body"])["policy_id"]
@@ -182,7 +190,9 @@ def next_status(decision: Decision, limit: float) -> str:
     return "in_progress"
 
 
-@router.post("/{claim_id}/decision", operation_id="record_decision")
+@router.post(
+    "/{claim_id}/decision", operation_id="record_decision", dependencies=keys.AGENT
+)
 def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, Any]:
     """Record the decision on a claim in progress; a repeat of it counts as done."""
     if decision.decision != "approve" and decision.payout != 0:
@@ -241,7 +251,7 @@ def settle_payment(conn: Connection, claim_id: str) -> None:
     )
 
 
-@router.post("/{claim_id}/payment", operation_id="pay_claim")
+@router.post("/{claim_id}/payment", operation_id="pay_claim", dependencies=keys.AGENT)
 def pay_claim(
     claim_id: str, payment: Payment, conn: SingleStatementDb
 ) -> dict[str, Any]:
@@ -301,7 +311,7 @@ def sign_off(
     return {"claim_id": claim_id, "status": "in_progress", "sign_off": signed}
 
 
-@router.post("/{claim_id}/fail", operation_id="fail_claim")
+@router.post("/{claim_id}/fail", operation_id="fail_claim", dependencies=keys.AGENT)
 def fail_claim(claim_id: str, failure: Failure, conn: Db) -> dict[str, str]:
     """Count a failed attempt: back to the queue, or to a handler the second time."""
     status = fail(conn, claim_id, failure.reason)

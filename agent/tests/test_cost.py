@@ -9,7 +9,7 @@ from agent import graph, model, tracing
 from agent.tests.stubs import call, script
 from backend import db
 from backend.api import app
-from backend.tests.signing import as_handler
+from backend.tests.signing import as_agent, as_handler
 
 CLAIM = "CLM-1001"
 RUN: tracing.Run = {"run_id": 12, "kind": "dispatch", "version": 1, "round_id": None}
@@ -124,12 +124,17 @@ def test_the_wait_for_a_sign_off_is_not_counted(requests, monkeypatch):
     )
     monkeypatch.setattr(claim_agent, "clock", lambda: next(times))
     claim_agent.run(CLAIM, "thread-1", script(approve(1200.0)), RUN)
-    TestClient(app).post(f"/api/claims/{CLAIM}/sign-off", headers=as_handler())
+    TestClient(app, headers=as_agent()).post(
+        f"/api/claims/{CLAIM}/sign-off", headers=as_handler()
+    )
     claim_agent.carry_on(CLAIM, script())
     sessions = rows(db.work_sessions)
     assert [row["seconds"] for row in sessions] == [10.0, 3.0]
     assert [row["run_id"] for row in sessions] == [12, None]
-    assert TestClient(app).get(f"/api/claims/{CLAIM}").json()["status"] == "decided"
+    assert (
+        TestClient(app, headers=as_agent()).get(f"/api/claims/{CLAIM}").json()["status"]
+        == "decided"
+    )
 
 
 def test_the_trace_is_tagged_with_its_run():

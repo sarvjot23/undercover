@@ -1,6 +1,9 @@
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 
+/** The agent's API key for the end-to-end backend. Each spec's `request` sends it. */
+export const AGENT_KEY = "e2e-agent-key-0123456789abcdefghijklmnop";
+
 /** Start a claim on a thread, the way the agent does. */
 export function start(request: APIRequestContext, claimId: string) {
   return request.post(`/api/claims/${claimId}/start`, {

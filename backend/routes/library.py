@@ -6,19 +6,21 @@ from typing import Any
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from backend import db
+from backend import db, keys
 from backend.db import SingleStatementDb, handlers
 
 router = APIRouter(prefix="/api")
 
 
-@router.get("/policy-wording", operation_id="get_policy_wording")
+@router.get(
+    "/policy-wording", operation_id="get_policy_wording", dependencies=keys.HANDLER
+)
 def get_policy_wording() -> dict[str, str]:
     """Get the policy wording that decisions follow."""
     return {"text": (db.DATA / "policy_wording.md").read_text(encoding="utf-8")}
 
 
-@router.get("/handlers", operation_id="list_handlers")
+@router.get("/handlers", operation_id="list_handlers", dependencies=keys.HANDLER)
 def list_handlers(conn: SingleStatementDb) -> list[dict[str, Any]]:
     """List the claims handlers."""
     return [

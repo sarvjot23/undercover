@@ -134,7 +134,7 @@ def test_a_finished_evaluation_is_scored_from_its_own_records(client):
     client.post(f"/api/claims/{copies['CLM-1020']}/payment", json={"amount": 300})
     client.post(f"/api/runs/{run['run_id']}/finish")
 
-    found = client.get(f"/api/evaluations/{run['run_id']}").json()
+    found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()
     by_source = {row["source_id"]: row for row in found["claims"]}
     assert by_source["CLM-1020"]["handler_payout"] == 240.0
     assert by_source["CLM-1020"]["agent_payout"] == 300.0
@@ -147,7 +147,7 @@ def test_a_finished_evaluation_is_scored_from_its_own_records(client):
     assert scores["cost_of_mistakes"] == pytest.approx(110.0)
     assert scores["straight_through"] == pytest.approx(3 / 5)
 
-    listed = client.get("/api/evaluations").json()
+    listed = client.get("/api/evaluations", headers=as_handler()).json()
     assert [e["run_id"] for e in listed] == [run["run_id"]]
     assert listed[0]["scores"] == scores
     assert "claims" not in listed[0]
@@ -157,7 +157,7 @@ def test_a_stopped_evaluation_shows_as_stopped_with_no_measures(client):
     run = evaluate(client)
     decide(client, run["claims"][0]["claim_id"], "refer", 0)
     client.post(f"/api/runs/{run['run_id']}/stop")
-    found = client.get(f"/api/evaluations/{run['run_id']}").json()
+    found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()
     assert found["status"] == "stopped"
     assert found["scores"] is None
     assert found["claims"][0]["agent_decision"] == "refer"
@@ -168,7 +168,7 @@ def test_evaluations_are_listed_newest_first(client):
     client.post(f"/api/runs/{first['run_id']}/finish")
     second = evaluate(client, "held_out")
     client.post(f"/api/runs/{second['run_id']}/stop")
-    listed = client.get("/api/evaluations").json()
+    listed = client.get("/api/evaluations", headers=as_handler()).json()
     assert [e["run_id"] for e in listed] == [second["run_id"], first["run_id"]]
 
 
@@ -184,7 +184,10 @@ def test_a_dispatch_is_not_an_evaluation(client):
             "round_id": None,
         },
     ).json()["run_id"]
-    assert client.get(f"/api/evaluations/{run_id}").status_code == 404
+    assert (
+        client.get(f"/api/evaluations/{run_id}", headers=as_handler()).status_code
+        == 404
+    )
 
 
 def test_an_evaluation_is_asked_of_the_agents_service(client, monkeypatch):
@@ -210,9 +213,9 @@ def test_an_ended_evaluations_measures_are_worked_out_once(client, monkeypatch):
         measures, "work_out", lambda conn, row: worked.append(1) or original(conn, row)
     )
     for _ in range(2):
-        client.get(f"/api/evaluations/{run['run_id']}")
+        client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler())
     assert len(worked) == 2
     client.post(f"/api/runs/{run['run_id']}/finish")
     for _ in range(2):
-        client.get(f"/api/evaluations/{run['run_id']}")
+        client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler())
     assert len(worked) == 3

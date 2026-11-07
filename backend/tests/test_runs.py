@@ -36,7 +36,7 @@ def decide(client, claim_id, decision="refer", payout=0.0):
 
 
 def test_no_run_yet(client):
-    assert client.get("/api/runs/current").json() is None
+    assert client.get("/api/runs/current", headers=as_handler()).json() is None
     assert client.get("/api/runs/running").json() is None
 
 
@@ -91,7 +91,10 @@ def test_a_finished_run_makes_way_for_the_next(client):
 def test_a_stopped_run_shows_as_stopped(client):
     run_id = create(client).json()["run_id"]
     assert client.post(f"/api/runs/{run_id}/stop").json()["status"] == "stopped"
-    assert client.get("/api/runs/current").json()["status"] == "stopped"
+    assert (
+        client.get("/api/runs/current", headers=as_handler()).json()["status"]
+        == "stopped"
+    )
     again = client.post(f"/api/runs/{run_id}/finish")
     assert again.status_code == 409
     assert again.json()["detail"] == f"Run {run_id} is stopped"

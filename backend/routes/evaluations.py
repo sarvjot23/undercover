@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from backend import measures, runs
+from backend import keys, measures, runs
 from backend.auth import SignedIn
 from backend.db import SingleStatementDb
 from backend.db import runs as run_table
@@ -21,7 +21,7 @@ def start_evaluation(start: EvaluationStart, _: SignedIn) -> dict[str, bool]:
     return ask_to_start("/evaluations", start.model_dump())
 
 
-@router.get("", operation_id="list_evaluations")
+@router.get("", operation_id="list_evaluations", dependencies=keys.HANDLER)
 def list_evaluations(conn: SingleStatementDb) -> list[dict[str, Any]]:
     """List the evaluations, newest first, with their measures."""
     query = (
@@ -36,7 +36,7 @@ def list_evaluations(conn: SingleStatementDb) -> list[dict[str, Any]]:
     return found
 
 
-@router.get("/{run_id}", operation_id="get_evaluation")
+@router.get("/{run_id}", operation_id="get_evaluation", dependencies=keys.HANDLER)
 def get_evaluation(run_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """Get an evaluation: each claim, the handler's answer beside the agent's."""
     row = runs.find_run(conn, run_id)

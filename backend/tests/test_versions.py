@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from backend import allowed, db, diffs, versions
+from backend.tests.signing import as_handler
 
 RUN = {"n": 3, "tiny": False, "round_id": None}
 
@@ -66,11 +67,13 @@ def test_a_versions_scores_count_only_the_whole_set_evaluations_of_rounds(client
     evaluate(client)
     evaluate(client, "held_out", round_id=1)
     evaluate(client, "held_out", round_id=1)
-    listed = client.get("/api/configuration/versions").json()
+    listed = client.get("/api/configuration/versions", headers=as_handler()).json()
     scores = listed[0]["scores"]
     assert scores["evaluation"]["runs"] == 1
     assert scores["held_out"]["runs"] == 2
-    own = client.get(f"/api/evaluations/{counted['run_id']}").json()["scores"]
+    own = client.get(
+        f"/api/evaluations/{counted['run_id']}", headers=as_handler()
+    ).json()["scores"]
     assert scores["evaluation"]["accuracy"] == own["accuracy"]
     assert listed[0]["changed"] == []
 
@@ -85,7 +88,7 @@ def test_a_stopped_or_unfinished_evaluation_doesnt_count(client):
 
 def test_versions_are_listed_newest_first_with_what_they_changed(client):
     add_version()
-    listed = client.get("/api/configuration/versions").json()
+    listed = client.get("/api/configuration/versions", headers=as_handler()).json()
     assert [entry["version"] for entry in listed] == [2, 1]
     assert listed[0]["changed"] == ["instructions", "model", "reasoning effort"]
     assert listed[1]["proposed_by"] == "seed"
@@ -114,24 +117,26 @@ def test_distant_changes_are_split_by_a_gap():
 
 def test_a_version_is_shown_against_the_one_before(client):
     add_version(instructions="Decide carefully.\nRefer when unsure.")
-    diff = client.get("/api/configuration/versions/2/diff").json()
+    diff = client.get("/api/configuration/versions/2/diff", headers=as_handler()).json()
     assert diff["before"] == 1
     assert {"kind": "add", "text": "Refer when unsure."} in diff["instructions"]
     assert diff["model"] == ["openai/gpt-6-luna", "google/gemini-3.5-flash-lite"]
     assert diff["reasoning"] == ["low", "minimal"]
-    first = client.get("/api/configuration/versions/1/diff").json()
+    first = client.get(
+        "/api/configuration/versions/1/diff", headers=as_handler()
+    ).json()
     assert first["before"] is None
     assert {line["kind"] for line in first["instructions"]} == {"add"}
 
 
 def test_the_recipe_starts_as_the_labs(client):
-    recipes = client.get("/api/recipes").json()
+    recipes = client.get("/api/recipes", headers=as_handler()).json()
     assert [recipe["version"] for recipe in recipes] == [1]
     assert recipes[0]["recipe"].startswith("1. Call read_results")
     assert "propose_recipe" in recipes[0]["recipe"]
-    diff = client.get("/api/recipes/1/diff").json()
+    diff = client.get("/api/recipes/1/diff", headers=as_handler()).json()
     assert diff["before"] is None
-    assert client.get("/api/recipes/2/diff").status_code == 404
+    assert client.get("/api/recipes/2/diff", headers=as_handler()).status_code == 404
 
 
 def test_the_models_allowed_are_the_labs_three(monkeypatch):

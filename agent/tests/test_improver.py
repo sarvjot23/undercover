@@ -11,7 +11,7 @@ from agent import claim, dispatcher, improver, rounds, service, tracing
 from agent.tests.stubs import StubModel, call
 from backend import evaluations, spending
 from backend.api import app
-from backend.tests.signing import as_handler
+from backend.tests.signing import as_agent, as_handler
 
 CHANGE = {
     "instructions": "Refer a claim when a required document is missing.",
@@ -101,7 +101,7 @@ def agent_service():
 
 
 def api():
-    return TestClient(app)
+    return TestClient(app, headers=as_agent())
 
 
 def start_round():
@@ -147,7 +147,9 @@ def test_a_round_from_start_to_finish(requests, small, monkeypatch):
     assert waiting["proposal"]["reasoning"] == "low"
     assert "Call read_results" in str(model.seen[0][0].content)
     # The proposal changes nothing until a handler approves it.
-    assert len(api().get("/api/configuration/versions").json()) == 1
+    assert (
+        len(api().get("/api/configuration/versions", headers=as_handler()).json()) == 1
+    )
 
     rejection = {**APPROVE, "decision": "reject", "message": REJECTION}
     assert decide(round_id, rejection).status_code == 202
@@ -177,7 +179,10 @@ def test_a_round_from_start_to_finish(requests, small, monkeypatch):
         ("approve", "recipe"),
     ]
     assert done["events"][0]["message"] == REJECTION
-    assert api().get("/api/recipes").json()[0]["recipe"] == RECIPE["recipe"]
+    assert (
+        api().get("/api/recipes", headers=as_handler()).json()[0]["recipe"]
+        == RECIPE["recipe"]
+    )
     assert done["spent"] > 0
     assert {kwargs["parallel_tool_calls"] for kwargs in model.bound} == {False}
     assert not service.busy.locked()

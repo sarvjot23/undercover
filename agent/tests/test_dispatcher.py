@@ -14,7 +14,7 @@ from agent import claim as claim_agent
 from agent.tests.stubs import BrokenModel, RateLimitedModel, call, script
 from backend import db, runs
 from backend.api import app
-from backend.tests.signing import as_handler
+from backend.tests.signing import as_agent, as_handler
 
 RECORD = {
     "kind": "dispatch",
@@ -27,7 +27,7 @@ RECORD = {
 
 
 def api():
-    return TestClient(app)
+    return TestClient(app, headers=as_agent())
 
 
 def refer(claim_id):
@@ -329,7 +329,9 @@ def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, m
     )
     assert gone is None
 
-    found = api().get(f"/api/evaluations/{created['run_id']}").json()
+    found = (
+        api().get(f"/api/evaluations/{created['run_id']}", headers=as_handler()).json()
+    )
     assert found["status"] == "finished"
     assert (found["set_name"], found["n"], found["model"]) == (
         "evaluation",

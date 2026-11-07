@@ -1,5 +1,6 @@
 """The agent's service, its entry point: uv run -m uvicorn agent.service:app."""
 
+import os
 import threading
 import time
 from collections.abc import AsyncIterator, Callable
@@ -16,6 +17,7 @@ BACKEND_WAIT_TRIES = 30
 BACKEND_WAIT_SECONDS = 1.0
 MAX_AGENTS = 25
 ALREADY_RUNNING = "A dispatch or evaluation is already running"
+KEY_MISSING = "UNDERCOVER_API_KEY is missing, so the backend would refuse the agent"
 
 # Held while a dispatch, an evaluation or a stretch of a round's work goes on: one
 # at a time. A round's evaluations are part of its work. `doing` names what holds
@@ -117,7 +119,12 @@ def pick_up_signed_off() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Pick up signed-off claims in the background, so startup doesn't wait for them."""
+    """Pick up signed-off claims in the background, so startup doesn't wait for them.
+
+    Without the agent's key every call to the backend would be refused, so stop.
+    """
+    if not os.getenv("UNDERCOVER_API_KEY"):
+        raise RuntimeError(KEY_MISSING)
     threading.Thread(target=pick_up_signed_off, daemon=True).start()
     yield
 

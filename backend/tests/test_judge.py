@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from backend import db, grading, judge
 from backend.tests import judging
+from backend.tests.signing import as_handler
 
 HANDLER = {
     "decision": "approve",
@@ -104,7 +105,7 @@ def test_an_undecided_claim_gets_an_f_without_a_call(client, monkeypatch):
     first = run["claims"][0]["claim_id"]
     decide(client, first)
     client.post(f"/api/runs/{run['run_id']}/finish")
-    found = client.get(f"/api/evaluations/{run['run_id']}").json()
+    found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()
     assert len(asked) == 1
     rows = {row["claim_id"]: row for row in found["claims"]}
     assert rows[first]["letter"] == "B"
@@ -135,7 +136,7 @@ def test_an_ungraded_claim_is_left_out_of_the_average(client, monkeypatch):
             },
         )
     client.post(f"/api/runs/{run['run_id']}/finish")
-    found = client.get(f"/api/evaluations/{run['run_id']}").json()
+    found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()
     rows = {row["claim_id"]: row for row in found["claims"]}
     assert rows[claims[0]]["graded"] is False
     assert rows[claims[0]]["grade"] is None
@@ -150,7 +151,7 @@ def test_nothing_graded_means_no_grade(client, monkeypatch):
     for entry in run["claims"]:
         decide(client, entry["claim_id"])
     client.post(f"/api/runs/{run['run_id']}/finish")
-    found = client.get(f"/api/evaluations/{run['run_id']}").json()
+    found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()
     assert asked == []
     assert found["scores"]["grade"] is None
     assert {row["graded"] for row in found["claims"]} == {False}
@@ -173,7 +174,9 @@ def test_the_judges_cost_is_kept_apart_from_the_claim_agents(client, monkeypatch
             },
         )
     client.post(f"/api/runs/{run['run_id']}/finish")
-    scores = client.get(f"/api/evaluations/{run['run_id']}").json()["scores"]
+    scores = client.get(
+        f"/api/evaluations/{run['run_id']}", headers=as_handler()
+    ).json()["scores"]
     assert scores["cost"] == pytest.approx(0.005)
     assert scores["judge_cost"] == pytest.approx(0.010)
 

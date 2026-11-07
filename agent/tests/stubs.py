@@ -7,6 +7,8 @@ from langchain_core.exceptions import ModelRateLimitError
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
+from agent import client
+
 ids = itertools.count()
 
 
@@ -65,6 +67,9 @@ class StoppedModel(StubModel):
 
 class Backend(TestClient):
     """The backend as the agent sees it: already running, so no startup per call."""
+
+    def __init__(self, app, **kwargs):
+        super().__init__(app, headers=client.key_header(), **kwargs)
 
     def __enter__(self):
         return self

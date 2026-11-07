@@ -7,7 +7,7 @@ from agent import graph, lease
 from agent.tests.stubs import BrokenModel, Stopped, StoppedModel, call, script
 from backend import db
 from backend.api import app
-from backend.tests.signing import as_handler
+from backend.tests.signing import as_agent, as_handler
 
 CLAIM = "CLM-1001"
 THREAD = "CLM-1001-first"
@@ -29,7 +29,7 @@ def stop():
 
 
 def api():
-    return TestClient(app)
+    return TestClient(app, headers=as_agent())
 
 
 def claim():

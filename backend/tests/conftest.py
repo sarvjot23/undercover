@@ -13,5 +13,5 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "test.db"))
     signing.install(monkeypatch)
     judging.install(monkeypatch)
-    with TestClient(app) as test_client:
+    with TestClient(app, headers=signing.as_agent()) as test_client:
         yield test_client

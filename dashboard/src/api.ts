@@ -297,22 +297,23 @@ export interface Handler {
   can_approve_over_limit: boolean;
 }
 
+/** The signed-in handler's access token, which every request carries. */
+async function signedIn(): Promise<Record<string, string>> {
+  const token = await accessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path);
+  const response = await fetch(path, { headers: await signedIn() });
   if (!response.ok) throw new Error(`${path}: ${String(response.status)}`);
   return (await response.json()) as T;
 }
 
-/** POST as the signed-in handler, with their access token. */
+/** POST as the signed-in handler. */
 async function post(path: string, body?: object, method = "POST") {
-  const token = await accessToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
   return fetch(path, {
     method,
-    headers,
+    headers: { "Content-Type": "application/json", ...(await signedIn()) },
     body: body ? JSON.stringify(body) : undefined,
   });
 }

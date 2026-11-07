@@ -11,6 +11,7 @@ from agent import claim as claim_agent
 from agent import client, graph, tools, tracing
 from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
+from backend.tests.signing import as_agent
 
 
 def decision(decision, payout):
@@ -29,12 +30,12 @@ def run(*replies):
 
 
 def claim():
-    with TestClient(app) as client:
+    with TestClient(app, headers=as_agent()) as client:
         return client.get("/api/claims/CLM-1001").json()
 
 
 def steps():
-    with TestClient(app) as client:
+    with TestClient(app, headers=as_agent()) as client:
         return client.get("/api/claims/CLM-1001/steps").json()
 
 

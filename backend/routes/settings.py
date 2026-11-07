@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
-from backend import allowed, settings
+from backend import allowed, keys, settings
 from backend.auth import over_the_limit
 from backend.db import Db, SingleStatementDb
 from backend.settings import Settings
@@ -25,7 +25,7 @@ def describe(conn: Any) -> dict[str, Any]:
     }
 
 
-@router.get("", operation_id="get_settings")
+@router.get("", operation_id="get_settings", dependencies=keys.READ)
 def get_settings(conn: SingleStatementDb) -> dict[str, Any]:
     """Get the settings, their changes and the models the claim agent may use."""
     return describe(conn)

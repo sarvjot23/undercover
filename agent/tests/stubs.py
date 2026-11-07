@@ -8,6 +8,7 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from agent import client
+from agent.screening import Screening
 
 ids = itertools.count()
 
@@ -87,3 +88,38 @@ def call(name, **args):
 def script(*replies):
     """A stub model that plays these replies in order."""
     return StubModel(messages=iter(replies))
+
+
+def screened(found, reason="Nothing in the claim instructs its handler.", usage=None):
+    """One answer from the check's model, as with_structured_output gives it."""
+    metadata = {"model_name": "stub-checker"}
+    if usage:
+        metadata["token_usage"] = usage
+    raw = AIMessage(content="", id=f"check-{next(ids)}", response_metadata=metadata)
+    parsed = (
+        None if found is None else Screening(reason=reason, instructions_found=found)
+    )
+    return {"raw": raw, "parsed": parsed, "parsing_error": None}
+
+
+class StubChecker:
+    """The security check's model: scripted answers, and a pass once they run out.
+
+    An answer of None found is one that can't be read; an exception is raised.
+    """
+
+    def __init__(self, *answers):
+        self.answers = list(answers)
+        self.calls = 0
+
+    def with_structured_output(self, schema, include_raw):
+        assert schema is Screening
+        assert include_raw
+        return self
+
+    def invoke(self, messages):
+        self.calls += 1
+        answer = self.answers.pop(0) if self.answers else screened(False)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer

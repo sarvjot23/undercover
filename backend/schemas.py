@@ -46,7 +46,7 @@ class Lease(BaseModel):
 class Step(BaseModel):
     """One step of the agent's work on a claim."""
 
-    kind: Literal["tool_call", "tool_result", "read", "answer", "error"]
+    kind: Literal["check", "tool_call", "tool_result", "read", "answer", "error"]
     text: str
     key: str
 

@@ -1,11 +1,11 @@
 import { expect, test } from "./fixtures";
 
-test("the queue shows the 25 claims", async ({ page }) => {
+test("the queue shows the 26 claims", async ({ page }) => {
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "The claims queue" }),
   ).toBeVisible();
-  await expect(page.locator("tbody tr")).toHaveCount(25);
+  await expect(page.locator("tbody tr")).toHaveCount(26);
   await expect(
     page.getByRole("row").filter({ hasText: "CLM-1001" }).getByText("Waiting"),
   ).toBeVisible();

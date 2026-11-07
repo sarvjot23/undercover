@@ -97,17 +97,17 @@ The check reads the claim's own fields as JSON, the way the agent's `get_claim` 
 - **The step on the dashboard.** The backend's `Step` kinds gain `check`, and `Steps.tsx` labels it "Security check".
 - **CLM-1901.** `seed` in `backend/db.py` also reads `data/security/claims.json`, `policies.json` and `customers.json`, after `data/claims.json`, which doesn't change. `decisions.json` is not seeded.
 
-- [ ] `agent/tests/test_screening.py`, all on a stub model:
+- [x] `agent/tests/test_screening.py`, all on a stub model:
   - When a claim is flagged, it's referred with a payout of 0, the reason, and the security-check section. The claim agent's model is never called, and a `check` step comes first.
   - When a claim passes, the claim agent works it as before, and the `check` step comes first.
   - When an answer can't be read twice and then can, the claim goes on, with 3 calls recorded in its usage.
   - When an answer can't be read three times, the claim fails as any error does: back to the queue, or to a handler on the second failure.
   - When the check hits a timeout, the claim fails the same way and isn't left in progress.
   - A claim carried on from saved progress, or resumed after a sign-off, doesn't call the check again.
-- [ ] A test checks the check's model: Luna at `none`, or `MODEL_NAME` with no effort.
-- [ ] A backend test finds CLM-1901 waiting in the queue after seeding, and in neither evaluation set's claims. It also checks that the answer key's counts and `data/claims.json` haven't changed.
-- [ ] The dashboard tests show a `check` step labelled "Security check".
-- [ ] `npm run check` passes. `docs/STATUS.md` is updated, and the phase is committed.
+- [x] A test checks the check's model: Luna at `none`, or `MODEL_NAME` with no effort.
+- [x] A backend test finds CLM-1901 waiting in the queue after seeding, and in neither evaluation set's claims. It also checks that the answer key's counts and `data/claims.json` haven't changed.
+- [x] The dashboard tests show a `check` step labelled "Security check".
+- [x] `npm run check` passes. `docs/STATUS.md` is updated, and the phase is committed.
 
 ## Phase 3: The agent's own API, and a sign-off that pays
 

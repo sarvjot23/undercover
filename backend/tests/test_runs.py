@@ -53,7 +53,7 @@ def test_a_dispatch_takes_the_claims_in_progress_then_the_oldest_waiting(client)
     ids = [entry["claim_id"] for entry in run["claims"]]
     assert ids == ["CLM-1020", *[claim_id for _, claim_id in waiting]]
     assert "CLM-1003" not in ids
-    assert run["total"] == 24
+    assert run["total"] == 25
     assert run["status"] == "running"
     assert run["kind"] == "dispatch"
     assert run["n"] == 3
@@ -66,7 +66,7 @@ def test_a_dispatch_never_takes_an_evaluations_copies(client):
     client.post(f"/api/runs/{evaluation['run_id']}/stop")
     dispatch = create(client).json()
     ids = [entry["claim_id"] for entry in dispatch["claims"]]
-    assert len(ids) == 25
+    assert len(ids) == 26
     assert not any(claim_id.startswith("EV") for claim_id in ids)
 
 

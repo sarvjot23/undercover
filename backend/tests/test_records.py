@@ -13,7 +13,7 @@ from backend.tests.signing import as_handler
 
 def test_queue_is_seeded_waiting(client):
     claims = client.get("/api/claims").json()
-    assert len(claims) == 25
+    assert len(claims) == 26  # the 25 in claims.json and CLM-1901
     assert {claim["status"] for claim in claims} == {"waiting"}
     assert claims[0] == {
         "claim_id": "CLM-1001",
@@ -76,7 +76,7 @@ def test_handlers(client):
 
 def test_seed_runs_once(client):
     db.init()
-    assert len(client.get("/api/claims").json()) == 25
+    assert len(client.get("/api/claims").json()) == 26
 
 
 def test_seed_reads_only_the_answer_key_from_the_evals(tmp_path, monkeypatch):
@@ -100,7 +100,7 @@ def test_seed_reads_only_the_answer_key_from_the_evals(tmp_path, monkeypatch):
 
 def test_the_answer_key_stays_out_of_the_queue(client):
     claims = client.get("/api/claims").json()
-    assert [claim["claim_id"] for claim in claims][-1] == "CLM-1025"
+    assert [claim["claim_id"] for claim in claims][-2:] == ["CLM-1025", "CLM-1901"]
     assert client.get("/api/claims/CLM-1101").status_code == 404
     with db.engine().connect() as conn:
         held_out = conn.execute(select(func.count()).select_from(db.held_out_claims))

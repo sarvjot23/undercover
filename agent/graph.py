@@ -16,7 +16,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command, RetryPolicy, interrupt
 
-from agent import client
+from agent import client, screening
 from agent.tools import TOOLS
 
 MODEL_CALLS = 30
@@ -90,6 +90,41 @@ def record_usage(claim_id: str, run_id: int | None, reply: AIMessage) -> None:
                 "key": reply.id,
             },
         )
+
+
+def check(state: ClaimState, config: RunnableConfig) -> dict[str, Any]:
+    """Run the security check before the claim agent's model sees the claim.
+
+    A claim that tries to instruct its handler is referred, with the check's reason.
+    """
+    claim_id = state["claim_id"]
+    run_id = config.get("configurable", {})["run_id"]
+    with client.backend() as backend:
+        claim = backend.get(f"/api/claims/{claim_id}").json()
+    found = screening.screen(claim, lambda reply: record_usage(claim_id, run_id, reply))
+    result = (
+        "Instructions found" if found.instructions_found else "No instructions found"
+    )
+    record_step(
+        claim_id, "check", f"{result}: {found.reason}", f"{state['thread_id']}:check"
+    )
+    if found.instructions_found:
+        with client.backend() as backend:
+            backend.post(
+                f"/api/claims/{claim_id}/decision",
+                json={
+                    "decision": "refer",
+                    "payout": 0,
+                    "reasons": f"{screening.REFERRAL} {found.reason}",
+                    "policy_section": screening.SECTION,
+                },
+            ).raise_for_status()
+    return {}
+
+
+def after_check(state: ClaimState) -> Literal["agent", "close"]:
+    """On to the claim agent, unless the check referred the claim."""
+    return "agent" if standing(state["claim_id"])["decision"] is None else "close"
 
 
 def record_tool_result(
@@ -218,13 +253,15 @@ def build(
         retry_on=retry_model,
     )
     builder = StateGraph(ClaimState)
+    builder.add_node("check", check)
     builder.add_node("agent", agent_node(make_llm, instructions), retry_policy=retry)
     builder.add_node("record", record)
     builder.add_node("tools", ToolNode(TOOLS, wrap_tool_call=record_tool_result))
     builder.add_node("sign_off", sign_off)
     builder.add_node("pay", pay)
     builder.add_node("close", close)
-    builder.add_edge(START, "agent")
+    builder.add_edge(START, "check")
+    builder.add_conditional_edges("check", after_check, ["agent", "close"])
     builder.add_edge("agent", "record")
     builder.add_conditional_edges("record", after_record, ["tools", END])
     builder.add_conditional_edges(

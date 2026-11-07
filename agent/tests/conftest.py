@@ -1,10 +1,18 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from agent import checkpoints, client, graph
-from agent.tests.stubs import Backend
+from agent import checkpoints, client, graph, model
+from agent.tests.stubs import Backend, StubChecker
 from backend.api import app
 from backend.tests import judging, signing
+
+
+@pytest.fixture(autouse=True)
+def checker(monkeypatch) -> StubChecker:
+    """The security check's model, a stub that passes every claim unless told."""
+    stub = StubChecker()
+    monkeypatch.setattr(model, "check_model", lambda: stub)
+    return stub
 
 
 @pytest.fixture

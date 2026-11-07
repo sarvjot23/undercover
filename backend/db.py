@@ -37,6 +37,7 @@ DEFAULT_REASONING = "low"
 ANSWER_KEY = {"evaluation": "decisions.json", "held_out": "held_out_decisions.json"}
 SCHEMA = "undercover"
 MAX_CONNECTIONS = 4
+SECURITY_CLAIMS = "security/claims.json"
 # 25 claim agents share the 4 connections: a request waits for one rather than fail.
 POOL_TIMEOUT = 120
 CHECKPOINT_TABLES = ("checkpoint_writes", "checkpoint_blobs", "checkpoints")
@@ -345,7 +346,11 @@ def init() -> None:
 
 
 def seed(conn: Connection) -> None:
-    """Fill the tables from the claims queue and the insurer's records."""
+    """Fill the tables from the claims queue and the insurer's records.
+
+    The security team's claim, CLM-1901, joins the queue with its policy and its
+    customer, but not its handler's decision, so it stays out of the evaluations.
+    """
     conn.execute(
         claims.insert(),
         [
@@ -355,11 +360,13 @@ def seed(conn: Connection) -> None:
                 "body": json.dumps(claim),
                 "attempts": 0,
             }
-            for claim in load("claims.json")
+            for claim in load("claims.json") + load(SECURITY_CLAIMS)
         ],
     )
-    conn.execute(policies.insert(), rows("policies.json", "policy_id"))
-    conn.execute(customers.insert(), rows("customers.json", "customer_id"))
+    for name in ("policies.json", "security/policies.json"):
+        conn.execute(policies.insert(), rows(name, "policy_id"))
+    for name in ("customers.json", "security/customers.json"):
+        conn.execute(customers.insert(), rows(name, "customer_id"))
     conn.execute(
         handlers.insert(),
         [

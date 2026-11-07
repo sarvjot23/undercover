@@ -221,7 +221,7 @@ def test_the_service_waits_for_the_backend(requests, monkeypatch):
 
     monkeypatch.setattr(client, "backend", flaky)
     monkeypatch.setattr(service, "BACKEND_WAIT_SECONDS", 0)
-    assert len(service.backend_claims()) == 25
+    assert len(service.backend_claims()) == 26
     assert len(tries) == 2
 
 

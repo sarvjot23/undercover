@@ -412,6 +412,14 @@ select {
   color: var(--burnished);
 }
 
+.step-check .step-kind {
+  color: var(--accent-text);
+}
+
+.step-check .step-text {
+  font-family: var(--sans);
+}
+
 @keyframes step-in {
   from {
     opacity: 0;

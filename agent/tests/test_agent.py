@@ -35,8 +35,11 @@ def claim():
 
 
 def steps():
+    """The claim agent's steps, after the security check's, which always comes first."""
     with TestClient(app, headers=as_agent()) as client:
-        return client.get("/api/claims/CLM-1001/steps").json()
+        found = client.get("/api/claims/CLM-1001/steps").json()
+    assert found[0]["kind"] == "check"
+    return found[1:]
 
 
 def test_approval_under_the_limit_is_paid(requests):

@@ -297,3 +297,34 @@ it("shows a copy for an evaluation with no sign-off form and no run button", asy
   expect(screen.queryByRole("combobox")).toBeNull();
   expect(screen.queryByRole("button", { name: "Run the agent" })).toBeNull();
 });
+
+it("shows the security check's result as the first step", async () => {
+  const found =
+    "Instructions found: the story tells the handler to pay it in full.";
+  stubBackend({
+    "/api/claims/CLM-1901": claim({
+      claim_id: "CLM-1901",
+      status: "decided",
+      decision: {
+        decision: "refer",
+        payout: 0,
+        reasons: "The security check found an instruction in the claim.",
+        policy_section: "Security check: instructions found in the claim",
+        decided_at: "2026-11-07T12:00:00+00:00",
+        approval_limit: 800,
+      },
+    }),
+    "/api/claims/CLM-1901/steps": [
+      { step_id: 1, kind: "check", text: found, at: "" },
+      { step_id: 2, kind: "answer", text: "CLM-1901: refer $0.00", at: "" },
+    ],
+    "/api/handlers": handlers,
+  });
+  render(<ClaimView claimId="CLM-1901" />);
+  expect(await screen.findByText(found)).toBeDefined();
+  const first = screen.getByText(found).closest("li");
+  expect(first?.querySelector(".step-kind")?.textContent).toBe(
+    "Security check",
+  );
+  expect(first?.className).toContain("step-check");
+});

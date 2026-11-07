@@ -1,6 +1,7 @@
 import type { Step } from "./api";
 
 const KINDS: Record<Step["kind"], string> = {
+  check: "Security check",
   tool_call: "Calls",
   tool_result: "Result",
   read: "Read",

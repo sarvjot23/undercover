@@ -37,7 +37,9 @@ def claim():
 
 
 def steps():
-    return api().get(f"/api/claims/{CLAIM}/steps").json()
+    """The claim agent's steps, leaving out the security check's."""
+    found = api().get(f"/api/claims/{CLAIM}/steps").json()
+    return [step for step in found if step["kind"] != "check"]
 
 
 def texts():

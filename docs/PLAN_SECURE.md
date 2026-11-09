@@ -169,20 +169,20 @@ The check reads the claim's own fields as JSON, the way the agent's `get_claim` 
 
 We reseed once with `npm run seed`, then run `npm run dev` on the default model. Each check is done once, in this order.
 
-- [ ] The dashboard works as before for Dana, signed in through the Playwright MCP server with `HANDLER_PASSWORD` from the environment, never printed.
-- [ ] `curl -X POST http://127.0.0.1:8000/api/claims/CLM-1001/decision` without the key gets 401.
-- [ ] `uv run -m agent CLM-1001` works the claim to a decision.
-- [ ] A dispatch with 3 agents at once works the rest of the queue as before. CLM-1901 is referred with the check's reason, and the claim page shows the "Security check" step first, with the reason.
-- [ ] An evaluation of the evaluation set's tiny five flags none of them.
-- [ ] Dana signs off a held payout on the dashboard, and it's paid once with no call from the agent.
-- [ ] We stop `npm run dev`. The backend alone, started with `AWS_LAMBDA_FUNCTION_NAME` set and `DATABASE_URL` switched to port 6543 in that process only, serves the claims to a signed-in handler.
-- [ ] After `npm run build`, `uv run -m uvicorn backend.main:app` serves the dashboard at `http://127.0.0.1:8000`, where Dana signs in and sees the claims, checked through the Playwright MCP server.
-- [ ] We build the deployment package in a temporary folder, as Lab 2 does (`uv export --only-group server`, `uv pip install --python-platform x86_64-manylinux2014 --python-version 3.12 --only-binary :all:`, then `backend/`, `data/` and `dashboard/dist/`), zip it, and report its size against Lambda's 50 MB limit. The folder is deleted afterwards.
-- [ ] We report what the live checks spent, from the runs' recorded cost.
-- [ ] The docs are updated:
+- [x] The dashboard works as before for Dana, signed in through the Playwright MCP server with `HANDLER_PASSWORD` from the environment, never printed.
+- [x] `curl -X POST http://127.0.0.1:8000/api/claims/CLM-1001/decision` without the key gets 401.
+- [x] `uv run -m agent CLM-1001` works the claim to a decision.
+- [x] A dispatch with 3 agents at once works the rest of the queue as before. CLM-1901 is referred with the check's reason, and the claim page shows the "Security check" step first, with the reason.
+- [x] An evaluation of the evaluation set's tiny five flags none of them.
+- [x] Dana signs off a held payout on the dashboard, and it's paid once with no call from the agent.
+- [x] We stop `npm run dev`. The backend alone, started with `AWS_LAMBDA_FUNCTION_NAME` set and `DATABASE_URL` switched to port 6543 in that process only, serves the claims to a signed-in handler.
+- [x] After `npm run build`, `uv run -m uvicorn backend.main:app` serves the dashboard at `http://127.0.0.1:8000`, where Dana signs in and sees the claims, checked through the Playwright MCP server.
+- [x] We build the deployment package in a temporary folder, as Lab 2 does (`uv export --only-group server`, `uv pip install --python-platform x86_64-manylinux2014 --python-version 3.12 --only-binary :all:`, then `backend/`, `data/` and `dashboard/dist/`), zip it, and report its size against Lambda's 50 MB limit. The folder is deleted afterwards.
+- [x] We report what the live checks spent, from the runs' recorded cost.
+- [x] The docs are updated:
   - `docs/SPEC.md` for the key, the check and the sign-off that pays
   - `docs/TECH_STACK.md` for the key, the check, the agent's document and the deployment
   - `docs/PROCESS.md` for `npm run build`, `check:server` and the test key
   - `docs/STATUS.md`
   - `data/README.md`, saying CLM-1901 is now seeded into the queue without its decision
-- [ ] `npm run check` passes with `.env` moved out of the way. The results are reported and the phase is committed.
+- [x] `npm run check` passes with `.env` moved out of the way. The results are reported and the phase is committed.

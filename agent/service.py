@@ -11,7 +11,15 @@ import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from agent import claim, client, dispatcher, graph, improver_client, rounds, tracing
+from agent import (
+    checkpoints,
+    claim,
+    client,
+    dispatcher,
+    improver_client,
+    rounds,
+    tracing,
+)
 
 BACKEND_WAIT_TRIES = 30
 BACKEND_WAIT_SECONDS = 1.0
@@ -110,8 +118,7 @@ def pick_up_signed_off() -> None:
         return
     stop_leftover_run()
     halt_leftover_round()
-    config = tracing.config("warm-up", graph.RECURSION_LIMIT, None)
-    claim.build(None, None).get_state(config)
+    checkpoints.saver().get_tuple({"configurable": {"thread_id": "warm-up"}})
     for found in claims:
         if found["signed_off"]:
             claim.carry_on(found["claim_id"])

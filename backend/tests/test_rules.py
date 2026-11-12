@@ -432,3 +432,37 @@ def test_the_link_says_when_the_service_is_away(monkeypatch):
     monkeypatch.setattr(agent_service.httpx, "post", post)
     assert agent_service.ask("/dispatches", {"n": 3}) is None
     assert not agent_service.tell("/dispatches", {"n": 3})
+
+
+def hold(client, claim_id="CLM-1001", **kwargs):
+    return client.post(
+        f"/api/claims/{claim_id}/hold",
+        json={"reason": "Tool Execution Denied: over $1,000"},
+        **kwargs,
+    )
+
+
+def test_a_payment_the_gateway_refused_waits_for_a_sign_off(client):
+    decide(client, "CLM-1001")
+    held = hold(client)
+    assert held.json()["status"] == "awaiting_sign_off"
+    assert held.json()["decision"]["payment_refused"].startswith("Tool Execution")
+    signed = client.post("/api/claims/CLM-1001/sign-off", headers=as_handler())
+    assert signed.json()["payment"]["amount"] == 650.0
+    assert status(client, "CLM-1001") == "decided"
+
+
+def test_only_an_approved_unpaid_claim_in_progress_is_held(client):
+    assert hold(client).status_code == 409
+    decide(client, "CLM-1002", decision="decline", payout=0)
+    assert hold(client, "CLM-1002").status_code == 409
+    decide(client, "CLM-1003", payout=1200.0)
+    assert hold(client, "CLM-1003").status_code == 409
+    decide(client, "CLM-1004")
+    client.post("/api/claims/CLM-1004/payment", json={"amount": 650.0})
+    assert hold(client, "CLM-1004").status_code == 409
+
+
+def test_only_the_agent_holds_a_payment(client):
+    decide(client, "CLM-1001")
+    assert hold(client, headers={"X-API-Key": ""}).status_code == 401

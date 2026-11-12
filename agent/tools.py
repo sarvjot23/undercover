@@ -1,11 +1,17 @@
-"""The claim agent's tools. Each one is a call to the backend."""
+"""The claim agent's tools. Each one is a thin layer over an operation of the app or
+the context layer, on the claim's route, and fills in what the agent already knows:
+the claim, its policy and its customer. So the model acts only on its own claim."""
 
+from dataclasses import dataclass
 from typing import Literal
 
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
 from agent import client
+from agent.direct import APP
+from agent.mcp_bridge import Refused
+from agent.routes import Route
 
 Document = Literal["policy_wording", "claims_manual"]
 Benefit = Literal[
@@ -17,6 +23,18 @@ Benefit = Literal[
     "passport",
     "emergency_medical",
 ]
+
+
+@dataclass(frozen=True)
+class ClaimContext:
+    """What the agent knows about the claim it's working, besides the model."""
+
+    claim_id: str
+    policy_id: str
+    customer_id: str
+    version: int
+    kind: str | None
+    route: Route
 
 
 class Line(BaseModel):
@@ -51,12 +69,78 @@ class Line(BaseModel):
     )
 
 
-@tool
-def get_claim(claim_id: str) -> str:
-    """Get a claim with its policy, plan limits and the customer's claim history."""
-    with client.backend() as backend:
-        response = backend.get(f"/api/claims/{claim_id}")
-    return client.reply(response)
+def maker(claim: ClaimContext) -> str:
+    """Who makes the decision, for the record: the agent and its version."""
+    return f"UnderCover Agent, version {claim.version}"
+
+
+def answer(
+    claim: ClaimContext, target: str, operation: str, **arguments: object
+) -> str:
+    """Call an operation on the claim's route; a refusal is the model's answer."""
+    try:
+        return claim.route.call(target, operation, arguments)
+    except Refused as refused:
+        return str(refused)
+
+
+def app_tools(claim: ClaimContext) -> list[BaseTool]:
+    """The app's operations for the model, on its own claim, policy and customer."""
+
+    @tool
+    def get_claim() -> str:
+        """Get the claim with its policy, plan limits and claim history."""
+        return answer(claim, APP, "get_claim", claim_id=claim.claim_id)
+
+    @tool
+    def get_policy() -> str:
+        """Get the customer's policy with its plan's limits."""
+        return answer(claim, APP, "get_policy", policy_id=claim.policy_id)
+
+    @tool
+    def get_claim_history() -> str:
+        """Get the customer's claim history with UnderCover."""
+        return answer(claim, APP, "get_claim_history", customer_id=claim.customer_id)
+
+    @tool
+    def calculate_payout(
+        benefit: Benefit, lines: list[Line], paid_by_others: float
+    ) -> str:
+        """Work out the payout on an approved claim with UnderCover's payout rules.
+
+        List each covered line, leaving out excluded ones. paid_by_others is anything a
+        carrier, hotel or other party has paid or refunded for the same loss, or 0.
+        """
+        return answer(
+            claim,
+            APP,
+            "calculate_payout",
+            claim_id=claim.claim_id,
+            benefit=benefit,
+            lines=[line.model_dump() for line in lines],
+            paid_by_others=paid_by_others,
+        )
+
+    @tool
+    def record_decision(
+        decision: Literal["approve", "decline", "refer"],
+        payout: float,
+        reasons: str,
+        policy_section: str,
+    ) -> str:
+        """Record a decision with its payout, reasons and policy section."""
+        return answer(
+            claim,
+            APP,
+            "record_decision",
+            claim_id=claim.claim_id,
+            decision=decision,
+            payout=payout,
+            reasons=reasons,
+            policy_section=policy_section,
+        )
+
+    return [get_claim, get_policy, get_claim_history, calculate_payout, record_decision]
 
 
 @tool
@@ -97,54 +181,9 @@ def search_documents(query: str) -> str:
     )
 
 
-@tool
-def calculate_payout(
-    claim_id: str, benefit: Benefit, lines: list[Line], paid_by_others: float
-) -> str:
-    """Work out the payout on an approved claim with UnderCover's payout rules.
-
-    List each covered line, leaving out excluded ones. paid_by_others is anything a
-    carrier, hotel or other party has paid or refunded for the same loss, or 0.
-    """
-    with client.backend() as backend:
-        response = backend.post(
-            f"/api/claims/{claim_id}/payout",
-            json={
-                "benefit": benefit,
-                "lines": [line.model_dump() for line in lines],
-                "paid_by_others": paid_by_others,
-            },
-        )
-    return client.reply(response)
+DOCUMENT_TOOLS = [list_sections, read_section, search_documents]
 
 
-@tool
-def record_decision(
-    claim_id: str,
-    decision: Literal["approve", "decline", "refer"],
-    payout: float,
-    reasons: str,
-    policy_section: str,
-) -> str:
-    """Record a decision with its payout, reasons and policy section."""
-    with client.backend() as backend:
-        response = backend.post(
-            f"/api/claims/{claim_id}/decision",
-            json={
-                "decision": decision,
-                "payout": payout,
-                "reasons": reasons,
-                "policy_section": policy_section,
-            },
-        )
-    return client.reply(response)
-
-
-TOOLS = [
-    get_claim,
-    list_sections,
-    read_section,
-    search_documents,
-    calculate_payout,
-    record_decision,
-]
+def for_claim(claim: ClaimContext) -> list[BaseTool]:
+    """Every tool the model has on this claim."""
+    return [*app_tools(claim), *DOCUMENT_TOOLS]

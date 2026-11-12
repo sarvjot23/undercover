@@ -34,9 +34,9 @@ def test_the_claim_agent_is_built_from_its_runs_version(requests, monkeypatch):
     built = []
     original = graph.build
 
-    def spy(make_llm, instructions, saver):
+    def spy(make_llm, instructions, saver, claim):
         built.append(instructions)
-        return original(make_llm, instructions, saver)
+        return original(make_llm, instructions, saver, claim)
 
     monkeypatch.setattr(graph, "build", spy)
     models = []
@@ -46,7 +46,6 @@ def test_the_claim_agent_is_built_from_its_runs_version(requests, monkeypatch):
         return script(
             call(
                 "record_decision",
-                claim_id=claim_id,
                 decision="refer",
                 payout=0,
                 reasons="Needs a handler. The manual says so.",
@@ -93,7 +92,6 @@ def test_outside_a_run_the_claim_agent_uses_the_current_version(requests):
         script(
             call(
                 "record_decision",
-                claim_id="CLM-1001",
                 decision="refer",
                 payout=0,
                 reasons="Needs a handler. The manual says so.",

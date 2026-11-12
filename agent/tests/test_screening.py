@@ -41,7 +41,6 @@ def use(monkeypatch, *answers):
 def decide(decision, payout):
     return call(
         "record_decision",
-        claim_id=CLAIM,
         decision=decision,
         payout=payout,
         reasons="The wording settles it. The documents support it.",

@@ -33,7 +33,6 @@ def api():
 def refer(claim_id):
     return call(
         "record_decision",
-        claim_id=claim_id,
         decision="refer",
         payout=0,
         reasons="Needs a handler. The manual says so.",
@@ -44,7 +43,6 @@ def refer(claim_id):
 def approve(claim_id, payout):
     return call(
         "record_decision",
-        claim_id=claim_id,
         decision="approve",
         payout=payout,
         reasons="The wording settles it. The documents support it.",
@@ -143,7 +141,7 @@ def test_a_rate_limit_carries_on_as_the_same_attempt(requests, only, models):
     only("CLM-1001")
     limited = RateLimitedModel(
         limited=[2],
-        messages=iter([call("get_claim", claim_id="CLM-1001"), refer("CLM-1001")]),
+        messages=iter([call("get_claim"), refer("CLM-1001")]),
     )
     models("CLM-1001", limited, limited)
     dispatcher.dispatch(new_run(), 1)

@@ -89,6 +89,9 @@ decisions = Table(
     Column("decided_at", Text, nullable=False),
     # The limit the decision was made under: a new limit applies to later decisions.
     Column("approval_limit", Float, nullable=False),
+    # Why the Gateway refused the payment, when it did: the claim then waits for a
+    # handler's sign-off, as an approval over the limit does.
+    Column("payment_refused", Text),
 )
 sign_offs = Table(
     "sign_offs",

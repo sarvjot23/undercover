@@ -16,8 +16,10 @@ from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command, RetryPolicy, interrupt
 
-from agent import client, screening
-from agent.tools import TOOLS
+from agent import client, screening, tools
+from agent.direct import APP
+from agent.mcp_bridge import Refused
+from agent.tools import ClaimContext
 
 MODEL_CALLS = 30
 RETRIES = 2
@@ -190,24 +192,38 @@ def sign_off(state: ClaimState) -> dict[str, Any]:
     return {"signed_off_by": answer["handler_id"]}
 
 
-def pay(state: ClaimState) -> dict[str, Any]:
-    """Pay the approved payout. The backend refuses it without a sign-off."""
-    claim_id = state["claim_id"]
-    amount = standing(claim_id)["decision"]["payout"]
+def hold(claim_id: str, reason: str) -> None:
+    """Have the claim wait for a handler's sign-off, since the Gateway refused it."""
     with client.backend() as backend:
-        response = backend.post(
-            f"/api/claims/{claim_id}/payment", json={"amount": amount}
-        )
-    if not response.is_success:
-        raise RuntimeError(client.reply(response))
-    prefix = f"{state['thread_id']}:pay"
-    record_step(
-        claim_id,
-        "tool_result",
-        f"pay_claim: Paid ${amount:,.2f}",
-        f"{prefix}:result",
-    )
-    return {}
+        backend.post(
+            f"/api/claims/{claim_id}/hold", json={"reason": reason}
+        ).raise_for_status()
+
+
+def pay_node(claim: ClaimContext) -> Any:
+    """Make the node that pays the approved payout, on the claim's route.
+
+    The app refuses it without a sign-off. A payment the Gateway refuses waits for a
+    handler's sign-off, as an approval over the limit does, so a handler can pay it.
+    """
+
+    def pay(state: ClaimState) -> Command[Literal["sign_off", "close"]]:
+        claim_id = state["claim_id"]
+        amount = standing(claim_id)["decision"]["payout"]
+        key = f"{state['thread_id']}:pay:result"
+        name = claim.route.tool_name(APP, "pay_claim")
+        try:
+            claim.route.call(APP, "pay_claim", {"claim_id": claim_id, "amount": amount})
+        except Refused as refused:
+            if refused.by != "the Gateway":
+                raise RuntimeError(str(refused)) from refused
+            record_step(claim_id, "tool_result", f"{name}: {refused}", key)
+            hold(claim_id, refused.reason)
+            return Command(goto="sign_off")
+        record_step(claim_id, "tool_result", f"{name}: Paid ${amount:,.2f}", key)
+        return Command(goto="close")
+
+    return pay
 
 
 def close(state: ClaimState) -> dict[str, Any]:
@@ -217,7 +233,9 @@ def close(state: ClaimState) -> dict[str, Any]:
     return {}
 
 
-def agent_node(make_llm: Callable[[], BaseChatModel], instructions: str) -> Any:
+def agent_node(
+    make_llm: Callable[[], BaseChatModel], instructions: str, bound_tools: list[Any]
+) -> Any:
     """Make the node that calls the model with the conversation so far.
 
     The model is made on first use: paying a signed-off claim doesn't need one.
@@ -226,7 +244,7 @@ def agent_node(make_llm: Callable[[], BaseChatModel], instructions: str) -> Any:
 
     @cache
     def bound() -> Any:
-        return make_llm().bind_tools(TOOLS)
+        return make_llm().bind_tools(bound_tools)
 
     def agent(state: ClaimState, config: RunnableConfig) -> dict[str, Any]:
         calls = state["model_calls"]
@@ -244,8 +262,10 @@ def build(
     make_llm: Callable[[], BaseChatModel],
     instructions: str,
     saver: BaseCheckpointSaver[Any],
+    claim: ClaimContext,
 ) -> Any:
-    """Build the claim graph on this model and checkpointer."""
+    """Build the claim graph for one claim on this model and checkpointer."""
+    claim_tools = tools.for_claim(claim)
     retry = RetryPolicy(
         max_attempts=RETRIES + 1,
         initial_interval=RETRY_DELAY,
@@ -254,11 +274,13 @@ def build(
     )
     builder = StateGraph(ClaimState)
     builder.add_node("check", check)
-    builder.add_node("agent", agent_node(make_llm, instructions), retry_policy=retry)
+    builder.add_node(
+        "agent", agent_node(make_llm, instructions, claim_tools), retry_policy=retry
+    )
     builder.add_node("record", record)
-    builder.add_node("tools", ToolNode(TOOLS, wrap_tool_call=record_tool_result))
+    builder.add_node("tools", ToolNode(claim_tools, wrap_tool_call=record_tool_result))
     builder.add_node("sign_off", sign_off)
-    builder.add_node("pay", pay)
+    builder.add_node("pay", pay_node(claim), destinations=("sign_off", "close"))
     builder.add_node("close", close)
     builder.add_edge(START, "check")
     builder.add_conditional_edges("check", after_check, ["agent", "close"])
@@ -268,6 +290,5 @@ def build(
         "tools", after_tools, ["agent", "sign_off", "pay", "close"]
     )
     builder.add_edge("sign_off", "close")
-    builder.add_edge("pay", "close")
     builder.add_edge("close", END)
     return builder.compile(checkpointer=saver)

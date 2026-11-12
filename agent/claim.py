@@ -9,8 +9,9 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from agent import checkpoints, client, graph, lease, tracing
+from agent import checkpoints, client, graph, lease, routes, tracing
 from agent.model import model
+from agent.tools import ClaimContext
 from agent.tracing import Run
 
 NO_DECISION = "The agent finished without recording a decision"
@@ -31,15 +32,27 @@ def fail(claim_id: str, reason: str) -> str:
     return f"{claim_id}: failed ({reason}), {where}"
 
 
-def build(llm: BaseChatModel | None, version: int | None) -> Any:
-    """Build the claim graph from a version of its configuration, or the current one."""
+def build(llm: BaseChatModel | None, claim_id: str, run: Run | None) -> Any:
+    """Build a claim's graph from its run's version of the configuration, or the
+    current one, on the route the settings give now."""
+    version = version_of(run)
     path = "current" if version is None else f"versions/{version}"
     with client.backend() as backend:
         config = backend.get(f"/api/configuration/{path}").json()
+        found = backend.get(f"/api/claims/{claim_id}").json()
+    claim = ClaimContext(
+        claim_id=claim_id,
+        policy_id=found["policy_id"],
+        customer_id=found["customer_id"],
+        version=config["version"],
+        kind=run["kind"] if run else None,
+        route=routes.choose(),
+    )
     return graph.build(
         lambda: llm or model(config["model"], config["reasoning"]),
         config["instructions"],
         checkpoints.saver(),
+        claim,
     )
 
 
@@ -119,7 +132,7 @@ def run(
         if not started.is_success:
             return f"{claim_id}: not started, {client.reply(started)}"
         start = first_input(claim_id, thread_id)
-        claim_graph = build(llm, version_of(in_run))
+        claim_graph = build(llm, claim_id, in_run)
         return invoke(claim_graph, claim_id, thread_id, start, in_run)
 
 
@@ -138,7 +151,7 @@ def carry_on(
         if claim["status"] != "in_progress" and not signed_off:
             return graph.report(claim)
         thread_id = claim["thread_id"]
-        claim_graph = build(llm, version_of(in_run))
+        claim_graph = build(llm, claim_id, in_run)
         saved = claim_graph.get_state({"configurable": {"thread_id": thread_id}})
         start: Any = None
         if signed_off:

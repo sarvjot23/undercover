@@ -31,10 +31,8 @@ class DecidingModel(StubModel):
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
         last = messages[-1]
         if isinstance(last, HumanMessage):
-            claim_id = str(last.content).split()[-1].rstrip(".")
             message = call(
                 "record_decision",
-                claim_id=claim_id,
                 decision="refer",
                 payout=0,
                 reasons="Needs a handler. The manual says so.",

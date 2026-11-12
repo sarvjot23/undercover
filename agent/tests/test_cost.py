@@ -28,7 +28,6 @@ def priced(message, number, cost=0.002):
 def refer():
     return call(
         "record_decision",
-        claim_id=CLAIM,
         decision="refer",
         payout=0,
         reasons="Needs a handler. The manual says so.",
@@ -39,7 +38,6 @@ def refer():
 def approve(payout):
     return call(
         "record_decision",
-        claim_id=CLAIM,
         decision="approve",
         payout=payout,
         reasons="The wording settles it. The documents support it.",
@@ -75,7 +73,7 @@ def test_each_replys_tokens_and_cost_are_recorded_once(requests):
         CLAIM,
         "thread-1",
         script(
-            priced(call("get_claim", claim_id=CLAIM), 1),
+            priced(call("get_claim"), 1),
             priced(refer(), 2, cost=0.003),
         ),
     )

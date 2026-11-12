@@ -51,6 +51,12 @@ class Step(BaseModel):
     key: str
 
 
+class Hold(BaseModel):
+    """Why the Gateway refused to pay an approved claim."""
+
+    reason: str = Field(min_length=1)
+
+
 class Failure(BaseModel):
     """Why the agent's run on a claim failed."""
 

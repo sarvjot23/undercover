@@ -17,7 +17,6 @@ from backend.tests.signing import as_agent
 def decision(decision, payout):
     return call(
         "record_decision",
-        claim_id="CLM-1001",
         decision=decision,
         payout=payout,
         reasons="The wording settles it. The documents support it.",
@@ -44,7 +43,7 @@ def steps():
 
 def test_approval_under_the_limit_is_paid(requests):
     answer = run(
-        call("get_claim", claim_id="CLM-1001"),
+        call("get_claim"),
         call("list_sections", document="policy_wording"),
         decision("approve", 420.0),
     )
@@ -61,12 +60,12 @@ def test_decline(requests):
 
 
 def test_the_model_has_no_pay_tool():
-    assert "pay_claim" not in {t.name for t in tools.TOOLS}
+    assert "pay_claim" not in {t.name for t in tools.DOCUMENT_TOOLS}
 
 
 def test_steps_are_recorded_in_order(requests):
     run(
-        call("get_claim", claim_id="CLM-1001"),
+        call("get_claim"),
         decision("refer", 0),
         AIMessage(content="Referred."),
     )
@@ -77,7 +76,7 @@ def test_steps_are_recorded_in_order(requests):
         "tool_result",
         "answer",
     ]
-    assert steps()[0]["text"] == 'get_claim {"claim_id": "CLM-1001"}'
+    assert steps()[0]["text"] == "get_claim {}"
     assert steps()[1]["text"].startswith('get_claim: {"claim_id":"CLM-1001"')
     assert len(steps()[1]["text"]) <= len("get_claim: ") + graph.STEP_LENGTH
 
@@ -113,7 +112,7 @@ def test_a_provider_error_is_retried(requests):
 
 
 def test_a_claim_stops_after_thirty_model_calls(requests):
-    looping = [call("get_claim", claim_id="CLM-1001") for _ in range(31)]
+    looping = [call("get_claim") for _ in range(31)]
     answer = run(*looping)
     assert "failed" in answer
     assert claim()["status"] == "waiting"
@@ -133,7 +132,7 @@ def test_run_without_a_decision_goes_back_to_waiting(requests):
 
 def test_agent_reaches_only_the_backend_api(requests):
     run(
-        call("get_claim", claim_id="CLM-1001"),
+        call("get_claim"),
         call("list_sections", document="policy_wording"),
         decision("refer", 0),
         AIMessage(content="Referred."),
@@ -171,7 +170,7 @@ def test_a_missing_section_is_a_refusal_not_a_read(requests):
 
 
 def test_no_tool_hands_over_a_whole_document(requests):
-    names = {t.name for t in tools.TOOLS}
+    names = {t.name for t in tools.DOCUMENT_TOOLS}
     assert "get_policy_wording" not in names
     whole = Path("data/claims_manual.md").read_text(encoding="utf-8")
     section = tools.read_section.invoke({"document": "claims_manual", "number": 7})
@@ -191,7 +190,6 @@ def test_the_payout_tool_goes_through_the_backend(requests):
     run(
         call(
             "calculate_payout",
-            claim_id="CLM-1001",
             benefit="baggage",
             lines=[
                 {

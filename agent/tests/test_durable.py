@@ -16,7 +16,6 @@ THREAD = "CLM-1001-first"
 def decision(choice="approve", payout=1200.0):
     return call(
         "record_decision",
-        claim_id=CLAIM,
         decision=choice,
         payout=payout,
         reasons="The wording settles it. The documents support it.",
@@ -47,7 +46,7 @@ def texts():
 
 
 def saved_state():
-    graph_built = claim_agent.build(script(), None)
+    graph_built = claim_agent.build(script(), CLAIM, None)
     return graph_built.get_state({"configurable": {"thread_id": THREAD}})
 
 
@@ -108,7 +107,7 @@ def test_a_held_claim_without_a_sign_off_is_not_resumed(requests):
 
 
 def test_a_claim_stopped_partway_carries_on_from_its_last_step(requests):
-    stopping = StoppedModel(messages=iter([call("get_claim", claim_id=CLAIM)]))
+    stopping = StoppedModel(messages=iter([call("get_claim")]))
     with pytest.raises(Stopped):
         claim_agent.run(CLAIM, THREAD, stopping)
     assert claim()["status"] == "in_progress"
@@ -153,7 +152,7 @@ def test_a_restart_repeats_no_step(requests, monkeypatch, kind, after):
         claim_agent.run(
             CLAIM,
             THREAD,
-            script(call("get_claim", claim_id=CLAIM), decision("refer", 0)),
+            script(call("get_claim"), decision("refer", 0)),
         )
     claim_agent.carry_on(CLAIM, script(decision("refer", 0)))
     keys = [step["key"] for step in steps()]
@@ -172,7 +171,7 @@ def test_a_reply_lost_in_a_crash_never_appears(requests):
 
 def test_a_stop_between_the_decision_and_the_payment_pays_once(requests, monkeypatch):
     with monkeypatch.context() as patch:
-        patch.setattr(graph, "pay", lambda state: stop())
+        patch.setattr(graph, "pay_node", lambda claim: lambda state: stop())
         with pytest.raises(Stopped):
             claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
     assert claim()["status"] == "in_progress"
@@ -215,7 +214,7 @@ def test_an_error_after_the_decision_does_not_send_the_claim_back(
         raise RuntimeError("backend hiccup")
 
     with monkeypatch.context() as patch:
-        patch.setattr(graph, "pay", broken)
+        patch.setattr(graph, "pay_node", lambda claim: broken)
         answer = claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
     assert "carries on next time" in answer
     assert claim()["status"] == "in_progress"

@@ -24,7 +24,6 @@ def hold(claim_id="CLM-1001"):
         script(
             call(
                 "record_decision",
-                claim_id=claim_id,
                 decision="approve",
                 payout=1200.0,
                 reasons="The wording settles it. The documents support it.",
@@ -113,7 +112,6 @@ def test_a_dispatch_is_created_through_the_backend_and_worked(requests, monkeypa
         lambda name, reasoning: script(
             call(
                 "record_decision",
-                claim_id="CLM-1002",
                 decision="refer",
                 payout=0,
                 reasons="Needs a handler. The manual says so.",

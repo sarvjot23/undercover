@@ -35,6 +35,7 @@ from backend.schemas import (
     ClaimStart,
     Decision,
     Failure,
+    Hold,
     Lease,
     Payment,
     PayoutRequest,
@@ -273,6 +274,24 @@ def pay_claim(
         insert_once(conn, payments, **paid)
     settle_payment(conn, claim_id)
     return {**found, "status": "decided", "payment": paid}
+
+
+@router.post("/{claim_id}/hold", operation_id="hold_payment", dependencies=keys.AGENT)
+def hold_payment(claim_id: str, hold: Hold, conn: Db) -> dict[str, Any]:
+    """Have an approved, unpaid claim wait for a sign-off, as the Gateway refused it."""
+    found = standing(conn, claim_id)
+    decision = found["decision"]
+    if decision is None or decision["decision"] != "approve" or found["payment"]:
+        raise HTTPException(409, f"Claim {claim_id} has no approved, unpaid payout")
+    move(conn, claim_id, "in_progress", "awaiting_sign_off")
+    conn.execute(
+        decisions.update()
+        .where(decisions.c.claim_id == claim_id)
+        .values(payment_refused=hold.reason)
+    )
+    recorded = standing(conn, claim_id)
+    conn.commit()
+    return recorded
 
 
 @router.post("/{claim_id}/sign-off", operation_id="sign_off")

@@ -7,7 +7,7 @@ The data behind UnderCover Travel Insurance, a fictional insurer. Everything her
 - `company.json`: company settings, including the payout approval limit, $800, which seeds the approval limit setting. Handlers change it on the Settings page, which keeps it in the database.
 - `settings.json`: the first values of the improvement settings, from our team's lab: the business objectives on the held-out set, the noise and tolerance for each measure, a round's spending limit and the claim agents at once in its evaluations.
 - `models.json`: the models the claim agent may use, with their reasoning efforts and their prices in US dollars per million input and output tokens. Only our IT team changes it.
-- `plans.json`: the three plans (Economy, Premium, First) with their limits, waiting periods and deductibles, and the three add-ons.
+- `plans.json`: the three plans (Economy, Premium, First) with their limits, waiting periods and deductibles, and the three add-ons. Kept as it was: the product now reads the plans from data governance's `context/plans.yaml`.
 - `policies.json`: one policy per trip, with the plan, the add-ons, the purchase date, the trip and the travelers.
 - `customers.json`: contact details and claim history, with the date and a one line summary of each earlier claim. This is personal data.
 - `handlers.json`: the claims handlers, with the email they sign in with and whether they can sign off payouts over the limit. Dana Whitfield can; Marcus Oyelaran and Priya Raman can't.
@@ -17,6 +17,19 @@ The data behind UnderCover Travel Insurance, a fictional insurer. Everything her
 
 - `policy_wording.md`: the contract with the customer. Short enough to fit in a prompt.
 - `claims_manual.md`: the internal handling manual. Longer, and it holds rules the wording does not, such as the third claim in 12 months, losses to wild animals and meals without receipts.
+
+Both are kept as they were. The product now reads the documents from `context/`, where each has front matter with its source and version, and `npm run seed` loads them into the database's documents table.
+
+## The context layer
+
+`context/` holds data governance's seven files, which the context layer serves to the claim agent and which seeding reads for the plans and the documents. Each names the system it comes from, its owner and when it was last reviewed. They are data governance's to change, not ours.
+
+- `data_dictionary.yaml`: what each field of a claim, a policy, a previous claim and a decision means
+- `glossary.yaml`: the terms the policy wording defines
+- `plans.yaml`: each plan's limits, waiting periods and deductible, the benefits the deductible applies to, and the add-ons
+- `claim_rules.yaml`: the filing window, the pre-existing look-back, repeat claims and meals without receipts
+- `reference_data.yaml`: outside events, places and products, such as named storms, strikes and prices
+- `policy_wording.md` and `claims_manual.md`: the two documents, by section, with their versions (2026.1 and 2026.2)
 
 ## The evaluation set
 

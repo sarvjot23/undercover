@@ -1,15 +1,16 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard, and passes them `.env`. `npm run seed` starts the database again from `data/`. `npm run build` builds the dashboard into `dashboard/dist`, which the backend then serves itself, as it does on Lambda; delete `dashboard/dist` to go back to the backend serving only the API.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service, the context layer (port 8006) and the dashboard, and passes the backend and the agent's service `.env`. `npm run seed` starts the database again from `data/` and the plans and documents in `context/`. `npm run build` builds the dashboard into `dashboard/dist`, which the backend then serves itself, as it does on Lambda; delete `dashboard/dist` to go back to the backend serving only the API.
 
 `npm run check` runs every check:
 
 - Python: ruff (lint and format), pyright, and pytest with 80% coverage
 - `npm run check:server`: the backend imports with only the `server` dependency group, the one the Lambda package has, installed in a temporary environment
+- `npm run check:context`: the context layer imports with only the `context` dependency group, the one its Lambda package has, the same way
 - TypeScript: ESLint, Prettier, tsc, and vitest with 80% coverage
 - Playwright end-to-end tests, with stand-ins for the agent's service on port 8003, Supabase Auth on port 8004 (it signs tokens with a key of its own) and the judge on port 8005. Every spec signs in as a handler first.
 
-`npm run check` needs no Supabase, Langfuse or OpenRouter, and passes with `.env` moved out of the way. The tests run on SQLite, and never call a model, the judge or Supabase Auth. They set a fixed test value for `UNDERCOVER_API_KEY` (the Python tests' fixtures through `backend/tests/signing.py`, the end-to-end tests in `playwright.config.ts`), so they never need the real key.
+`npm run check` needs no Supabase, Langfuse, OpenRouter or AWS, and passes with `.env` moved out of the way. The agent's tests run the context layer in the test process, and stand in for the AgentCore Gateway with a small MCP server and for AgentCore Memory with a stand-in store. The tests run on SQLite, and never call a model, the judge or Supabase Auth. They set a fixed test value for `UNDERCOVER_API_KEY` (the Python tests' fixtures through `backend/tests/signing.py`, the end-to-end tests in `playwright.config.ts`), so they never need the real key.
 
 The pre-commit hook runs the format, lint, type and unit test checks on every commit.
 

@@ -129,15 +129,15 @@ The brief's five steps are phases 1 to 5, one each, with a commit at the end of 
 
 On the default model (GPT-6 Luna), after one `npm run seed`, with `npm run dev` running (backend, agent's service, context layer and dashboard), with no `UNDERCOVER_GATEWAY_URL` and no `UNDERCOVER_MEMORY_ID`.
 
-- [ ] `npm run check` is green with `.env` moved out of the way
-- [ ] The context layer answers on the direct route: a script lists its seven tools at `http://127.0.0.1:8006/mcp` and calls `lookup_term("unattended")`
-- [ ] `uv run -m agent CLM-1005`, then `uv run -m agent CLM-1006`, each record a complete decision (calculation for an approval, maker, manual version), with no memory tool
-- [ ] A dispatch at N=25 works the rest of the queue as before, and CLM-1901 is still referred by the check, with "Security check" as its maker
-- [ ] An evaluation of the evaluation set's five tiny claims matches as before
-- [ ] Dana Whitfield sees CLM-1005's and CLM-1006's pages: the tool calls, the lookups with where each came from, the Context used panel and the decision with its calculation. These are checked through the Playwright MCP server. If it doesn't connect, as last time, they're checked with Playwright's library from a script, said in the status.
-- [ ] The run's cost from the recorded usage, reported
-- [ ] `docs/SPEC.md`, `docs/TECH_STACK.md` (with the Deployment section's context layer and agent settings), `docs/PROCESS.md`, `docs/CODE_STANDARDS.md` (one module for each route), `docs/STATUS.md` and `data/README.md` describe the product as it now is
-- [ ] Every box in this plan is ticked, and each phase has its own commit
+- [x] `npm run check` is green with `.env` moved out of the way (the end-to-end tests passed on a second run, after the first timed out starting a server while memory was short)
+- [x] The context layer answers on the direct route: a script lists its seven tools at `http://127.0.0.1:8006/mcp` and calls `lookup_term("unattended")`
+- [x] `uv run -m agent CLM-1005`, then `uv run -m agent CLM-1006`, each record a complete decision (calculation for an approval, maker, manual version), with no memory tool
+- [x] A dispatch at N=25 works the rest of the queue as before, and CLM-1901 is still referred by the check, with "Security check" as its maker
+- [ ] An evaluation of the evaluation set's five tiny claims matches as before. **Not met:** every decision matched, but EV2-CLM-1021 paid $954 against our handlers' $825 (accuracy 0.8). The model listed headphones as electronics, escaping the per-item limit; the same claim paid $825 in the dispatch. See `docs/STATUS.md`. Left for the student to decide on, not rerun until it matched
+- [x] Dana Whitfield sees CLM-1005's and CLM-1006's pages: the tool calls, the lookups with where each came from, the Context used panel and the decision with its calculation. These are checked through the Playwright MCP server. If it doesn't connect, as last time, they're checked with Playwright's library from a script, said in the status.
+- [x] The run's cost from the recorded usage, reported
+- [x] `docs/SPEC.md`, `docs/TECH_STACK.md` (with the Deployment section's context layer and agent settings), `docs/PROCESS.md`, `docs/CODE_STANDARDS.md` (one module for each route), `docs/STATUS.md` and `data/README.md` describe the product as it now is
+- [ ] Every box in this plan is ticked, and each phase has its own commit. Each phase has its own commit; every box but the evaluation's is ticked
 
 ## Not in this plan
 

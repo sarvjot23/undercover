@@ -1,4 +1,4 @@
-"""The claim agent's own API: an OpenAPI document with its eight operations only.
+"""The claim agent's own API: an OpenAPI document with its six operations only.
 
 The AgentCore Gateway makes a tool of each operation, so the dashboard's routes,
 the evaluations and the sign-off stay out of the agent's reach. The deployment
@@ -17,8 +17,6 @@ OPERATIONS = {
     "get_claim",
     "get_policy",
     "get_claim_history",
-    "search_documents",
-    "read_section",
     "calculate_payout",
     "record_decision",
     "pay_claim",

@@ -141,11 +141,12 @@ def record_tool_result(
         number = [call["id"] for call in message.tool_calls].index(
             request.tool_call["id"]
         )
-        kind, text = (
-            ("read", result.text.splitlines()[0])
-            if name == "read_section" and not result.text.startswith("Refused")
-            else ("tool_result", f"{name}: {result.text[:STEP_LENGTH]}")
-        )
+        if name == "read_section" and not result.text.startswith("Refused"):
+            section = json.loads(result.text)
+            kind = "read"
+            text = f"{section['name']} · {section['number']}. {section['title']}"
+        else:
+            kind, text = "tool_result", f"{name}: {result.text[:STEP_LENGTH]}"
         key = f"{state['thread_id']}:{message.id}:{number}:result"
         record_step(state["claim_id"], kind, text, key)
     return result

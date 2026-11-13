@@ -8,8 +8,7 @@ from typing import Literal
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
-from agent import client
-from agent.direct import APP
+from agent.direct import APP, CONTEXT
 from agent.mcp_bridge import Refused
 from agent.routes import Route
 
@@ -143,47 +142,55 @@ def app_tools(claim: ClaimContext) -> list[BaseTool]:
     return [get_claim, get_policy, get_claim_history, calculate_payout, record_decision]
 
 
-@tool
-def list_sections(document: Document) -> str:
-    """List the numbered sections of the policy wording or the claims manual."""
-    with client.backend() as backend:
-        response = backend.get(f"/api/documents/{document}/sections")
-    if not response.is_success:
-        return client.reply(response)
-    found = response.json()
-    titles = [f"{s['number']}. {s['title']}" for s in found["sections"]]
-    return "\n".join([found["name"], *titles])
+def context_tools(claim: ClaimContext) -> list[BaseTool]:
+    """The context layer's lookups for the model, on the claim's route."""
 
+    @tool
+    def lookup_term(term: str) -> str:
+        """Look up a term the policy wording defines, with the sections it is from."""
+        return answer(claim, CONTEXT, "lookup_term", term=term)
 
-@tool
-def read_section(document: Document, number: int) -> str:
-    """Read one numbered section of the policy wording or the claims manual."""
-    with client.backend() as backend:
-        response = backend.get(f"/api/documents/{document}/sections/{number}")
-    if not response.is_success:
-        return client.reply(response)
-    section = response.json()
-    heading = f"{section['name']} · {section['number']}. {section['title']}"
-    return f"{heading}\n\n{section['text']}"
+    @tool
+    def describe_fields(record: Literal["claim", "policy", "previous_claim"]) -> str:
+        """Describe what each field means in a claim, a policy or a previous claim."""
+        return answer(claim, CONTEXT, "describe_fields", record=record)
 
+    @tool
+    def get_plan(plan: Literal["economy", "premium", "first"]) -> str:
+        """Get a plan's limits, waiting periods and deductible, and the add-ons."""
+        return answer(claim, CONTEXT, "get_plan", plan=plan)
 
-@tool
-def search_documents(query: str) -> str:
-    """Find the sections of the wording and the manual that mention every word."""
-    with client.backend() as backend:
-        response = backend.get(f"/api/documents/search/{query}")
-    found = response.json()
-    if not found:
-        return f"Nothing in the wording or the manual mentions {query!r}."
-    return "\n\n".join(
-        f"{f['name']} · {f['number']}. {f['title']}\n" + "\n".join(f["lines"][:5])
-        for f in found
-    )
+    @tool
+    def get_claim_rules() -> str:
+        """Get the rules claims operations applies to every claim, with numbers."""
+        return answer(claim, CONTEXT, "get_claim_rules")
 
+    @tool
+    def search_reference_data(query: str) -> str:
+        """Find outside facts, such as storms, strikes and prices, with every word."""
+        return answer(claim, CONTEXT, "search_reference_data", query=query)
 
-DOCUMENT_TOOLS = [list_sections, read_section, search_documents]
+    @tool
+    def search_documents(query: str) -> str:
+        """Find the sections of the wording and the manual that mention every word."""
+        return answer(claim, CONTEXT, "search_documents", query=query)
+
+    @tool
+    def read_section(document: Document, number: int) -> str:
+        """Read one numbered section of the policy wording or the claims manual."""
+        return answer(claim, CONTEXT, "read_section", document=document, number=number)
+
+    return [
+        lookup_term,
+        describe_fields,
+        get_plan,
+        get_claim_rules,
+        search_reference_data,
+        search_documents,
+        read_section,
+    ]
 
 
 def for_claim(claim: ClaimContext) -> list[BaseTool]:
     """Every tool the model has on this claim."""
-    return [*app_tools(claim), *DOCUMENT_TOOLS]
+    return [*app_tools(claim), *context_tools(claim)]

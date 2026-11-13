@@ -63,6 +63,17 @@ def test_get_claim_gives_the_same_text_on_both_routes(standin_url):
     assert direct == api().get(f"/api/claims/{CLAIM}").text
 
 
+def test_the_context_layer_answers_the_same_through_the_gateway(standin_url):
+    claim = context_for(gateway.Gateway(standin_url))
+    through = {t.name: t for t in tools.context_tools(claim)}
+    direct = {t.name: t for t in tools.context_tools(context_for(routes.choose()))}
+    question = {"term": "Unattended"}
+    assert through["lookup_term"].invoke(question) == (
+        direct["lookup_term"].invoke(question)
+    )
+    assert "glossary.yaml" in through["lookup_term"].invoke(question)
+
+
 def test_a_refusal_by_the_app_on_each_route(standin_url):
     for route in (Direct(DEFAULT_CONTEXT), gateway.Gateway(standin_url)):
         found = tools.app_tools(context_for(route, "CLM-9999"))[0].invoke({})

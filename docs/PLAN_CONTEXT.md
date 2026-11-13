@@ -73,13 +73,13 @@ The brief's five steps are phases 1 to 5, one each, with a commit at the end of 
 - `backend/agent_api.py` has six operations: `get_claim`, `get_policy`, `get_claim_history`, `calculate_payout`, `record_decision` and `pay_claim`.
 - The model's tools add the context layer's seven tools, from the route (`undercover-context___…` on the Gateway). `list_sections` goes. `backend/instructions/claim.md` changes only as far as the tools it names; phase 4 rewrites what it works from.
 
-- [ ] `context/tests/test_server.py` calls each tool against the real files in `context/`: a term in any case, an unknown term (with the list of terms), each record's fields, each plan, the claim rules, a reference search with two words in mixed case, a document search naming each section's file, a section read, and a section that doesn't exist. Every answer names its file and source.
-- [ ] A test calls `context.server.handler` twice in one process with Function URL events and a Function URL's host: it lists the tools, then calls one. Both succeed.
-- [ ] `npm run check:context` passes, and so does `npm run check:server` with `pyyaml` in its group
-- [ ] `backend/tests/test_agent_api.py` expects exactly the six operations
-- [ ] Seeding: the plans come from `plans.yaml` with the same limits as before, the documents table holds both documents with versions `2026.1` and `2026.2`, and a test shows that seeding opens no plan or document file in `data/`
-- [ ] The payout tests pass unchanged, on plans from the table
-- [ ] `npm run check` passes, and the commit goes through the pre-commit hook
+- [x] `context/tests/test_server.py` calls each tool against the real files in `context/`: a term in any case, an unknown term (with the list of terms), each record's fields, each plan, the claim rules, a reference search with two words in mixed case, a document search naming each section's file, a section read, and a section that doesn't exist. Every answer names its file and source.
+- [x] A test calls `context.server.handler` twice in one process with Function URL events and a Function URL's host: it lists the tools, then calls one. Both succeed.
+- [x] `npm run check:context` passes, and so does `npm run check:server` with `pyyaml` in its group
+- [x] `backend/tests/test_agent_api.py` expects exactly the six operations
+- [x] Seeding: the plans come from `plans.yaml` with the same limits as before, the documents table holds both documents with versions `2026.1` and `2026.2`, and a test shows that seeding opens no plan or document file in `data/`
+- [x] The payout tests pass unchanged, on plans from the table
+- [x] `npm run check` passes, and the commit goes through the pre-commit hook
 
 ## Phase 3: A complete decision record
 

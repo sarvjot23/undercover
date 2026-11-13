@@ -1,8 +1,12 @@
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from backend.payout import Line, work_out_payout
+
+PLANS = yaml.safe_load(Path("context/plans.yaml").read_text(encoding="utf-8"))
 
 LIMIT = 800.0
 
@@ -21,6 +25,11 @@ def line(amount, kind: Any = "item", quantity=1, nights=0, hours=0):
 def policy(plan="premium", add_ons=(), travelers=1, trip_cost=9000.0):
     return {
         "plan": plan,
+        "plan_rules": {
+            **next(p for p in PLANS["plans"] if p["plan"] == plan),
+            "deductible_applies_to": PLANS["deductible_applies_to"],
+            "add_ons": PLANS["add_ons"],
+        },
         "add_ons": list(add_ons),
         "travelers": ["Traveler"] * travelers,
         "trip": {"trip_cost": trip_cost},

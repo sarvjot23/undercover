@@ -1,7 +1,7 @@
 """The payout rules for an approved claim.
 
-From section 10 of the policy wording, the plan limits in data/plans.json and
-sections 6, 7 and 10 of the claims manual.
+From section 10 of the policy wording, the plans as seeding loads them from
+context/plans.yaml, and sections 6, 7 and 10 of the claims manual.
 """
 
 from math import ceil, inf
@@ -9,14 +9,6 @@ from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
-from backend import db
-
-PLAN_DATA = db.load("plans.json")
-PLANS = {plan["plan"]: plan for plan in PLAN_DATA["plans"]}
-ADD_ONS = {add_on["add_on"]: add_on for add_on in PLAN_DATA["add_ons"]}
-DEDUCTIBLE_BENEFITS = PLAN_DATA["deductible_applies_to"]
-
-ELECTRONICS_PLUS_LIMIT = ADD_ONS["electronics_plus"]["electronics_per_item_limit"]
 CASH_LIMIT = 100.0
 HOTEL_NIGHT_LIMIT = 350.0
 MEALS_PER_TRAVELER_PER_DAY = 35.0
@@ -75,9 +67,18 @@ def step(description: str, amount: float) -> CalculationStep:
     return {"step": description, "amount": round(amount, 2)}
 
 
+def electronics_plus_limit(plan: dict[str, Any]) -> float:
+    """The per-item limit for electronics with the Electronics Plus add-on."""
+    return next(
+        add_on["electronics_per_item_limit"]
+        for add_on in plan["add_ons"]
+        if add_on["add_on"] == "electronics_plus"
+    )
+
+
 def limit_for(line: Line, policy: dict[str, Any]) -> float:
     """Return the most we pay for one line, or infinity if it has no limit."""
-    plan = PLANS[policy["plan"]]
+    plan = policy["plan_rules"]
     travelers = len(policy["travelers"])
     match line.kind:
         case "item":
@@ -85,7 +86,9 @@ def limit_for(line: Line, policy: dict[str, Any]) -> float:
         case "electronics":
             electronics_plus = "electronics_plus" in policy["add_ons"]
             per_item = (
-                ELECTRONICS_PLUS_LIMIT if electronics_plus else plan["per_item_limit"]
+                electronics_plus_limit(plan)
+                if electronics_plus
+                else plan["per_item_limit"]
             )
             return per_item * line.quantity
         case "hotel":
@@ -106,7 +109,7 @@ def eligible_amount(line: Line, policy: dict[str, Any]) -> CalculationStep:
 
 def benefit_maximum(policy: dict[str, Any], benefit: Benefit) -> float:
     """Return the most the plan pays; cancellation also stops at the trip cost."""
-    maximum = PLANS[policy["plan"]][BENEFIT_MAXIMUM[benefit]]
+    maximum = policy["plan_rules"][BENEFIT_MAXIMUM[benefit]]
     if benefit in ("trip_cancellation", "trip_interruption"):
         return min(maximum, policy["trip"]["trip_cost"])
     return maximum
@@ -121,8 +124,10 @@ def work_out_payout(
 ) -> Payout:
     """Work out the payout on an approved claim, following section 10 of the wording.
 
-    It needs a sign-off when it's over the approval limit.
+    The policy carries its plan's rules as plan_rules. It needs a sign-off when
+    it's over the approval limit.
     """
+    plan = policy["plan_rules"]
     calculation = [
         eligible_amount(line, policy) for line in lines if line.kind != "cash"
     ]
@@ -139,8 +144,8 @@ def work_out_payout(
         )
         total -= paid_by_others
 
-    if benefit in DEDUCTIBLE_BENEFITS and total > 0:
-        deductible = min(PLANS[policy["plan"]]["deductible"], total)
+    if benefit in plan["deductible_applies_to"] and total > 0:
+        deductible = min(plan["deductible"], total)
         if deductible:
             calculation.append(step("Less the deductible", -deductible))
             total -= deductible

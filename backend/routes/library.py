@@ -6,8 +6,8 @@ from typing import Any
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from backend import db, keys
-from backend.db import SingleStatementDb, handlers
+from backend import keys
+from backend.db import SingleStatementDb, documents, handlers
 
 router = APIRouter(prefix="/api")
 
@@ -15,9 +15,10 @@ router = APIRouter(prefix="/api")
 @router.get(
     "/policy-wording", operation_id="get_policy_wording", dependencies=keys.HANDLER
 )
-def get_policy_wording() -> dict[str, str]:
+def get_policy_wording(conn: SingleStatementDb) -> dict[str, str]:
     """Get the policy wording that decisions follow."""
-    return {"text": (db.DATA / "policy_wording.md").read_text(encoding="utf-8")}
+    query = select(documents.c.text).where(documents.c.document == "policy_wording")
+    return {"text": conn.execute(query).scalar_one()}
 
 
 @router.get("/handlers", operation_id="list_handlers", dependencies=keys.HANDLER)

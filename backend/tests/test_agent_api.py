@@ -17,14 +17,12 @@ def operations(document):
     }
 
 
-def test_the_document_has_exactly_the_agents_eight_operations(client):
+def test_the_document_has_exactly_the_agents_six_operations(client):
     document = client.get(DOCUMENT).json()
     assert set(operations(document)) == {
         "get_claim",
         "get_policy",
         "get_claim_history",
-        "search_documents",
-        "read_section",
         "calculate_payout",
         "record_decision",
         "pay_claim",

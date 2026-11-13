@@ -1,4 +1,5 @@
-"""The UnderCover database: Supabase or SQLite, seeded from the data in data/."""
+"""The UnderCover database: Supabase or SQLite, seeded from the data in data/ and
+data governance's plans and documents in context/, which only seeding reads."""
 
 import json
 import os
@@ -8,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
 
+import yaml
 from fastapi import Depends
 from sqlalchemy import (
     Boolean,
@@ -31,6 +33,8 @@ from sqlalchemy import (
 from sqlalchemy.pool import NullPool
 
 DATA = Path(__file__).parent.parent / "data"
+CONTEXT = Path(__file__).parent.parent / "context"
+DOCUMENTS = {"policy_wording": "Policy wording", "claims_manual": "Claims manual"}
 INSTRUCTIONS = Path(__file__).parent / "instructions"
 DEFAULT_MODEL = "openai/gpt-6-luna"
 DEFAULT_REASONING = "low"
@@ -71,6 +75,16 @@ claims = Table(
 policies = body_table("policies", "policy_id")
 customers = body_table("customers", "customer_id")
 plans = body_table("plans", "plan")
+# The policy wording and the claims manual, with the version and source of each.
+documents = Table(
+    "documents",
+    metadata,
+    Column("document", Text, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("version", Text, nullable=False),
+    Column("source", Text, nullable=False),
+    Column("text", Text, nullable=False),
+)
 handlers = Table(
     "handlers",
     metadata,
@@ -399,16 +413,46 @@ def seed(conn: Connection) -> None:
             for handler in load("handlers.json")
         ],
     )
-    conn.execute(
-        plans.insert(),
-        [
-            {"plan": plan["plan"], "body": json.dumps(plan)}
-            for plan in load("plans.json")["plans"]
-        ],
-    )
+    seed_plans(conn)
+    seed_documents(conn)
     seed_answer_key(conn)
     seed_versions(conn)
     seed_settings(conn)
+
+
+def seed_plans(conn: Connection) -> None:
+    """Each plan from policy administration, with what every plan shares: the
+    benefits the deductible applies to and the add-ons."""
+    found = yaml.safe_load((CONTEXT / "plans.yaml").read_text(encoding="utf-8"))
+    shared = {
+        "deductible_applies_to": found["deductible_applies_to"],
+        "add_ons": found["add_ons"],
+    }
+    conn.execute(
+        plans.insert(),
+        [
+            {"plan": plan["plan"], "body": json.dumps({**plan, **shared})}
+            for plan in found["plans"]
+        ],
+    )
+
+
+def seed_documents(conn: Connection) -> None:
+    """The wording and the manual, each with the version and source in its front
+    matter, which is left out of its text."""
+    for document, name in DOCUMENTS.items():
+        whole = (CONTEXT / f"{document}.md").read_text(encoding="utf-8")
+        _, front, text = whole.split("---\n", 2)
+        meta = yaml.safe_load(front)
+        conn.execute(
+            documents.insert().values(
+                document=document,
+                name=name,
+                version=meta["version"],
+                source=json.dumps(meta["source"]),
+                text=text.strip(),
+            )
+        )
 
 
 def seed_versions(conn: Connection) -> None:

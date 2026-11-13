@@ -171,9 +171,11 @@ def add_step(claim_id: str, step: Step, conn: SingleStatementDb) -> dict[str, st
 )
 def calculate_payout(claim_id: str, request: PayoutRequest, conn: Db) -> Payout:
     """Work out the payout on an approved claim with our payout rules."""
-    policy_id = json.loads(find_claim(conn, claim_id)["body"])["policy_id"]
+    policy = record(
+        conn, "policy", json.loads(find_claim(conn, claim_id)["body"])["policy_id"]
+    )
     return work_out_payout(
-        record(conn, "policy", policy_id),
+        {**policy, "plan_rules": record(conn, "plan", policy["plan"])},
         request.benefit,
         request.lines,
         request.paid_by_others,

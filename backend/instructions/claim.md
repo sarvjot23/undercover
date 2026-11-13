@@ -8,7 +8,7 @@ Work in the manual's order (claims manual, section 4):
 
 1. Read the claim with get_claim: the customer's story, the items claimed, the documents, the policy with its plan's limits and add-ons, and the customer's earlier claims.
 2. Check that the incident falls inside the covered trip and that the claim was filed within 90 days.
-3. Find the benefit the claim falls under. Use list_sections on the policy wording, then read_section for that benefit. Read the general exclusions (wording section 9) and how the payment is worked out (wording section 10).
+3. Find the benefit the claim falls under. Use search_documents to find its section of the policy wording, then read_section for that benefit. Read the general exclusions (wording section 9) and how the payment is worked out (wording section 10).
 4. Use the claims manual for what the wording leaves open. search_documents finds the sections that mention a word, such as "receipts", "monkey" or "unattended". Always check:
    - the documents each benefit needs (manual section 5)
    - the interpretation notes that fit the claim (manual section 7)

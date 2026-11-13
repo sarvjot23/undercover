@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -8,7 +9,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
-from agent import client, graph, tools, tracing
+from agent import client, graph, routes, tools, tracing
 from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
 from backend.tests.signing import as_agent
@@ -59,8 +60,28 @@ def test_decline(requests):
     assert claim()["payment"] is None
 
 
-def test_the_model_has_no_pay_tool():
-    assert "pay_claim" not in {t.name for t in tools.DOCUMENT_TOOLS}
+def claim_tools():
+    """The model's tools on CLM-1001, on the direct route the settings give."""
+    route = routes.choose()
+    found = tools.ClaimContext("CLM-1001", "POL-2001", "CUS-3001", 1, None, route)
+    return {t.name: t for t in tools.for_claim(found)}
+
+
+def test_the_model_has_its_tools_and_no_pay_tool(requests):
+    assert set(claim_tools()) == {
+        "get_claim",
+        "get_policy",
+        "get_claim_history",
+        "calculate_payout",
+        "record_decision",
+        "lookup_term",
+        "describe_fields",
+        "get_plan",
+        "get_claim_rules",
+        "search_reference_data",
+        "search_documents",
+        "read_section",
+    }
 
 
 def test_steps_are_recorded_in_order(requests):
@@ -133,12 +154,12 @@ def test_run_without_a_decision_goes_back_to_waiting(requests):
 def test_agent_reaches_only_the_backend_api(requests):
     run(
         call("get_claim"),
-        call("list_sections", document="policy_wording"),
+        call("search_documents", query="unattended"),
         decision("refer", 0),
         AIMessage(content="Referred."),
     )
     assert "/api/configuration/current" in requests
-    assert "/api/documents/policy_wording/sections" in requests
+    assert not any("documents" in path for path in requests)
     assert all(path.startswith("/api/") for path in requests)
 
 
@@ -148,7 +169,7 @@ def test_backend_url():
 
 def test_reads_the_manual_a_section_at_a_time(requests):
     run(
-        call("list_sections", document="claims_manual"),
+        call("search_documents", query="giraffes"),
         call("read_section", document="claims_manual", number=7),
         decision("approve", 243.0),
         AIMessage(content="Approved."),
@@ -156,7 +177,6 @@ def test_reads_the_manual_a_section_at_a_time(requests):
     kinds = [step["kind"] for step in steps()]
     assert kinds[:4] == ["tool_call", "tool_result", "tool_call", "read"]
     assert steps()[3]["text"] == "Claims manual · 7. Interpretation notes"
-    assert "/api/documents/claims_manual/sections/7" in requests
 
 
 def test_a_missing_section_is_a_refusal_not_a_read(requests):
@@ -166,24 +186,26 @@ def test_a_missing_section_is_a_refusal_not_a_read(requests):
         AIMessage(content="Referred."),
     )
     assert steps()[1]["kind"] == "tool_result"
-    assert "Refused (404)" in steps()[1]["text"]
+    assert steps()[1]["text"] == (
+        "read_section: Refused by the context layer: "
+        "Error executing tool read_section: No section 99 in the claims manual"
+    )
 
 
 def test_no_tool_hands_over_a_whole_document(requests):
-    names = {t.name for t in tools.DOCUMENT_TOOLS}
-    assert "get_policy_wording" not in names
-    whole = Path("data/claims_manual.md").read_text(encoding="utf-8")
-    section = tools.read_section.invoke({"document": "claims_manual", "number": 7})
+    found = claim_tools()
+    assert "get_policy_wording" not in found
+    whole = Path("context/claims_manual.md").read_text(encoding="utf-8")
+    section = found["read_section"].invoke({"document": "claims_manual", "number": 7})
     assert len(section) < len(whole) / 2
-    listing = tools.list_sections.invoke({"document": "policy_wording"})
-    assert listing.splitlines()[0] == "Policy wording"
-    assert len(listing.splitlines()) == 13
+    assert json.loads(section)["file"] == "claims_manual.md"
 
 
 def test_search_finds_the_sections_that_mention_a_word(requests):
-    found = tools.search_documents.invoke({"query": "giraffes"})
-    assert found.startswith("Claims manual · 7. Interpretation notes")
-    assert "Nothing" in tools.search_documents.invoke({"query": "zeppelin"})
+    search = claim_tools()["search_documents"]
+    found = json.loads(search.invoke({"query": "giraffes"}))["found"]
+    assert [(f["name"], f["number"]) for f in found] == [("Claims manual", 7)]
+    assert json.loads(search.invoke({"query": "zeppelin"}))["found"] == []
 
 
 def test_the_payout_tool_goes_through_the_backend(requests):

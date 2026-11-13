@@ -10,7 +10,6 @@ from backend import agent_api, db, static
 from backend.routes import (
     claims,
     configuration,
-    documents,
     evaluations,
     library,
     records,
@@ -33,7 +32,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="UnderCover", lifespan=lifespan)
 app.add_middleware(TakingTurns)
 app.include_router(claims.router)
-app.include_router(documents.router)
 app.include_router(library.router)
 app.include_router(runs.router)
 app.include_router(usage.router)

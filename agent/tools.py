@@ -127,7 +127,10 @@ def app_tools(claim: ClaimContext) -> list[BaseTool]:
         reasons: str,
         policy_section: str,
     ) -> str:
-        """Record a decision with its payout, reasons and policy section."""
+        """Record a decision with its payout, reasons and policy section.
+
+        An approval's payout must equal the latest calculate_payout for this claim.
+        """
         return answer(
             claim,
             APP,
@@ -137,6 +140,7 @@ def app_tools(claim: ClaimContext) -> list[BaseTool]:
             payout=payout,
             reasons=reasons,
             policy_section=policy_section,
+            decided_by=maker(claim),
         )
 
     return [get_claim, get_policy, get_claim_history, calculate_payout, record_decision]

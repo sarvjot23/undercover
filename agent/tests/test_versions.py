@@ -29,6 +29,12 @@ def add_version():
         )
 
 
+def maker(claim_id):
+    """Who or what the claim's decision record says made the decision."""
+    found = TestClient(app, headers=as_agent()).get(f"/api/claims/{claim_id}").json()
+    return found["decision"]["decided_by"]
+
+
 def test_the_claim_agent_is_built_from_its_runs_version(requests, monkeypatch):
     add_version()
     built = []
@@ -83,6 +89,7 @@ def test_the_claim_agent_is_built_from_its_runs_version(requests, monkeypatch):
     assert built == ["Version 2's instructions."]
     assert models == [("google/gemini-3.5-flash-lite", "minimal")]
     assert "/api/configuration/versions/2" in requests
+    assert maker(claim_id) == "UnderCover Agent, version 2"
 
 
 def test_outside_a_run_the_claim_agent_uses_the_current_version(requests):
@@ -100,6 +107,7 @@ def test_outside_a_run_the_claim_agent_uses_the_current_version(requests):
         ),
     )
     assert "/api/configuration/current" in requests
+    assert maker("CLM-1001") == "UnderCover Agent, version 1"
 
 
 def test_the_claim_agents_client_and_tools_never_reach_the_scores():

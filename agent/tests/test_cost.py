@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from agent import claim as claim_agent
 from agent import graph, model, tracing
+from agent.tests import stubs
 from agent.tests.stubs import call, script
 from backend import db
 from backend.api import app
@@ -36,13 +37,7 @@ def refer():
 
 
 def approve(payout):
-    return call(
-        "record_decision",
-        decision="approve",
-        payout=payout,
-        reasons="The wording settles it. The documents support it.",
-        policy_section="3. Trip Delay",
-    )
+    return stubs.decide("approve", payout, CLAIM)
 
 
 def rows(table):
@@ -121,7 +116,7 @@ def test_the_wait_for_a_sign_off_is_not_counted(requests, monkeypatch):
         ]
     )
     monkeypatch.setattr(claim_agent, "clock", lambda: next(times))
-    claim_agent.run(CLAIM, "thread-1", script(approve(1200.0)), RUN)
+    claim_agent.run(CLAIM, "thread-1", script(*approve(1200.0)), RUN)
     TestClient(app, headers=as_agent()).post(
         f"/api/claims/{CLAIM}/sign-off", headers=as_handler()
     )

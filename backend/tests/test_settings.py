@@ -1,3 +1,4 @@
+from backend.tests import deciding
 from backend.tests.signing import MARCUS, as_handler
 
 START = {
@@ -26,16 +27,7 @@ def change(client, email=None, **values):
 
 
 def decide(client, claim_id, payout):
-    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "t"})
-    return client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": "approve",
-            "payout": payout,
-            "reasons": "Covered by the wording. The receipts support it.",
-            "policy_section": "3. Trip Delay",
-        },
-    ).json()
+    return deciding.decide(client, claim_id, "approve", payout).json()
 
 
 def test_the_settings_start_with_the_labs_values_and_our_limit(client):

@@ -11,23 +11,72 @@ export function start(request: APIRequestContext, claimId: string) {
   });
 }
 
-/** Start a claim and record a decision, the way the agent does. */
-export async function decide(
+type Choice = "approve" | "decline" | "refer";
+
+/** The reasons every decision recorded by these tests gives. */
+export const REASONS =
+  "Recorded by the end-to-end test. The wording settles it.";
+
+/** Work out a payout of this amount, so an approval has its calculation on file:
+ * one expense under emergency medical for the payout plus the plan's deductible. */
+async function calculate(
   request: APIRequestContext,
   claimId: string,
-  decision: "approve" | "decline" | "refer",
   payout: number,
 ) {
-  expect((await start(request, claimId)).ok()).toBe(true);
+  const claim = (await (
+    await request.get(`/api/claims/${claimId}`)
+  ).json()) as {
+    plan: { deductible: number };
+  };
+  const response = await request.post(`/api/claims/${claimId}/payout`, {
+    data: {
+      benefit: "emergency_medical",
+      lines: [
+        {
+          description: "Covered costs",
+          amount: payout + claim.plan.deductible,
+          quantity: 1,
+          kind: "expense",
+          nights: 0,
+          hours: 0,
+        },
+      ],
+      paid_by_others: 0,
+    },
+  });
+  expect(((await response.json()) as { payout: number }).payout).toBe(payout);
+}
+
+/** Record a decision on a claim in progress, the way the agent does. */
+export async function record(
+  request: APIRequestContext,
+  claimId: string,
+  decision: Choice,
+  payout: number,
+) {
+  if (decision === "approve") await calculate(request, claimId, payout);
   const response = await request.post(`/api/claims/${claimId}/decision`, {
     data: {
       decision,
       payout,
-      reasons: "Recorded by the end-to-end test. The wording settles it.",
+      reasons: REASONS,
       policy_section: "3. Trip Delay",
+      decided_by: "UnderCover Agent, version 1",
     },
   });
   expect(response.ok()).toBe(true);
+}
+
+/** Start a claim and record a decision, the way the agent does. */
+export async function decide(
+  request: APIRequestContext,
+  claimId: string,
+  decision: Choice,
+  payout: number,
+) {
+  expect((await start(request, claimId)).ok()).toBe(true);
+  await record(request, claimId, decision, payout);
 }
 
 /** Create a dispatch without starting the agent, so the test can play its part. */

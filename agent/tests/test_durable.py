@@ -4,6 +4,7 @@ from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
 from agent import graph, lease
+from agent.tests import stubs
 from agent.tests.stubs import BrokenModel, Stopped, StoppedModel, call, script
 from backend import db
 from backend.api import app
@@ -14,13 +15,7 @@ THREAD = "CLM-1001-first"
 
 
 def decision(choice="approve", payout=1200.0):
-    return call(
-        "record_decision",
-        decision=choice,
-        payout=payout,
-        reasons="The wording settles it. The documents support it.",
-        policy_section="3. Trip Delay",
-    )
+    return stubs.decide(choice, payout, CLAIM)
 
 
 def stop():
@@ -51,7 +46,7 @@ def saved_state():
 
 
 def hold():
-    return claim_agent.run(CLAIM, THREAD, script(decision()))
+    return claim_agent.run(CLAIM, THREAD, script(*decision()))
 
 
 def sign_off():
@@ -59,7 +54,7 @@ def sign_off():
 
 
 def test_an_approval_up_to_the_limit_is_paid_straight_after_the_decision(requests):
-    answer = claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+    answer = claim_agent.run(CLAIM, THREAD, script(*decision(payout=420.0)))
     assert answer == "CLM-1001: approve $420.00"
     assert claim()["status"] == "decided"
     assert claim()["payment"]["signed_off_by"] is None
@@ -115,7 +110,7 @@ def test_a_claim_stopped_partway_carries_on_from_its_last_step(requests):
     before = texts()
     assert [kind for kind, _ in before] == ["tool_call", "tool_result"]
 
-    answer = claim_agent.carry_on(CLAIM, script(decision("refer", 0)))
+    answer = claim_agent.carry_on(CLAIM, script(*decision("refer", 0)))
     assert answer == "CLM-1001: refer $0.00"
     assert claim()["attempts"] == 0
     assert claim()["thread_id"] == THREAD
@@ -152,9 +147,9 @@ def test_a_restart_repeats_no_step(requests, monkeypatch, kind, after):
         claim_agent.run(
             CLAIM,
             THREAD,
-            script(call("get_claim"), decision("refer", 0)),
+            script(call("get_claim"), *decision("refer", 0)),
         )
-    claim_agent.carry_on(CLAIM, script(decision("refer", 0)))
+    claim_agent.carry_on(CLAIM, script(*decision("refer", 0)))
     keys = [step["key"] for step in steps()]
     assert len(keys) == len(set(keys))
     assert [k for k, _ in texts()].count("tool_call") == 2
@@ -165,7 +160,7 @@ def test_a_reply_lost_in_a_crash_never_appears(requests):
     with pytest.raises(Stopped):
         claim_agent.run(CLAIM, THREAD, StoppedModel(messages=iter([])))
     assert steps() == []
-    claim_agent.carry_on(CLAIM, script(decision("refer", 0)))
+    claim_agent.carry_on(CLAIM, script(*decision("refer", 0)))
     assert [kind for kind, _ in texts()] == ["tool_call", "tool_result", "answer"]
 
 
@@ -173,7 +168,7 @@ def test_a_stop_between_the_decision_and_the_payment_pays_once(requests, monkeyp
     with monkeypatch.context() as patch:
         patch.setattr(graph, "pay_node", lambda claim: lambda state: stop())
         with pytest.raises(Stopped):
-            claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+            claim_agent.run(CLAIM, THREAD, script(*decision(payout=420.0)))
     assert claim()["status"] == "in_progress"
     assert claim()["payment"] is None
 
@@ -186,7 +181,7 @@ def test_a_stop_between_the_decision_and_the_payment_pays_once(requests, monkeyp
 def test_a_stop_after_the_payment_pays_once_and_repeats_no_step(requests, monkeypatch):
     stop_on(monkeypatch, "tool_result", after=False, text="pay_claim:")
     with pytest.raises(Stopped):
-        claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+        claim_agent.run(CLAIM, THREAD, script(*decision(payout=420.0)))
     paid = claim()["payment"]
     assert paid["amount"] == 420.0
 
@@ -201,7 +196,7 @@ def test_a_claim_that_fails_with_an_error_starts_afresh(requests):
     assert claim_agent.run(CLAIM, THREAD, broken).endswith("back in the queue")
     assert claim()["attempts"] == 1
     assert claim()["thread_id"] is None
-    answer = claim_agent.run(CLAIM, "CLM-1001-second", script(decision("refer", 0)))
+    answer = claim_agent.run(CLAIM, "CLM-1001-second", script(*decision("refer", 0)))
     assert answer == "CLM-1001: refer $0.00"
     assert claim()["thread_id"] == "CLM-1001-second"
     assert claim()["attempts"] == 1
@@ -215,7 +210,7 @@ def test_an_error_after_the_decision_does_not_send_the_claim_back(
 
     with monkeypatch.context() as patch:
         patch.setattr(graph, "pay_node", lambda claim: broken)
-        answer = claim_agent.run(CLAIM, THREAD, script(decision(payout=420.0)))
+        answer = claim_agent.run(CLAIM, THREAD, script(*decision(payout=420.0)))
     assert "carries on next time" in answer
     assert claim()["status"] == "in_progress"
     assert claim()["attempts"] == 0
@@ -236,17 +231,17 @@ def test_an_answer_with_no_decision_fails_when_carried_on(requests, monkeypatch)
 def test_a_claim_with_another_workers_live_lease_is_left_alone(requests, monkeypatch):
     api().post(f"/api/claims/{CLAIM}/start", json={"thread_id": THREAD})
     api().post(f"/api/claims/{CLAIM}/lease", json={"worker": "other"})
-    answer = claim_agent.carry_on(CLAIM, script(decision("refer", 0)))
+    answer = claim_agent.carry_on(CLAIM, script(*decision("refer", 0)))
     assert answer == f"{CLAIM}: not picked up, another worker is on it"
     assert steps() == []
 
     monkeypatch.setattr(db, "now", lambda: "2099-01-01T00:00:00+00:00")
-    assert claim_agent.carry_on(CLAIM, script(decision("refer", 0))).endswith("$0.00")
+    assert claim_agent.carry_on(CLAIM, script(*decision("refer", 0))).endswith("$0.00")
 
 
 def test_a_second_worker_cannot_start_a_claim(requests):
     api().post(f"/api/claims/{CLAIM}/lease", json={"worker": "other"})
-    answer = claim_agent.run(CLAIM, THREAD, script(decision("refer", 0)))
+    answer = claim_agent.run(CLAIM, THREAD, script(*decision("refer", 0)))
     assert answer == f"{CLAIM}: not started, another worker is on it"
     assert claim()["status"] == "waiting"
 

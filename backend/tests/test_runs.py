@@ -1,6 +1,7 @@
 import pytest
 
 from backend import agent_service
+from backend.tests import deciding
 from backend.tests.signing import as_handler
 
 DISPATCH = {
@@ -24,14 +25,13 @@ def begin(client, claim_id):
 
 def decide(client, claim_id, decision="refer", payout=0.0):
     begin(client, claim_id)
-    client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": decision,
-            "payout": payout,
-            "reasons": "The wording settles it.",
-            "policy_section": "11. How to claim",
-        },
+    deciding.record(
+        client,
+        claim_id,
+        decision,
+        payout,
+        reasons="The wording settles it.",
+        policy_section="11. How to claim",
     )
 
 

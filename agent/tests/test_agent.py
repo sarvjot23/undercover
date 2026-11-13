@@ -10,19 +10,14 @@ from langchain_core.messages import AIMessage
 
 from agent import claim as claim_agent
 from agent import client, graph, routes, tools, tracing
+from agent.tests import stubs
 from agent.tests.stubs import BrokenModel, FlakyModel, StubModel, call
 from backend.api import app
 from backend.tests.signing import as_agent
 
 
-def decision(decision, payout):
-    return call(
-        "record_decision",
-        decision=decision,
-        payout=payout,
-        reasons="The wording settles it. The documents support it.",
-        policy_section="3. Trip Delay",
-    )
+def decision(choice, payout):
+    return stubs.decide(choice, payout)
 
 
 def run(*replies):
@@ -45,16 +40,32 @@ def steps():
 def test_approval_under_the_limit_is_paid(requests):
     answer = run(
         call("get_claim"),
-        call("list_sections", document="policy_wording"),
-        decision("approve", 420.0),
+        call("read_section", document="policy_wording", number=3),
+        *decision("approve", 420.0),
     )
     assert answer == "CLM-1001: approve $420.00"
     assert claim()["status"] == "decided"
     assert claim()["payment"]["amount"] == 420.0
+    record = claim()["decision"]
+    assert record["calculation"]["payout"] == 420.0
+    assert record["decided_by"] == "UnderCover Agent, version 1"
+    assert record["manual_version"] == "2026.2"
+
+
+def test_a_record_section_14_refuses_is_put_right_and_tried_again(requests):
+    run(
+        *decision("approve", 420.0)[1:],
+        *decision("approve", 420.0),
+        AIMessage(content="Approved."),
+    )
+    refusal = next(s["text"] for s in steps() if s["kind"] == "tool_result")
+    assert refusal.startswith("record_decision: Refused by the app:")
+    assert "Claims manual section 14" in refusal
+    assert claim()["decision"]["payout"] == 420.0
 
 
 def test_decline(requests):
-    run(decision("decline", 0), AIMessage(content="Declined."))
+    run(*decision("decline", 0), AIMessage(content="Declined."))
     assert claim()["status"] == "decided"
     assert claim()["decision"]["decision"] == "decline"
     assert claim()["payment"] is None
@@ -87,7 +98,7 @@ def test_the_model_has_its_tools_and_no_pay_tool(requests):
 def test_steps_are_recorded_in_order(requests):
     run(
         call("get_claim"),
-        decision("refer", 0),
+        *decision("refer", 0),
         AIMessage(content="Referred."),
     )
     assert [step["kind"] for step in steps()] == [
@@ -125,7 +136,7 @@ def test_a_second_failure_leaves_the_claim_for_a_handler(requests):
 
 
 def test_a_provider_error_is_retried(requests):
-    replies = iter([decision("refer", 0), AIMessage(content="Referred.")])
+    replies = iter([*decision("refer", 0), AIMessage(content="Referred.")])
     answer = claim_agent.run("CLM-1001", "thread-1", FlakyModel(messages=replies))
     assert answer == "CLM-1001: refer $0.00"
     assert claim()["status"] == "decided"
@@ -141,7 +152,7 @@ def test_a_claim_stops_after_thirty_model_calls(requests):
 
 
 def test_a_claim_that_is_not_waiting_is_not_started(requests):
-    run(decision("refer", 0), AIMessage(content="Referred."))
+    run(*decision("refer", 0), AIMessage(content="Referred."))
     assert run().startswith("CLM-1001: not started, Refused (409)")
 
 
@@ -155,7 +166,7 @@ def test_agent_reaches_only_the_backend_api(requests):
     run(
         call("get_claim"),
         call("search_documents", query="unattended"),
-        decision("refer", 0),
+        *decision("refer", 0),
         AIMessage(content="Referred."),
     )
     assert "/api/configuration/current" in requests
@@ -171,7 +182,7 @@ def test_reads_the_manual_a_section_at_a_time(requests):
     run(
         call("search_documents", query="giraffes"),
         call("read_section", document="claims_manual", number=7),
-        decision("approve", 243.0),
+        *decision("approve", 243.0),
         AIMessage(content="Approved."),
     )
     kinds = [step["kind"] for step in steps()]
@@ -182,7 +193,7 @@ def test_reads_the_manual_a_section_at_a_time(requests):
 def test_a_missing_section_is_a_refusal_not_a_read(requests):
     run(
         call("read_section", document="claims_manual", number=99),
-        decision("refer", 0),
+        *decision("refer", 0),
         AIMessage(content="Referred."),
     )
     assert steps()[1]["kind"] == "tool_result"
@@ -225,7 +236,7 @@ def test_the_payout_tool_goes_through_the_backend(requests):
             ],
             paid_by_others=0,
         ),
-        decision("refer", 0),
+        *decision("refer", 0),
         AIMessage(content="Referred."),
     )
     assert "/api/claims/CLM-1001/payout" in requests

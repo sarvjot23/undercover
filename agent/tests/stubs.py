@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage
 
 from agent import client
 from agent.screening import Screening
+from backend.api import app as backend_app
 
 ids = itertools.count()
 
@@ -123,3 +124,43 @@ class StubChecker:
         if isinstance(answer, Exception):
             raise answer
         return answer
+
+
+FIELDS = {
+    "reasons": "The wording settles it. The documents support it.",
+    "policy_section": "3. Trip Delay",
+}
+
+
+def deductible(claim_id):
+    """The deductible of the claim's plan."""
+    with Backend(backend_app) as backend:
+        return backend.get(f"/api/claims/{claim_id}").json()["plan"]["deductible"]
+
+
+def decide(decision, payout, claim_id="CLM-1001", **fields):
+    """The model's replies that record a decision, as the claim agent would.
+
+    An approval works out its payout first, so a calculation is on file: one expense
+    under emergency medical for the payout plus the plan's deductible.
+    """
+    record = call(
+        "record_decision", decision=decision, payout=payout, **{**FIELDS, **fields}
+    )
+    if decision != "approve":
+        return [record]
+    line = {
+        "description": "Covered costs",
+        "amount": payout + deductible(claim_id),
+        "quantity": 1,
+        "kind": "expense",
+        "nights": 0,
+        "hours": 0,
+    }
+    calculation = call(
+        "calculate_payout",
+        benefit="emergency_medical",
+        lines=[line],
+        paid_by_others=0,
+    )
+    return [calculation, record]

@@ -4,19 +4,18 @@ from fastapi.testclient import TestClient
 
 from backend import agent_service, db, rules
 from backend.api import app
+from backend.tests import deciding
 from backend.tests.signing import as_handler
 
 
 def decide(client, claim_id, decision="approve", payout=650.0):
-    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "thread-test"})
-    return client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": decision,
-            "payout": payout,
-            "reasons": "The delay was covered. The receipts support the costs.",
-            "policy_section": "3. Trip Delay",
-        },
+    return deciding.decide(
+        client,
+        claim_id,
+        decision,
+        payout,
+        thread_id="thread-test",
+        reasons="The delay was covered. The receipts support the costs.",
     )
 
 
@@ -126,14 +125,12 @@ def test_a_different_payment_is_refused(client):
 
 def test_a_repeated_decision_counts_as_done(client):
     assert decide(client, "CLM-1001", payout=420.0).status_code == 200
-    again = client.post(
-        "/api/claims/CLM-1001/decision",
-        json={
-            "decision": "approve",
-            "payout": 420.0,
-            "reasons": "The same again, in other words.",
-            "policy_section": "3. Trip Delay",
-        },
+    again = deciding.record(
+        client,
+        "CLM-1001",
+        "approve",
+        420.0,
+        reasons="The same again, in other words.",
     )
     assert again.status_code == 200
     assert again.json()["decision"]["reasons"] != "The same again, in other words."
@@ -262,15 +259,7 @@ def test_referral_is_decided(client):
 
 
 def test_decision_needs_a_claim_in_progress(client):
-    response = client.post(
-        "/api/claims/CLM-1001/decision",
-        json={
-            "decision": "decline",
-            "payout": 0,
-            "reasons": "Not covered.",
-            "policy_section": "9. General exclusions",
-        },
-    )
+    response = deciding.record(client, "CLM-1001", "decline", 0)
     assert response.status_code == 409
 
 
@@ -406,15 +395,7 @@ def test_a_backend_restart_leaves_a_claim_in_progress(client):
 
 def test_never_decided_or_paid_twice(client):
     decide(client, "CLM-1001", payout=420.0)
-    again = client.post(
-        "/api/claims/CLM-1001/decision",
-        json={
-            "decision": "decline",
-            "payout": 0,
-            "reasons": "Changed my mind.",
-            "policy_section": "9. General exclusions",
-        },
-    )
+    again = deciding.record(client, "CLM-1001", "decline", 0)
     assert again.status_code == 409
     paid = client.post("/api/claims/CLM-1001/payment", json={"amount": 420.0})
     assert paid.status_code == 200

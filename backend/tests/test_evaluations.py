@@ -1,6 +1,7 @@
 import pytest
 
 from backend import agent_service, measures, scoring
+from backend.tests import deciding
 from backend.tests.signing import as_handler
 
 TINY = ["CLM-1007", "CLM-1015", "CLM-1017", "CLM-1020", "CLM-1021"]
@@ -22,15 +23,13 @@ def evaluate(client, set_name="evaluation", tiny=True):
 
 
 def decide(client, claim_id, decision, payout):
-    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": f"{claim_id}-t"})
-    client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": decision,
-            "payout": payout,
-            "reasons": "The wording settles it.",
-            "policy_section": "3. Trip Delay",
-        },
+    deciding.decide(
+        client,
+        claim_id,
+        decision,
+        payout,
+        thread_id=f"{claim_id}-t",
+        reasons="The wording settles it.",
     )
 
 

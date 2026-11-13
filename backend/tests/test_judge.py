@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from backend import db, grading, judge
-from backend.tests import judging
+from backend.tests import deciding, judging
 from backend.tests.signing import as_handler
 
 HANDLER = {
@@ -27,15 +27,14 @@ def evaluate(client, set_name="evaluation", tiny=True):
 
 
 def decide(client, claim_id, decision="refer", payout=0.0):
-    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": f"{claim_id}-t"})
-    client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": decision,
-            "payout": payout,
-            "reasons": "Needs a handler. The manual says so.",
-            "policy_section": "Claims manual 2.",
-        },
+    deciding.decide(
+        client,
+        claim_id,
+        decision,
+        payout,
+        thread_id=f"{claim_id}-t",
+        reasons="Needs a handler. The manual says so.",
+        policy_section="Claims manual 2.",
     )
 
 
@@ -125,15 +124,13 @@ def test_an_ungraded_claim_is_left_out_of_the_average(client, monkeypatch):
     run = evaluate(client)
     claims = [entry["claim_id"] for entry in run["claims"]]
     for number, claim_id in enumerate(claims):
-        client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "t"})
-        client.post(
-            f"/api/claims/{claim_id}/decision",
-            json={
-                "decision": "refer",
-                "payout": 0,
-                "reasons": "The first one." if number == 0 else "Needs a handler.",
-                "policy_section": "Claims manual 2.",
-            },
+        deciding.decide(
+            client,
+            claim_id,
+            "refer",
+            0,
+            reasons="The first one." if number == 0 else "Needs a handler.",
+            policy_section="Claims manual 2.",
         )
     client.post(f"/api/runs/{run['run_id']}/finish")
     found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()

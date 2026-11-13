@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { createDispatch, endRun, pay, start } from "./api";
+import { createDispatch, endRun, pay, record, start } from "./api";
 
 test("the live view shows a dispatch as a board, stamps each claim and ends on the summary", async ({
   page,
@@ -10,17 +10,6 @@ test("the live view shows a dispatch as a board, stamps each claim and ends on t
   await page.goto("/#/live");
   const board = page.getByRole("list", { name: `Dispatch ${String(runId)}` });
   await expect(board).toBeVisible();
-
-  const decide = async (claimId: string, decision: string, payout: number) => {
-    await request.post(`/api/claims/${claimId}/decision`, {
-      data: {
-        decision,
-        payout,
-        reasons: "Recorded by the end-to-end test.",
-        policy_section: "9. General exclusions",
-      },
-    });
-  };
 
   await start(request, "CLM-1020");
   await start(request, "CLM-1021");
@@ -33,9 +22,9 @@ test("the live view shows a dispatch as a board, stamps each claim and ends on t
   await expect(second).toContainText("Starting");
   await expect(page.getByText(/· 2 at work/)).toBeVisible();
 
-  await decide("CLM-1020", "decline", 0);
+  await record(request, "CLM-1020", "decline", 0);
   await expect(first.getByRole("status")).toHaveText("Declined");
-  await decide("CLM-1021", "approve", 50);
+  await record(request, "CLM-1021", "approve", 50);
   await expect(second.getByRole("status")).toHaveCount(0);
   await pay(request, "CLM-1021", 50);
   await expect(second.getByRole("status")).toContainText("Approved");

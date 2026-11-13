@@ -9,12 +9,17 @@ from backend.payout import Benefit, Line
 
 
 class Decision(BaseModel):
-    """The agent's decision on a claim."""
+    """The agent's decision on a claim, with who or what made it.
+
+    Section 14's checks are our own, in backend/decision_record.py, so a refusal
+    names the section and what's missing.
+    """
 
     decision: Literal["approve", "decline", "refer"]
-    payout: float = Field(ge=0)
-    reasons: str = Field(min_length=1)
-    policy_section: str = Field(min_length=1)
+    payout: float
+    reasons: str
+    policy_section: str
+    decided_by: str
 
 
 class Payment(BaseModel):

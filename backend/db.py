@@ -12,6 +12,7 @@ from typing import Annotated, Any
 import yaml
 from fastapi import Depends
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     Connection,
@@ -106,6 +107,19 @@ decisions = Table(
     # Why the Gateway refused the payment, when it did: the claim then waits for a
     # handler's sign-off, as an approval over the limit does.
     Column("payment_refused", Text),
+    # Section 14's record: the calculation behind an approval (none for a decline or
+    # a referral), who or what made the decision, and the manual's version (section 13).
+    Column("calculation", JSON),
+    Column("decided_by", Text, nullable=False),
+    Column("manual_version", Text, nullable=False),
+)
+# The latest payout calculation for each claim and attempt: an approval must match it.
+calculations = Table(
+    "calculations",
+    metadata,
+    Column("claim_id", Text, primary_key=True),
+    Column("attempt", Integer, primary_key=True),
+    Column("calculation", JSON, nullable=False),
 )
 sign_offs = Table(
     "sign_offs",

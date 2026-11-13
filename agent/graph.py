@@ -119,6 +119,7 @@ def check(state: ClaimState, config: RunnableConfig) -> dict[str, Any]:
                     "payout": 0,
                     "reasons": f"{screening.REFERRAL} {found.reason}",
                     "policy_section": screening.SECTION,
+                    "decided_by": screening.MAKER,
                 },
             ).raise_for_status()
     return {}

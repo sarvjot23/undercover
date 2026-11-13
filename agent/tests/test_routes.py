@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from agent import claim as claim_agent
 from agent import gateway, routes, tools
 from agent.direct import DEFAULT_CONTEXT, Direct
+from agent.tests import stubs
 from agent.tests.serving import serving
 from agent.tests.standin_gateway import gateway as standin
 from agent.tests.stubs import call, script
@@ -125,15 +126,7 @@ def test_a_payment_the_gateway_refuses_waits_for_a_sign_off(
         report = claim_agent.run(
             CLAIM,
             "thread-1",
-            script(
-                call(
-                    "record_decision",
-                    decision="approve",
-                    payout=420.0,
-                    reasons="Covered. The documents support it.",
-                    policy_section="5. Baggage and Personal Effects",
-                )
-            ),
+            script(*stubs.decide("approve", 420.0, CLAIM)),
         )
         assert report == f"{CLAIM}: approve $420.00, waiting for a handler's sign-off"
         found = api().get(f"/api/claims/{CLAIM}").json()

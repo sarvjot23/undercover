@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from backend import agent_service, db, evaluations, rounds
+from backend.tests import deciding
 from backend.tests.signing import MARCUS, as_handler
 
 RUN = {"kind": "evaluation", "n": 25, "tiny": False}
@@ -46,17 +47,12 @@ def evaluate(client, round_id, version, set_name, right):
     for entry in run["claims"]:
         if right:
             expected = answers[entry["source_id"]]
-            client.post(
-                f"/api/claims/{entry['claim_id']}/start", json={"thread_id": "t"}
-            )
-            client.post(
-                f"/api/claims/{entry['claim_id']}/decision",
-                json={
-                    "decision": expected["decision"],
-                    "payout": expected["payout"],
-                    "reasons": "As the handler decided.",
-                    "policy_section": "3. Trip Delay",
-                },
+            deciding.decide(
+                client,
+                entry["claim_id"],
+                expected["decision"],
+                expected["payout"],
+                reasons="As the handler decided.",
             )
     client.post(f"/api/runs/{run['run_id']}/finish")
     return run

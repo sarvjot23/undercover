@@ -5,7 +5,8 @@ from sqlalchemy import select
 from agent import claim as claim_agent
 from agent import model, screening
 from agent.model import check_model as real_check_model
-from agent.tests.stubs import BrokenModel, StubChecker, call, screened, script
+from agent.tests import stubs
+from agent.tests.stubs import BrokenModel, StubChecker, screened, script
 from backend import db
 from backend.api import app
 from backend.tests.signing import as_agent, as_handler
@@ -39,13 +40,7 @@ def use(monkeypatch, *answers):
 
 
 def decide(decision, payout):
-    return call(
-        "record_decision",
-        decision=decision,
-        payout=payout,
-        reasons="The wording settles it. The documents support it.",
-        policy_section="3. Trip Delay",
-    )
+    return stubs.decide(decision, payout, CLAIM)
 
 
 def test_a_flagged_claim_is_referred_without_the_claim_agents_model(
@@ -61,13 +56,15 @@ def test_a_flagged_claim_is_referred_without_the_claim_agents_model(
     assert found["decision"]["payout"] == 0
     assert FOUND in found["decision"]["reasons"]
     assert found["decision"]["policy_section"] == screening.SECTION
+    assert found["decision"]["decided_by"] == "Security check"
+    assert found["decision"]["calculation"] is None
     kinds = [step["kind"] for step in steps()]
     assert kinds == ["check", "answer"]
     assert steps()[0]["text"] == f"Instructions found: {FOUND}"
 
 
 def test_a_claim_that_passes_is_worked_as_before(requests):
-    answer = claim_agent.run(CLAIM, "thread-1", script(decide("decline", 0)))
+    answer = claim_agent.run(CLAIM, "thread-1", script(*decide("decline", 0)))
     assert answer == "CLM-1001: decline $0.00"
     kinds = [step["kind"] for step in steps()]
     assert kinds[:2] == ["check", "tool_call"]
@@ -78,7 +75,7 @@ def test_the_check_reads_only_what_the_customer_wrote(requests, monkeypatch):
     seen = []
     checker = use(monkeypatch)
     checker.invoke = lambda messages: seen.append(messages) or screened(False)
-    claim_agent.run(CLAIM, "thread-1", script(decide("decline", 0)))
+    claim_agent.run(CLAIM, "thread-1", script(*decide("decline", 0)))
     text = seen[0][1].content
     assert '"story"' in text
     assert '"policy":' not in text
@@ -95,7 +92,7 @@ def test_an_answer_that_cant_be_read_is_tried_again_and_each_call_costs(
         screened(None, usage=PRICED),
         screened(False, usage=PRICED),
     )
-    claim_agent.run(CLAIM, "thread-1", script(decide("decline", 0)))
+    claim_agent.run(CLAIM, "thread-1", script(*decide("decline", 0)))
     assert checker.calls == 3
     assert claim()["decision"]["decision"] == "decline"
     assert len([row for row in usage_rows() if row["model"] == "stub-checker"]) == 3
@@ -121,7 +118,7 @@ def test_a_timeout_in_the_check_fails_the_claim_rather_than_waiting(
 
 
 def test_work_carried_on_after_a_sign_off_isnt_checked_again(requests, checker):
-    claim_agent.run(CLAIM, "thread-1", script(decide("approve", 1200.0)))
+    claim_agent.run(CLAIM, "thread-1", script(*decide("approve", 1200.0)))
     assert claim()["status"] == "awaiting_sign_off"
     assert checker.calls == 1
     api().post(f"/api/claims/{CLAIM}/sign-off", headers=as_handler())

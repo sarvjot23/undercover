@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import Connection, select
 
-from backend import agent_service, db, keys, leases, settings
+from backend import agent_service, db, decision_record, keys, leases, settings
 from backend.auth import Approver
 from backend.db import (
     Db,
@@ -171,16 +171,18 @@ def add_step(claim_id: str, step: Step, conn: SingleStatementDb) -> dict[str, st
 )
 def calculate_payout(claim_id: str, request: PayoutRequest, conn: Db) -> Payout:
     """Work out the payout on an approved claim with our payout rules."""
-    policy = record(
-        conn, "policy", json.loads(find_claim(conn, claim_id)["body"])["policy_id"]
-    )
-    return work_out_payout(
+    claim = find_claim(conn, claim_id)
+    policy = record(conn, "policy", json.loads(claim["body"])["policy_id"])
+    payout = work_out_payout(
         {**policy, "plan_rules": record(conn, "plan", policy["plan"])},
         request.benefit,
         request.lines,
         request.paid_by_others,
         settings.current(conn).approval_limit,
     )
+    decision_record.store_calculation(conn, claim, payout)
+    conn.commit()
+    return payout
 
 
 def next_status(decision: Decision, limit: float) -> str:
@@ -197,8 +199,7 @@ def next_status(decision: Decision, limit: float) -> str:
 )
 def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, Any]:
     """Record the decision on a claim in progress; a repeat of it counts as done."""
-    if decision.decision != "approve" and decision.payout != 0:
-        raise HTTPException(422, "A decline or a referral pays $0")
+    decision_record.check_request(decision)
     payout = round(decision.payout, 2)
     found = standing(conn, claim_id)
     recorded = found["decision"]
@@ -206,6 +207,9 @@ def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, An
         if (recorded["decision"], recorded["payout"]) == (decision.decision, payout):
             return found
         raise HTTPException(409, f"Claim {claim_id} already has a different decision")
+    calculation = decision_record.calculation_for(
+        conn, decision, claim_id, found["attempts"]
+    )
     limit = settings.current(conn).approval_limit
     move(conn, claim_id, "in_progress", next_status(decision, limit))
     insert_once(
@@ -218,6 +222,9 @@ def record_decision(claim_id: str, decision: Decision, conn: Db) -> dict[str, An
         policy_section=decision.policy_section,
         decided_at=db.now(),
         approval_limit=limit,
+        calculation=calculation,
+        decided_by=decision.decided_by,
+        manual_version=decision_record.manual_version(conn),
     )
     recorded = standing(conn, claim_id)
     conn.commit()

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { endRun, pay, received } from "./api";
+import { decide, endRun, pay, REASONS, received } from "./api";
 
 test("starting an evaluation on the Scoreboard page reaches the agent's service", async ({
   page,
@@ -51,7 +51,7 @@ test("an evaluation played out through the API shows on the scoreboard with its 
   };
   const copy = (source: string) =>
     run.claims.find((entry) => entry.source_id === source)?.claim_id ?? "";
-  const answers: [string, string, number][] = [
+  const answers: [string, "approve" | "decline" | "refer", number][] = [
     ["CLM-1007", "approve", 50],
     ["CLM-1015", "decline", 0],
     ["CLM-1017", "refer", 0],
@@ -59,18 +59,7 @@ test("an evaluation played out through the API shows on the scoreboard with its 
     ["CLM-1021", "approve", 825],
   ];
   for (const [source, decision, payout] of answers) {
-    const claimId = copy(source);
-    await request.post(`/api/claims/${claimId}/start`, {
-      data: { thread_id: `${claimId}-e2e` },
-    });
-    await request.post(`/api/claims/${claimId}/decision`, {
-      data: {
-        decision,
-        payout,
-        reasons: "Recorded by the end-to-end test.",
-        policy_section: "3. Trip Delay",
-      },
-    });
+    await decide(request, copy(source), decision, payout);
   }
   await pay(request, copy("CLM-1007"), 50);
   await pay(request, copy("CLM-1020"), 300);
@@ -94,7 +83,7 @@ test("an evaluation played out through the API shows on the scoreboard with its 
     await request.get("http://127.0.0.1:8005/asked")
   ).json()) as { handler: { reason: string }; agent: { rationale: string } }[];
   expect(asked).toHaveLength(5);
-  expect(asked[0]?.agent.rationale).toBe("Recorded by the end-to-end test.");
+  expect(asked[0]?.agent.rationale).toBe(REASONS);
   expect(asked[0]?.handler.reason).toBeTruthy();
 
   await row

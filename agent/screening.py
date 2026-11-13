@@ -16,6 +16,7 @@ from agent import model
 
 ATTEMPTS = 3
 SECTION = "Security check: instructions found in the claim"
+MAKER = "Security check"
 REFERRAL = (
     "The security check found an instruction in the claim, so a handler decides it."
 )

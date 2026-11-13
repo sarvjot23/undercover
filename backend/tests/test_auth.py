@@ -1,6 +1,7 @@
 import pytest
 
 from backend import auth
+from backend.tests import deciding
 from backend.tests.signing import DANA, MARCUS, OTHER_KEY, as_handler, token
 
 # Every action a handler takes, with a body the backend accepts.
@@ -21,16 +22,7 @@ BAD_TOKENS = {
 
 
 def hold_for_sign_off(client, claim_id="CLM-1002"):
-    client.post(f"/api/claims/{claim_id}/start", json={"thread_id": "t"})
-    client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": "approve",
-            "payout": 1200.0,
-            "reasons": "Covered by the wording. The receipts support it.",
-            "policy_section": "3. Trip Delay",
-        },
-    )
+    deciding.decide(client, claim_id, "approve", 1200.0)
 
 
 @pytest.mark.parametrize(("path", "body"), ACTIONS)

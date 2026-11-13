@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent import claim, client, dispatcher, service
+from agent.tests import stubs
 from agent.tests.stubs import call, script
 from backend import runs
 from backend.api import app as backend_app
@@ -21,15 +22,7 @@ def hold(claim_id="CLM-1001"):
     return claim.run(
         claim_id,
         f"{claim_id}-first",
-        script(
-            call(
-                "record_decision",
-                decision="approve",
-                payout=1200.0,
-                reasons="The wording settles it. The documents support it.",
-                policy_section="3. Trip Delay",
-            )
-        ),
+        script(*stubs.decide("approve", 1200.0, claim_id)),
     )
 
 

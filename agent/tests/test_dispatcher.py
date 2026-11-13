@@ -11,6 +11,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 from agent import checkpoints, client, dispatcher, graph, service, tracing
 from agent import claim as claim_agent
+from agent.tests import stubs
 from agent.tests.stubs import BrokenModel, RateLimitedModel, call, script
 from backend import db, runs
 from backend.api import app
@@ -31,23 +32,17 @@ def api():
 
 
 def refer(claim_id):
-    return call(
-        "record_decision",
-        decision="refer",
-        payout=0,
+    return stubs.decide(
+        "refer",
+        0,
+        claim_id,
         reasons="Needs a handler. The manual says so.",
         policy_section="Claims manual 2.",
     )
 
 
 def approve(claim_id, payout):
-    return call(
-        "record_decision",
-        decision="approve",
-        payout=payout,
-        reasons="The wording settles it. The documents support it.",
-        policy_section="3. Trip Delay",
-    )
+    return stubs.decide("approve", payout, claim_id)
 
 
 def claim(claim_id):
@@ -126,8 +121,8 @@ def test_never_more_than_n_claims_are_worked_at_once(requests, monkeypatch):
 
 def test_a_dispatch_works_its_claims_and_finishes(requests, only, models):
     only("CLM-1001", "CLM-1002")
-    models("CLM-1001", script(approve("CLM-1001", 420.0)))
-    models("CLM-1002", script(refer("CLM-1002")))
+    models("CLM-1001", script(*approve("CLM-1001", 420.0)))
+    models("CLM-1002", script(*refer("CLM-1002")))
     run = new_run()
     results = dispatcher.dispatch(run, 2)
     assert sorted(results) == ["CLM-1001: approve $420.00", "CLM-1002: refer $0.00"]
@@ -141,7 +136,7 @@ def test_a_rate_limit_carries_on_as_the_same_attempt(requests, only, models):
     only("CLM-1001")
     limited = RateLimitedModel(
         limited=[2],
-        messages=iter([call("get_claim"), refer("CLM-1001")]),
+        messages=iter([call("get_claim"), *refer("CLM-1001")]),
     )
     models("CLM-1001", limited, limited)
     dispatcher.dispatch(new_run(), 1)
@@ -160,7 +155,7 @@ def test_a_claim_still_rate_limited_stays_in_progress_for_the_next(
     only("CLM-1001", "CLM-1002")
     limited = RateLimitedModel(limited=[1, 2, 3, 4], messages=iter([]))
     models("CLM-1001", *[limited] * dispatcher.ATTEMPTS)
-    models("CLM-1002", script(refer("CLM-1002")))
+    models("CLM-1002", script(*refer("CLM-1002")))
     run = new_run()
     results = dispatcher.dispatch(run, 1)
     assert "the next dispatch carries this claim on" in results[0]
@@ -170,7 +165,7 @@ def test_a_claim_still_rate_limited_stays_in_progress_for_the_next(
     assert claim("CLM-1002")["status"] == "decided"
     assert api().get(f"/api/runs/{run['run_id']}").json()["status"] == "finished"
 
-    models("CLM-1001", script(refer("CLM-1001")))
+    models("CLM-1001", script(*refer("CLM-1001")))
     dispatcher.dispatch(new_run(), 1)
     assert claim("CLM-1001")["status"] == "decided"
     assert claim("CLM-1001")["thread_id"] == held["thread_id"]
@@ -179,7 +174,7 @@ def test_a_claim_still_rate_limited_stays_in_progress_for_the_next(
 
 def test_a_failed_claim_is_tried_again_in_the_same_dispatch(requests, only, models):
     only("CLM-1001")
-    models("CLM-1001", BrokenModel(messages=iter([])), script(refer("CLM-1001")))
+    models("CLM-1001", BrokenModel(messages=iter([])), script(*refer("CLM-1001")))
     dispatcher.dispatch(new_run(), 1)
     assert claim("CLM-1001")["status"] == "decided"
     assert claim("CLM-1001")["attempts"] == 1
@@ -197,7 +192,7 @@ def test_a_claim_that_fails_twice_is_left_for_a_handler(requests, only, models):
 
 
 def test_a_claim_paid_by_its_sign_off_is_left_out_of_the_next_dispatch(requests, only):
-    claim_agent.run("CLM-1008", "CLM-1008-first", script(approve("CLM-1008", 2240.0)))
+    claim_agent.run("CLM-1008", "CLM-1008-first", script(*approve("CLM-1008", 2240.0)))
     api().post("/api/claims/CLM-1008/sign-off", headers=as_handler())
     only("CLM-1008")
     assert dispatcher.dispatch(new_run(), 1) == []
@@ -228,7 +223,7 @@ def test_each_claim_in_a_dispatch_is_traced_as_a_session_tagged_with_its_run(
     monkeypatch.setattr(tracing, "CallbackHandler", Spy)
     monkeypatch.setattr(tracing, "flush", lambda: None)
     only("CLM-1001")
-    models("CLM-1001", script(refer("CLM-1001")))
+    models("CLM-1001", script(*refer("CLM-1001")))
     run = new_run()
     dispatcher.dispatch(run, 1)
     parent, _, metadata = seen[0]
@@ -307,7 +302,7 @@ def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, m
         "CLM-1021": approve(copies["CLM-1021"], 825.0),
     }
     for source, answer in answers.items():
-        models(copies[source], script(answer))
+        models(copies[source], script(*answer))
     run: tracing.Run = {
         "run_id": created["run_id"],
         "kind": "evaluation",
@@ -355,8 +350,8 @@ def test_an_error_outside_the_graph_never_stops_the_dispatch(
         original(claim_id, in_run, started, finished)
 
     monkeypatch.setattr(claim_agent, "record_time", slow_backend)
-    models("CLM-1001", script(refer("CLM-1001")))
-    models("CLM-1002", script(refer("CLM-1002")))
+    models("CLM-1001", script(*refer("CLM-1001")))
+    models("CLM-1002", script(*refer("CLM-1002")))
     run = new_run()
     results = dispatcher.dispatch(run, 1)
     assert "the next dispatch carries it on" in results[0]

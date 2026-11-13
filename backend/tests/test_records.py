@@ -8,6 +8,7 @@ from sqlalchemy.schema import CreateTable
 
 from backend import db
 from backend.api import app
+from backend.tests import deciding
 from backend.tests.signing import as_handler
 
 
@@ -134,16 +135,7 @@ def test_every_operation_is_documented_with_no_optional_inputs():
 
 
 def test_reseed_starts_again_from_the_data(client):
-    client.post("/api/claims/CLM-1001/start", json={"thread_id": "thread-test"})
-    client.post(
-        "/api/claims/CLM-1001/decision",
-        json={
-            "decision": "refer",
-            "payout": 0,
-            "reasons": "Needs a handler.",
-            "policy_section": "11. How to claim",
-        },
-    )
+    deciding.decide(client, "CLM-1001", "refer", 0, reasons="Needs a handler.")
     db.reseed()
     claims = client.get("/api/claims").json()
     assert {claim["status"] for claim in claims} == {"waiting"}

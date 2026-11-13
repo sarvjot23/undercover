@@ -3,9 +3,11 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.payout import Benefit, Line
+
+NOTE_LENGTH = 1000
 
 
 class Decision(BaseModel):
@@ -59,13 +61,15 @@ class Step(BaseModel):
         "memory_search",
         "memory_save",
         "refusal",
+        "send_back",
         "answer",
         "error",
     ]
     text: str
     key: str
     # A lookup's detail is what was looked up and the files it came from, each with
-    # its source; a refusal's is who refused. Other kinds have none.
+    # its source; a refusal's is who refused, and a send back's who sent it back.
+    # Other kinds have none.
     detail: dict[str, Any] | None
 
 
@@ -73,6 +77,20 @@ class Hold(BaseModel):
     """Why the Gateway refused to pay an approved claim."""
 
     reason: str = Field(min_length=1)
+
+
+class SendBack(BaseModel):
+    """A senior handler's note on what the agent should look at again."""
+
+    note: str = Field(max_length=NOTE_LENGTH)
+
+    @field_validator("note")
+    @classmethod
+    def not_blank(cls, note: str) -> str:
+        """A note of only spaces says nothing."""
+        if not note.strip():
+            raise ValueError("A send back needs a note saying what to look at again")
+        return note.strip()
 
 
 class Failure(BaseModel):

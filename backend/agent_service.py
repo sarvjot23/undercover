@@ -1,5 +1,6 @@
 """The backend's line to the agent's service, which runs as a process of its own."""
 
+import logging
 import os
 from typing import NamedTuple
 
@@ -7,6 +8,7 @@ import httpx
 
 DEFAULT_URL = "http://127.0.0.1:8002"
 TIMEOUT = 5
+log = logging.getLogger(__name__)
 
 
 class Answer(NamedTuple):
@@ -34,5 +36,9 @@ def tell(path: str, body: dict[str, object]) -> bool:
 
 
 def resume(claim_id: str) -> None:
-    """Tell the agent a claim is signed off. If it's away, it picks it up next time."""
-    tell(f"/claims/{claim_id}/resume", {})
+    """Ask the agent to resume a paused claim with the handler's answer.
+
+    The handler's answer stands either way; a call that fails is only logged.
+    """
+    if not tell(f"/claims/{claim_id}/resume", {}):
+        log.warning("The agent didn't take %s to resume it", claim_id)

@@ -8,15 +8,17 @@ const KINDS: Record<Step["kind"], string> = {
   memory_search: "Searched memory",
   memory_save: "Saved to memory",
   refusal: "Refused",
+  send_back: "Sent back",
   answer: "Answer",
   error: "Error",
 };
 
-/** The step's label: a refusal says who refused, such as the Gateway. */
+/** The step's label: a refusal says who refused, such as the Gateway, and a send
+ * back who sent the decision back. */
 function kindOf(step: Step): string {
-  return step.kind === "refusal"
-    ? `Refused by ${step.detail.by}`
-    : KINDS[step.kind];
+  if (step.kind === "refusal") return `Refused by ${step.detail.by}`;
+  if (step.kind === "send_back") return `Sent back by ${step.detail.by}`;
+  return KINDS[step.kind];
 }
 
 /** The step's text; a refusal's leaves out who refused, which its label says. */

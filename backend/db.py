@@ -121,6 +121,18 @@ calculations = Table(
     Column("attempt", Integer, primary_key=True),
     Column("calculation", JSON, nullable=False),
 )
+# Each decision a handler sent back to the agent, with the note, who and when. The
+# claim's current decision is cleared, and a claim can be sent back more than once.
+sent_back = Table(
+    "sent_back",
+    metadata,
+    Column("sent_back_id", Integer, primary_key=True, autoincrement=True),
+    Column("claim_id", Text, nullable=False),
+    Column("decision", JSON, nullable=False),
+    Column("note", Text, nullable=False),
+    Column("handler_id", Text, nullable=False),
+    Column("sent_back_at", Text, nullable=False),
+)
 sign_offs = Table(
     "sign_offs",
     metadata,

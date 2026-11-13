@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, select
 
 from backend import agent_service, db, decision_record, keys, leases, settings
@@ -11,9 +11,12 @@ from backend.auth import Approver
 from backend.db import (
     Db,
     SingleStatementDb,
+    calculations,
     customers,
     decisions,
+    handlers,
     payments,
+    sent_back,
     sign_offs,
     steps,
 )
@@ -39,6 +42,7 @@ from backend.schemas import (
     Lease,
     Payment,
     PayoutRequest,
+    SendBack,
     Step,
 )
 
@@ -307,7 +311,6 @@ def hold_payment(claim_id: str, hold: Hold, conn: Db) -> dict[str, Any]:
 def sign_off(
     claim_id: str,
     handler: Approver,
-    background_tasks: BackgroundTasks,
     conn: Db,
 ) -> dict[str, Any]:
     """Record the signed-in handler's sign-off on a payout, and pay it."""
@@ -331,14 +334,89 @@ def sign_off(
     insert_once(conn, sign_offs, **signed)
     insert_once(conn, payments, **paid)
     conn.commit()
-    # The agent closes its paused work without paying; if it's away, nothing waits.
-    background_tasks.add_task(agent_service.resume, claim_id)
+    # The agent closes its paused work without paying; the sign-off stands either way.
+    agent_service.resume(claim_id)
     return {
         "claim_id": claim_id,
         "status": "decided",
         "sign_off": signed,
         "payment": paid,
     }
+
+
+@router.post("/{claim_id}/send-back", operation_id="send_back_claim")
+def send_back_claim(
+    claim_id: str, back: SendBack, handler: Approver, conn: Db
+) -> dict[str, Any]:
+    """Send a decision waiting for sign-off back to the agent with a note."""
+    if find_claim(conn, claim_id)["evaluation_id"] is not None:
+        raise HTTPException(409, f"Claim {claim_id} is a copy for an evaluation")
+    # Only a claim waiting for a sign-off moves, so a sign-off and a send back at the
+    # same moment can't both go through.
+    move(conn, claim_id, "awaiting_sign_off", "sent_back")
+    decision = standing(conn, claim_id)["decision"]
+    result = conn.execute(
+        sent_back.insert().values(
+            claim_id=claim_id,
+            decision=decision,
+            note=back.note,
+            handler_id=handler["handler_id"],
+            sent_back_at=db.now(),
+        )
+    )
+    # A new approval needs a new calculation.
+    conn.execute(decisions.delete().where(decisions.c.claim_id == claim_id))
+    conn.execute(calculations.delete().where(calculations.c.claim_id == claim_id))
+    step = {
+        "kind": "send_back",
+        "text": back.note,
+        "key": f"send-back-{result.inserted_primary_key[0]}",  # type: ignore[index]
+        "detail": {"by": handler["name"]},
+    }
+    add(conn, claim_id, step)
+    conn.commit()
+    # The agent takes the claim and decides again; the send back stands either way.
+    agent_service.resume(claim_id)
+    return standing(conn, claim_id)
+
+
+@router.get(
+    "/{claim_id}/sent-back", operation_id="list_sent_back", dependencies=keys.READ
+)
+def list_sent_back(claim_id: str, conn: SingleStatementDb) -> list[dict[str, Any]]:
+    """List the decisions sent back on a claim, oldest first, with their notes."""
+    find_claim(conn, claim_id)
+    query = (
+        select(sent_back, handlers.c.body)
+        .join(handlers, handlers.c.handler_id == sent_back.c.handler_id)
+        .where(sent_back.c.claim_id == claim_id)
+        .order_by(sent_back.c.sent_back_id)
+    )
+    return [
+        {
+            **{k: v for k, v in row.items() if k != "body"},
+            "handler_name": json.loads(row["body"])["name"],
+        }
+        for row in conn.execute(query).mappings()
+    ]
+
+
+@router.post("/{claim_id}/take", operation_id="take_claim", dependencies=keys.AGENT)
+def take_claim(claim_id: str, lease: Lease, conn: SingleStatementDb) -> dict[str, str]:
+    """Take a sent-back claim for work, once: the first caller gets it and its lease."""
+    update = (
+        claim_table.update()
+        .where(claim_table.c.claim_id == claim_id, claim_table.c.status == "sent_back")
+        .values(
+            status="in_progress",
+            lease_owner=lease.worker,
+            lease_until=leases.expiry(),
+        )
+    )
+    if conn.execute(update).rowcount == 0:
+        find_claim(conn, claim_id)
+        raise HTTPException(409, f"Claim {claim_id} is not sent back")
+    return {"claim_id": claim_id, "status": "in_progress"}
 
 
 @router.post("/{claim_id}/fail", operation_id="fail_claim", dependencies=keys.AGENT)

@@ -314,10 +314,11 @@ def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, m
     assert api().get("/api/claims").json() == before
     held = claim(copies["CLM-1021"])
     assert held["status"] == "awaiting_sign_off"
-    gone = checkpoints.saver().get_tuple(
+    # Nobody signs off a copy, so its work ends with no pause waiting.
+    assert checkpoints.saver().get_tuple(
         {"configurable": {"thread_id": held["thread_id"]}}
     )
-    assert gone is None
+    assert not claim_agent.paused(copies["CLM-1021"])
 
     found = (
         api().get(f"/api/evaluations/{created['run_id']}", headers=as_handler()).json()

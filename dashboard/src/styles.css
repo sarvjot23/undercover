@@ -352,6 +352,48 @@ button:disabled {
   background: var(--soft);
 }
 
+.sign-off-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.send-back {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.send-back textarea {
+  width: 100%;
+  min-height: 90px;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--soft);
+  background: var(--page);
+  color: var(--ink);
+}
+
+.sent-back {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.sent-back p {
+  margin: 0;
+}
+
+.note {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
 select {
   font: inherit;
   padding: 6px 10px;

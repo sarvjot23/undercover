@@ -1,7 +1,12 @@
 import { accessToken } from "./auth";
 
 export type Status =
-  "waiting" | "in_progress" | "awaiting_sign_off" | "decided" | "needs_handler";
+  | "waiting"
+  | "in_progress"
+  | "awaiting_sign_off"
+  | "sent_back"
+  | "decided"
+  | "needs_handler";
 export type Outcome = "approve" | "decline" | "refer";
 
 export interface ClaimSummary {
@@ -142,6 +147,7 @@ interface StepBase {
 export type Step =
   | (StepBase & { kind: "lookup"; detail: LookupDetail })
   | (StepBase & { kind: "refusal"; detail: { by: string } })
+  | (StepBase & { kind: "send_back"; detail: { by: string } })
   | (StepBase & { kind: "memory_search"; detail: { query: string } })
   | (StepBase & {
       kind:
@@ -155,6 +161,16 @@ export type Step =
     });
 
 export type SetName = "evaluation" | "held_out";
+
+/** A decision a handler sent back to the agent, with the note, who and when. */
+export interface SentBack {
+  sent_back_id: number;
+  decision: Decision;
+  note: string;
+  handler_id: string;
+  handler_name: string;
+  sent_back_at: string;
+}
 
 /** One of a run's claims: where it stands, its latest step, its cost and time. */
 export interface RunClaim {

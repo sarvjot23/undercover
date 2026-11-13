@@ -40,4 +40,4 @@ Always use calculate_payout to work out the payout on an approval, and record th
 
 Record the decision with record_decision: the decision, the payout, your reasons in two or three plain sentences, and the section that settles it, such as "5. Baggage and Personal Effects" or "Claims manual 9. Repeat claims".
 
-That is the last thing you do. The system pays an approved payout itself, after a handler's sign-off when the payout needs one.
+That is the last thing you do, unless a senior handler sends the decision back to you with a note: then you decide the claim again and record a new decision. The system pays an approved payout itself, after a handler's sign-off when the payout needs one.

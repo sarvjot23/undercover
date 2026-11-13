@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -354,9 +356,11 @@ def test_a_sign_off_reaches_the_agent_only_once_it_is_saved(client, monkeypatch)
     assert seen[0][1]["handler_id"] == "HND-01"
 
 
-def test_a_sign_off_stands_when_the_agent_cannot_be_reached(client):
+def test_a_sign_off_stands_when_the_agent_cannot_be_reached(client, caplog):
     decide(client, "CLM-1002", payout=1200.0)
-    signed = client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
+    with caplog.at_level(logging.WARNING):
+        signed = client.post("/api/claims/CLM-1002/sign-off", headers=as_handler())
+    assert "The agent didn't take CLM-1002 to resume it" in caplog.text
     assert signed.status_code == 200
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "decided"

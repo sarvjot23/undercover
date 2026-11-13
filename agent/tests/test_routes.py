@@ -4,12 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent import claim as claim_agent
-from agent import gateway, routes, tools
+from agent import gateway, memory, routes, tools
 from agent.direct import DEFAULT_CONTEXT, Direct
 from agent.tests import stubs
 from agent.tests.serving import serving
 from agent.tests.standin_gateway import gateway as standin
 from agent.tests.stubs import call, script
+from agent.tests.test_memory import StandinStore
 from backend.api import app
 from backend.tests.signing import as_agent, as_handler
 
@@ -161,6 +162,9 @@ def test_a_payment_the_gateway_refuses_waits_for_a_sign_off(
     requests, unsigned, monkeypatch
 ):
     forbidden = standin(lambda name, arguments: name.endswith("pay_claim"))
+    store = StandinStore()
+    monkeypatch.setenv("UNDERCOVER_MEMORY_ID", "memory-test")
+    monkeypatch.setattr(memory, "AgentCoreMemoryStore", lambda **kwargs: store)
     with serving(forbidden) as url:
         on_gateway(monkeypatch, f"{url}/mcp")
         report = claim_agent.run(
@@ -174,10 +178,15 @@ def test_a_payment_the_gateway_refuses_waits_for_a_sign_off(
         assert found["payment"] is None
         assert "Tool Execution Denied" in found["decision"]["payment_refused"]
         assert any("Refused by the Gateway" in text for text in steps())
+        assert claim_agent.paused(CLAIM)
+        # Remembered before the payment was tried, so not again after the sign-off.
+        assert len(store.events) == 2
         signed = api().post(f"/api/claims/{CLAIM}/sign-off", headers=as_handler())
         assert signed.json()["payment"]["amount"] == 420.0
         assert claim_agent.carry_on(CLAIM).endswith("approve $420.00")
     assert api().get(f"/api/claims/{CLAIM}").json()["status"] == "decided"
+    assert len(store.events) == 2
+    assert not claim_agent.paused(CLAIM)
 
 
 def test_the_route_is_read_when_a_graph_is_built(unsigned, monkeypatch):

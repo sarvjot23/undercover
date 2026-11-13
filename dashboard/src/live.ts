@@ -18,9 +18,10 @@ export function outcomeOf(claim: RunClaim): LiveOutcome | null {
   return claim.status === "decided" ? claim.decision : null;
 }
 
-/** Whether a claim of a run has reached an end: decided, held or left for a handler. */
+/** Whether a claim of a run has reached an end: decided, held or left for a handler.
+ * A claim sent back waits for the agent again. */
 export function hasEnded(status: string): boolean {
-  return status !== "waiting" && status !== "in_progress";
+  return !["waiting", "in_progress", "sent_back"].includes(status);
 }
 
 /** Where a card goes on the board: those being worked at the front, the waiting last. */

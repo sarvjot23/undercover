@@ -8,7 +8,13 @@ from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.exceptions import ModelRateLimitError, ModelTimeoutError
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, AnyMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -29,7 +35,7 @@ RECURSION_LIMIT = 3 * MODEL_CALLS + 20
 STEP_LENGTH = steps.STEP_LENGTH
 # The dispatcher waits these out and carries the claim on, so the graph doesn't retry.
 PASSED_UP = (ModelRateLimitError, ModelTimeoutError)
-After = Literal["sign_off", "pay", "close"]
+After = Literal["pay", "close"]
 log = logging.getLogger(__name__)
 
 
@@ -41,6 +47,8 @@ class ClaimState(TypedDict):
     thread_id: str
     model_calls: int
     signed_off_by: str
+    # Whether this decision is saved to memory, so it's saved once.
+    remembered: bool
 
 
 class TooManyModelCalls(Exception):
@@ -187,23 +195,30 @@ def after_record(state: ClaimState) -> str:
     return "tools" if message.tool_calls else END
 
 
-def after_tools(state: ClaimState) -> Literal["agent", "remember"]:
-    """Back to the model until it has recorded a decision."""
-    return "agent" if standing(state["claim_id"])["decision"] is None else "remember"
+def waits_for_sign_off(found: dict[str, Any]) -> bool:
+    """Whether a claim pauses for a handler: never an evaluation's copy, which
+    nobody signs off."""
+    return found["status"] == "awaiting_sign_off" and found["evaluation_id"] is None
+
+
+def after_tools(state: ClaimState) -> Literal["agent", "sign_off", "remember"]:
+    """Back to the model until it has recorded a decision; the backend alone applies
+    the limit, and an approval over it pauses before anything else."""
+    found = standing(state["claim_id"])
+    if found["decision"] is None:
+        return "agent"
+    return "sign_off" if waits_for_sign_off(found) else "remember"
 
 
 def after_decision(claim: dict[str, Any]) -> After:
-    """Where a decided claim goes; the backend alone applies the limit."""
-    if claim["status"] == "awaiting_sign_off":
-        return "sign_off"
-    if claim["status"] == "in_progress":
-        return "pay"
-    return "close"
+    """Where a remembered claim goes: an approval within the limit is paid."""
+    return "pay" if claim["status"] == "in_progress" else "close"
 
 
 def remember_node(claim: ClaimContext) -> Any:
     """Make the node that saves the claim and the decision the agent recorded to the
-    customer's memory, in code every time. It runs once, after the decision.
+    customer's memory, in code every time. It runs once for each decision: after
+    the decision, or after the sign-off when it waited for one.
 
     Nothing is saved without memory, in an evaluation or for an evaluation's copy.
     The check's referrals never come this way. If AgentCore can't be reached, the
@@ -213,7 +228,8 @@ def remember_node(claim: ClaimContext) -> Any:
     def remember(state: ClaimState) -> Command[After]:
         claim_id = state["claim_id"]
         found = standing(claim_id)
-        if claim.memory is not None and found["evaluation_id"] is None:
+        due = not state.get("remembered") and found["evaluation_id"] is None
+        if claim.memory is not None and due:
             with client.backend() as backend:
                 full = backend.get(f"/api/claims/{claim_id}").json()
             try:
@@ -223,15 +239,32 @@ def remember_node(claim: ClaimContext) -> Any:
             else:
                 key = f"{state['thread_id']}:remember"
                 record_step(claim_id, "memory_save", saved[:STEP_LENGTH], key)
-        return Command(goto=after_decision(found))
+        return Command(goto=after_decision(found), update={"remembered": True})
 
     return remember
 
 
-def sign_off(state: ClaimState) -> dict[str, Any]:
-    """Wait for a handler, whose sign-off pays the claim. This runs again on resume."""
+def sign_off(state: ClaimState) -> Command[Literal["remember", "agent"]]:
+    """Wait for a handler. A sign-off pays the claim, so the work goes on to remember
+    it. A decision sent back goes back to the model with the handler's note and a
+    full allowance of model calls; the app has already withdrawn the decision, so
+    nothing can pay it.
+
+    LangGraph runs this node again from the top on a resume, so nothing goes before
+    the interrupt.
+    """
     answer = interrupt({"claim_id": state["claim_id"]})
-    return {"signed_off_by": answer["handler_id"]}
+    if "signed_off_by" in answer:
+        update = {"signed_off_by": answer["signed_off_by"]}
+        return Command(goto="remember", update=update)
+    return Command(
+        goto="agent",
+        update={
+            "messages": [HumanMessage(answer["message"])],
+            "model_calls": 0,
+            "remembered": False,
+        },
+    )
 
 
 def hold(claim_id: str, reason: str) -> None:
@@ -262,7 +295,8 @@ def pay_node(claim: ClaimContext) -> Any:
             by = {"by": refused.by}
             record_step(claim_id, "refusal", f"{name}: {refused}", key, by)
             hold(claim_id, refused.reason)
-            return Command(goto="sign_off")
+            held = waits_for_sign_off(standing(claim_id))
+            return Command(goto="sign_off" if held else "close")
         record_step(claim_id, "tool_result", f"{name}: Paid ${amount:,.2f}", key)
         return Command(goto="close")
 
@@ -324,17 +358,16 @@ def build(
     builder.add_node(
         "tools", ToolNode(claim_tools, wrap_tool_call=tool_result_recorder(claim))
     )
-    builder.add_node(
-        "remember", remember_node(claim), destinations=("sign_off", "pay", "close")
-    )
-    builder.add_node("sign_off", sign_off)
+    builder.add_node("remember", remember_node(claim), destinations=("pay", "close"))
+    builder.add_node("sign_off", sign_off, destinations=("remember", "agent"))
     builder.add_node("pay", pay_node(claim), destinations=("sign_off", "close"))
     builder.add_node("close", close)
     builder.add_edge(START, "check")
     builder.add_conditional_edges("check", after_check, ["agent", "close"])
     builder.add_edge("agent", "record")
     builder.add_conditional_edges("record", after_record, ["tools", END])
-    builder.add_conditional_edges("tools", after_tools, ["agent", "remember"])
-    builder.add_edge("sign_off", "close")
+    builder.add_conditional_edges(
+        "tools", after_tools, ["agent", "sign_off", "remember"]
+    )
     builder.add_edge("close", END)
     return builder.compile(checkpointer=saver, store=claim.memory)

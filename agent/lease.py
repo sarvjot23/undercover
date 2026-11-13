@@ -23,9 +23,13 @@ def keep_renewing(path: str, worker: str, stop: threading.Event) -> None:
 
 
 @contextmanager
-def holding(path: str) -> Iterator[bool]:
-    """Take the lease at this path and say whether we got it; give it up at the end."""
-    worker = uuid.uuid4().hex
+def holding(path: str, worker: str | None = None) -> Iterator[bool]:
+    """Take the lease at this path and say whether we got it; give it up at the end.
+
+    A worker that already holds the lease, such as one that took a sent-back claim,
+    keeps it.
+    """
+    worker = worker or uuid.uuid4().hex
     with client.backend() as backend:
         if not backend.post(path, json={"worker": worker}).is_success:
             yield False

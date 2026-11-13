@@ -179,13 +179,12 @@ def test_the_service_starts_one_claim(monkeypatch):
     assert started == [("CLM-1001", "CLM-1001-x")]
 
 
-def test_at_startup_signed_off_claims_are_closed_and_a_leftover_run_stopped(
+def test_at_startup_a_leftover_run_is_stopped_and_signed_off_claims_left(
     requests, monkeypatch
 ):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     hold()
     sign_off()
-    hold("CLM-1002")
     record = {
         "kind": "dispatch",
         "n": 3,
@@ -195,10 +194,15 @@ def test_at_startup_signed_off_claims_are_closed_and_a_leftover_run_stopped(
         "round_id": None,
     }
     run_id = backend().post("/api/runs", json=record).json()["run_id"]
-    service.pick_up_signed_off()
-    assert backend().get("/api/claims/CLM-1001").json()["status"] == "decided"
-    assert backend().get("/api/claims/CLM-1002").json()["payment"] is None
+    service.stop_leftovers()
+    assert claim.paused("CLM-1001")
     assert backend().get(f"/api/runs/{run_id}").json()["status"] == "stopped"
+
+
+def test_resume_refuses_a_claim_that_isnt_paused(requests):
+    answer = agent_service().post("/claims/CLM-1001/resume")
+    assert answer.status_code == 409
+    assert answer.json()["detail"] == "Claim CLM-1001 isn't paused with an answer"
 
 
 def test_the_service_waits_for_the_backend(requests, monkeypatch):
@@ -225,4 +229,4 @@ def test_the_service_gives_up_if_the_backend_never_comes(monkeypatch):
     monkeypatch.setattr(service, "BACKEND_WAIT_SECONDS", 0)
     monkeypatch.setattr(service, "BACKEND_WAIT_TRIES", 2)
     assert service.backend_claims() == []
-    service.pick_up_signed_off()
+    service.stop_leftovers()

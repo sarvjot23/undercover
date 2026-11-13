@@ -66,6 +66,8 @@ def test_an_approval_over_the_limit_stops_and_waits(requests):
     assert claim()["status"] == "awaiting_sign_off"
     assert claim()["payment"] is None
     assert saved_state().next == ("sign_off",)
+    assert saved_state().interrupts
+    assert claim_agent.paused(CLAIM)
     assert claim()["thread_id"] == THREAD
     assert not claim()["agent_working"]
 

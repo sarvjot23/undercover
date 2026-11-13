@@ -225,10 +225,82 @@ it("tells Marcus why he can't sign off a held payout", async () => {
   renderAs(marcus, <ClaimView claimId="CLM-1001" />);
   expect(
     await screen.findByText(
-      "Only a handler who can sign off payouts over the limit can sign this off.",
+      "Only a handler who can sign off payouts over the limit can sign this off or send it back.",
     ),
   ).toBeDefined();
   expect(screen.queryByRole("button", { name: /Sign off/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Send back" })).toBeNull();
+});
+
+it("sends a decision back with a note, which is required and limited", async () => {
+  const routes: Record<string, unknown> = {
+    "/api/claims/CLM-1001": claim({
+      status: "awaiting_sign_off",
+      decision: approval,
+    }),
+    "/api/claims/CLM-1001/steps": [],
+    "/api/handlers": handlers,
+    "POST /api/claims/CLM-1001/send-back": { status: "sent_back" },
+  };
+  const fetchMock = stubBackend(routes);
+  renderAs(dana, <ClaimView claimId="CLM-1001" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Send back" }));
+  const note = screen.getByLabelText("What should the agent look at again?");
+  expect(note.getAttribute("maxLength")).toBe("1000");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Send back to the agent" }),
+  );
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "Say what the agent should look at again.",
+  );
+  expect(calls(fetchMock, "/api/claims/CLM-1001/send-back")).toBe(0);
+
+  fireEvent.change(note, { target: { value: "Check the carrier's refund." } });
+  expect(screen.getByText(/characters$/).textContent).toBe(
+    "27 of 1,000 characters",
+  );
+  routes["/api/claims/CLM-1001"] = claim({ status: "sent_back" });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Send back to the agent" }),
+  );
+  expect(
+    await screen.findByText(/Waiting for the next dispatch/, undefined, {
+      timeout: 3000,
+    }),
+  ).toBeDefined();
+  const sent = fetchMock.mock.calls.find(
+    ([input]) => pathOf(input) === "/api/claims/CLM-1001/send-back",
+  );
+  expect(JSON.parse(sent?.[1]?.body as string)).toEqual({
+    note: "Check the carrier's refund.",
+  });
+});
+
+it("shows each decision sent back with its note, who and when", async () => {
+  stubBackend({
+    "/api/claims/CLM-1001": claim({ status: "decided", decision: decline }),
+    "/api/claims/CLM-1001/steps": [],
+    "/api/handlers": handlers,
+    "/api/claims/CLM-1001/sent-back": [
+      {
+        sent_back_id: 1,
+        decision: approval,
+        note: "The carrier already paid $350.",
+        handler_id: "HND-01",
+        handler_name: "Dana Whitfield",
+        sent_back_at: "2026-10-21T12:04:00+00:00",
+      },
+    ],
+  });
+  renderAs(dana, <ClaimView claimId="CLM-1001" />);
+  expect(
+    await screen.findByText("The carrier already paid $350."),
+  ).toBeDefined();
+  expect(
+    screen.getByText(/Dana Whitfield sent back approved/).textContent,
+  ).toContain("$1,200.00");
+  expect(screen.getByText("Declined")).toBeDefined();
+  expect(screen.queryByText(/Waiting for the next dispatch/)).toBeNull();
 });
 
 it("shows a decline and a policy with add-ons and no history", async () => {

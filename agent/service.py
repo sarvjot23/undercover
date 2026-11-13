@@ -16,6 +16,7 @@ from agent import (
     claim,
     client,
     dispatcher,
+    graph,
     improver_client,
     rounds,
     tracing,
@@ -108,31 +109,24 @@ def halt_leftover_round() -> None:
         improver_client.halt(found["round_id"])
 
 
-def pick_up_signed_off() -> None:
-    """Stop what was left running, close what was signed off, and warm up for the next.
-
-    The queue leaves out evaluation copies, so none is ever picked up here.
-    """
-    claims = backend_claims()
-    if not claims:
+def stop_leftovers() -> None:
+    """Stop what was left running, and warm up for the next."""
+    if not backend_claims():
         return
     stop_leftover_run()
     halt_leftover_round()
     checkpoints.saver().get_tuple({"configurable": {"thread_id": "warm-up"}})
-    for found in claims:
-        if found["signed_off"]:
-            claim.carry_on(found["claim_id"])
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Pick up signed-off claims in the background, so startup doesn't wait for them.
+    """Stop leftovers in the background, so startup doesn't wait for them.
 
     Without the agent's key every call to the backend would be refused, so stop.
     """
     if not os.getenv("UNDERCOVER_API_KEY"):
         raise RuntimeError(KEY_MISSING)
-    threading.Thread(target=pick_up_signed_off, daemon=True).start()
+    threading.Thread(target=stop_leftovers, daemon=True).start()
     yield
 
 
@@ -194,8 +188,17 @@ def start_evaluation(
 
 @app.post("/claims/{claim_id}/resume", operation_id="resume_claim")
 def resume_claim(claim_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
-    """Pick a signed-off claim back up from where it stopped."""
-    background_tasks.add_task(claim.carry_on, claim_id)
+    """Resume a paused claim with the handler's answer, outside any run."""
+    # A sent-back claim is taken first: only the first caller gets it.
+    worker = None
+    found = graph.standing(claim_id)
+    if found["status"] == "sent_back":
+        worker = claim.take(claim_id)
+        if worker is None:
+            raise HTTPException(409, f"Claim {claim_id} was taken by another worker")
+    elif found["sign_off"] is None or not claim.paused(claim_id):
+        raise HTTPException(409, f"Claim {claim_id} isn't paused with an answer")
+    background_tasks.add_task(claim.carry_on, claim_id, None, None, worker)
     return {"claim_id": claim_id, "accepted": True}
 
 

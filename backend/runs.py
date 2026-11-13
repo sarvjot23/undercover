@@ -17,13 +17,14 @@ ALREADY_RUNNING = "A dispatch or evaluation is already running"
 
 
 def dispatch_claims(conn: Connection) -> list[str]:
-    """The claims a dispatch works: in progress first, then waiting, oldest first.
+    """The claims a dispatch works: in progress first, then sent back and waiting,
+    oldest first. A claim sent back that the agent never took is worked here.
 
     An evaluation's copies are never among them.
     """
     query = select(claims.c.claim_id, claims.c.status, claims.c.body).where(
         claims.c.evaluation_id.is_(None),
-        claims.c.status.in_(("in_progress", "waiting")),
+        claims.c.status.in_(("in_progress", "sent_back", "waiting")),
     )
     found = sorted(
         (

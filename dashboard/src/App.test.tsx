@@ -67,6 +67,7 @@ it("counts the claims in each state", async () => {
     "1Waiting",
     "0In progress",
     "1Waiting for sign-off",
+    "0Sent back",
     "1Decided",
     "0Left for a handler",
   ]);

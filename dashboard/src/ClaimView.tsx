@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Claim, Decision, Handler, Step } from "./api";
+import type { Claim, Decision, Handler, SentBack, Step } from "./api";
 import { postForRefusal, postJson } from "./api";
 import { ContextUsed } from "./ContextUsed";
 import { date, dateTime, label, money, OUTCOME_LABELS } from "./format";
@@ -14,9 +14,18 @@ interface Standing {
   evaluation_id: number | null;
 }
 
+const NOTE_LENGTH = 1000;
+
 /** Follow a claim while the agent may still pick it up or is working on it. */
 function pollClaim(claim: Claim): number {
-  return claim.status === "waiting" || claim.agent_working ? 1000 : 0;
+  const waiting = claim.status === "waiting" || claim.status === "sent_back";
+  return waiting || claim.agent_working ? 1000 : 0;
+}
+
+/** Follow the steps while the agent works, and while a claim sent back waits for it:
+ * the note is a step of its own. */
+function followSteps(claim: Claim | undefined): number {
+  return claim?.agent_working || claim?.status === "sent_back" ? 1000 : 0;
 }
 
 export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
@@ -24,10 +33,7 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
   const [problem, setProblem] = useState("");
   const path = `/api/claims/${claimId}`;
   const { data: claim, error, reload } = useJson<Claim>(path, pollClaim);
-  const steps = useJson<Step[]>(
-    `${path}/steps`,
-    claim?.agent_working ? 1000 : 0,
-  );
+  const steps = useJson<Step[]>(`${path}/steps`, followSteps(claim));
   const { data: standing } = useJson<Standing>(`${path}/standing`);
   const evaluationId = standing?.evaluation_id ?? null;
 
@@ -71,6 +77,7 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
         )}
       </div>
       {problem && <p role="alert">{problem}</p>}
+      <NextDispatch claim={claim} />
       {evaluationId !== null && (
         <p className="muted">
           A copy for{" "}
@@ -95,11 +102,22 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
             isCopy={evaluationId !== null}
             onSignedOff={reload}
           />
+          <SentBackPanel key={claim.status} path={`${path}/sent-back`} />
           <ContextUsed steps={steps.data ?? []} />
           <PolicyPanel claim={claim} />
         </div>
       </div>
     </section>
+  );
+}
+
+/** A sent-back claim the agent hasn't taken waits for the next dispatch. */
+function NextDispatch({ claim }: Readonly<{ claim: Claim }>) {
+  if (claim.status !== "sent_back" || claim.agent_working) return null;
+  return (
+    <p className="muted">
+      Waiting for the next dispatch, which gives the claim back to the agent.
+    </p>
   );
 }
 
@@ -191,6 +209,31 @@ function DecisionPanel({
   );
 }
 
+/** The decisions a handler sent back to the agent, each with its note. */
+function SentBackPanel({ path }: Readonly<{ path: string }>) {
+  const { data: returned } = useJson<SentBack[]>(path);
+  if (!returned || returned.length === 0) return null;
+  return (
+    <div className="panel">
+      <h3>Sent back</h3>
+      <ol className="sent-back">
+        {returned.map((back) => (
+          <li key={back.sent_back_id}>
+            <p className="muted">
+              {back.handler_name} sent back{" "}
+              {OUTCOME_LABELS[back.decision.decision].toLowerCase()}{" "}
+              <span className="mono">{money(back.decision.payout)}</span> on{" "}
+              <span className="mono">{dateTime(back.sent_back_at)}</span>
+            </p>
+            <blockquote className="note">{back.note}</blockquote>
+            <p className="muted">{back.decision.reasons}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 /** How an approval's payout was worked out, line by line. */
 function Calculation({ decision }: Readonly<{ decision: Decision }>) {
   const { calculation } = decision;
@@ -266,7 +309,9 @@ function SignOff({
     return (
       <div className="sign-off">
         {why}
-        <p className="muted">{ONLY_APPROVERS} can sign this off.</p>
+        <p className="muted">
+          {ONLY_APPROVERS} can sign this off or send it back.
+        </p>
       </div>
     );
   }
@@ -284,9 +329,91 @@ function SignOff({
   return (
     <div className="sign-off">
       {why}
-      <button type="button" onClick={signOff} disabled={busy}>
-        Sign off as {handler.name}
+      <div className="sign-off-actions">
+        <button type="button" onClick={signOff} disabled={busy}>
+          Sign off as {handler.name}
+        </button>
+        <SendBack claimId={claimId} onSentBack={onSignedOff} />
+      </div>
+      {problem && <p role="alert">{problem}</p>}
+    </div>
+  );
+}
+
+/** Send the decision back to the agent with a note saying what to look at again. */
+function SendBack({
+  claimId,
+  onSentBack,
+}: Readonly<{ claimId: string; onSentBack: () => void }>) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="secondary"
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
+        Send back
       </button>
+    );
+  }
+
+  const send = () => {
+    if (!note.trim()) {
+      setProblem("Say what the agent should look at again.");
+      return;
+    }
+    setBusy(true);
+    setProblem("");
+    void postForRefusal(`/api/claims/${claimId}/send-back`, { note }).then(
+      (refusal) => {
+        setBusy(false);
+        if (refusal) setProblem(refusal);
+        else onSentBack();
+      },
+    );
+  };
+
+  return (
+    <div className="send-back">
+      <label htmlFor="send-back-note">
+        What should the agent look at again?
+      </label>
+      <textarea
+        id="send-back-note"
+        value={note}
+        maxLength={NOTE_LENGTH}
+        required
+        onChange={(event) => {
+          setNote(event.target.value);
+        }}
+      />
+      <p className="muted">
+        <span className="mono">{note.length.toLocaleString("en-US")}</span> of{" "}
+        <span className="mono">{NOTE_LENGTH.toLocaleString("en-US")}</span>{" "}
+        characters
+      </p>
+      <div className="sign-off-actions">
+        <button type="button" onClick={send} disabled={busy}>
+          Send back to the agent
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            setOpen(false);
+            setProblem("");
+          }}
+        >
+          Cancel
+        </button>
+      </div>
       {problem && <p role="alert">{problem}</p>}
     </div>
   );

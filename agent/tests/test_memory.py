@@ -241,11 +241,13 @@ def test_a_store_that_fails_leaves_the_decision(requests, memory_on, caplog):
     assert not [step for step in steps() if step["kind"] == "memory_save"]
 
 
-def test_remember_runs_once(requests, memory_on):
+def test_a_claim_waiting_for_sign_off_is_remembered_once_resumed(requests, memory_on):
     held = approve(1200.0)
     assert held.endswith("waiting for a handler's sign-off")
-    assert len(memory_on.events) == 2
+    assert memory_on.events == []
     api().post(f"/api/claims/{CLAIM}/sign-off", headers=as_handler())
+    claim_agent.carry_on(CLAIM, script())
+    assert len(memory_on.events) == 2
     claim_agent.carry_on(CLAIM, script())
     assert len(memory_on.events) == 2
     assert len([s for s in steps() if s["kind"] == "memory_save"]) == 1

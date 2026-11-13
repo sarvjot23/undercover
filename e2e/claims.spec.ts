@@ -64,6 +64,45 @@ test("an approval over $800 waits for a sign-off, which pays it", async ({
   }).toPass();
 });
 
+test("a decision sent back with a note waits for the agent", async ({
+  page,
+  request,
+}) => {
+  await decide(request, "CLM-1009", "approve", 950);
+  await page.goto("/#/claims/CLM-1009");
+  await page.getByRole("button", { name: "Send back" }).click();
+  await page
+    .getByLabel("What should the agent look at again?")
+    .fill("The airline already refunded one night. Please take it off.");
+  await page.getByRole("button", { name: "Send back to the agent" }).click();
+  await expect(page.locator(".claim-head .badge")).toHaveText("Sent back");
+  await expect(page.getByText(/Waiting for the next dispatch/)).toBeVisible();
+  await expect(page.locator(".sent-back")).toContainText(
+    "Dana Whitfield sent back approved $950.00",
+  );
+  await expect(page.locator(".note")).toHaveText(
+    "The airline already refunded one night. Please take it off.",
+  );
+  await expect(page.locator(".step-send_back")).toContainText(
+    "Sent back by Dana Whitfield",
+  );
+  await expect(page.getByText("No decision yet.")).toBeVisible();
+
+  await page.goto("/");
+  await expect(
+    page.getByRole("row", { name: /CLM-1009/ }).locator(".badge"),
+  ).toHaveText("Sent back");
+
+  // The agent is asked to take the claim and decide again.
+  await expect(async () => {
+    const received = await request.get("http://127.0.0.1:8003/received");
+    expect(await received.json()).toContainEqual({
+      path: "/claims/CLM-1009/resume",
+      body: {},
+    });
+  }).toPass();
+});
+
 test("Marcus sees why he can't sign off a held payout", async ({
   page,
   request,
@@ -73,7 +112,7 @@ test("Marcus sees why he can't sign off a held payout", async ({
   await page.goto("/#/claims/CLM-1015");
   await expect(
     page.getByText(
-      "Only a handler who can sign off payouts over the limit can sign this off.",
+      "Only a handler who can sign off payouts over the limit can sign this off or send it back.",
     ),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: /Sign off as/ })).toHaveCount(

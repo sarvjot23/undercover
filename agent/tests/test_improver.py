@@ -312,14 +312,14 @@ def test_a_round_waiting_survives_a_restart_and_one_working_is_stopped(
         ),
     )
     round_id = start_round()
-    service.pick_up_signed_off()
+    service.stop_leftovers()
     assert found(round_id)["status"] == "waiting"
     decide(round_id)
     assert found(round_id)["stage"] == "recipe_waiting"
     api().post(f"/api/rounds/{round_id}/stop", headers=as_handler())
 
     working = api().post("/api/rounds/records", json={"handler_id": "HND-01"}).json()
-    service.pick_up_signed_off()
+    service.stop_leftovers()
     assert found(working["round_id"])["status"] == "stopped"
 
 

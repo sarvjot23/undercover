@@ -139,3 +139,26 @@ it("makes a refusal stand out, labeled by who refused", () => {
   // The agent's next attempt at the record follows the section 14 refusal.
   expect(rows()[7]?.text).toBe("record_decision {}");
 });
+
+it("shows a handler's note on a decision sent back, with who sent it", () => {
+  render(
+    <Steps
+      steps={[
+        {
+          step_id: 20,
+          kind: "send_back",
+          text: "The carrier already paid $350.",
+          at: "",
+          detail: { by: "Dana Whitfield" },
+        },
+      ]}
+    />,
+  );
+  expect(rows()).toEqual([
+    {
+      kind: "Sent back by Dana Whitfield",
+      text: "The carrier already paid $350.",
+      source: undefined,
+    },
+  ]);
+});

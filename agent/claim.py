@@ -70,6 +70,7 @@ def first_input(claim_id: str, thread_id: str) -> dict[str, Any]:
         "claim_id": claim_id,
         "thread_id": thread_id,
         "model_calls": 0,
+        "remembered": False,
     }
 
 
@@ -139,13 +140,18 @@ def run(
 
 
 def carry_on(
-    claim_id: str, llm: BaseChatModel | None = None, in_run: Run | None = None
+    claim_id: str,
+    llm: BaseChatModel | None = None,
+    in_run: Run | None = None,
+    worker: str | None = None,
 ) -> str:
     """Pick up a stopped claim from its last step, on the same thread.
 
-    A signed-off claim is already paid: its paused work only closes.
+    A paused claim resumes with the handler's answer: a signed-off claim is already
+    paid, so its work only closes, and a sent-back claim is decided again. A worker
+    that took a sent-back claim already holds its lease.
     """
-    with lease.holding(f"/api/claims/{claim_id}/lease") as held:
+    with lease.holding(f"/api/claims/{claim_id}/lease", worker) as held:
         if not held:
             return f"{claim_id}: not picked up, another worker is on it"
         claim = graph.standing(claim_id)
@@ -156,15 +162,68 @@ def carry_on(
         claim_graph = build(llm, claim_id, in_run)
         saved = claim_graph.get_state({"configurable": {"thread_id": thread_id}})
         start: Any = None
-        if signed_off:
-            if not saved.interrupts:
-                return graph.report(claim)
-            start = Command(resume=claim["sign_off"])
+        if saved.interrupts:
+            start = Command(resume=answer(claim))
+        elif signed_off:
+            return graph.report(claim)
         elif saved.values and not saved.next:
             return fail(claim_id, NO_DECISION)
         elif not saved.values:
+            # A sent-back claim whose saved progress is gone starts afresh, with
+            # the handler's note.
             start = first_input(claim_id, thread_id)
+            returned = sent_back(claim_id)
+            if returned:
+                start["messages"].append(handler_message(returned[-1]))
         return invoke(claim_graph, claim_id, thread_id, start, in_run)
+
+
+def sent_back(claim_id: str) -> list[dict[str, Any]]:
+    """The claim's decisions sent back by a handler, oldest first, with their notes."""
+    with client.backend() as backend:
+        return backend.get(f"/api/claims/{claim_id}/sent-back").json()
+
+
+def handler_message(returned: dict[str, Any]) -> HumanMessage:
+    """The message carrying a handler's note. It's written here in the agent's code,
+    not in its instructions, so a new version of the instructions can't drop it."""
+    return HumanMessage(
+        f"{returned['handler_name']}, a senior handler, sent your decision back to "
+        f"you with this note:\n\n{returned['note']}\n\n"
+        "Your earlier decision is withdrawn and nothing has been paid. Treat the note "
+        "as a senior handler's review of your decision: check what it asks against "
+        "the policy wording and the claims manual, like everything else, then record "
+        "a new decision with record_decision. If the wording doesn't support what the "
+        "note asks, refer the claim to a handler and give the reason."
+    )
+
+
+def answer(claim: dict[str, Any]) -> dict[str, Any]:
+    """The handler's answer to a paused claim, from the app's record: a sign-off, or
+    the latest decision sent back with its note."""
+    if claim["sign_off"] is not None:
+        return {"signed_off_by": claim["sign_off"]["handler_id"]}
+    return {"message": handler_message(sent_back(claim["claim_id"])[-1]).text}
+
+
+def take(claim_id: str) -> str | None:
+    """Take a sent-back claim for work with a new worker, holding its lease; None if
+    another caller took it first."""
+    worker = uuid.uuid4().hex
+    with client.backend() as backend:
+        taken = backend.post(f"/api/claims/{claim_id}/take", json={"worker": worker})
+    return worker if taken.is_success else None
+
+
+def paused(claim_id: str) -> bool:
+    """Whether a claim's thread has a pause waiting for a handler's answer."""
+    thread_id = graph.standing(claim_id)["thread_id"]
+    if thread_id is None:
+        return False
+    saved = build(None, claim_id, None).get_state(
+        {"configurable": {"thread_id": thread_id}}
+    )
+    return bool(saved.interrupts)
 
 
 def new_thread(claim_id: str) -> str:
@@ -173,16 +232,17 @@ def new_thread(claim_id: str) -> str:
 
 
 def work(claim_id: str, in_run: Run | None, llm: BaseChatModel | None = None) -> str:
-    """The one door to the claim agent: carry on a claim, or start a waiting one.
+    """The one door to the claim agent: carry on a claim, take a sent-back one, or
+    start a waiting one.
 
-    An evaluation's copy held for sign-off counts as finished: nobody signs off a
-    copy, so its saved progress is cleared.
+    An evaluation's copy never pauses for a sign-off: nobody signs off a copy.
     """
-    if graph.standing(claim_id)["status"] == "in_progress":
-        report = carry_on(claim_id, llm, in_run)
-    else:
-        report = run(claim_id, new_thread(claim_id), llm, in_run)
-    found = graph.standing(claim_id)
-    if found["evaluation_id"] is not None and found["status"] == "awaiting_sign_off":
-        checkpoints.saver().delete_thread(found["thread_id"])
-    return report
+    status = graph.standing(claim_id)["status"]
+    if status == "sent_back":
+        worker = take(claim_id)
+        if worker is None:
+            return f"{claim_id}: not picked up, another worker took it"
+        return carry_on(claim_id, llm, in_run, worker)
+    if status == "in_progress":
+        return carry_on(claim_id, llm, in_run)
+    return run(claim_id, new_thread(claim_id), llm, in_run)

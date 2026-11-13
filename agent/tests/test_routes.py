@@ -28,6 +28,7 @@ def context_for(route, claim_id=CLAIM):
         version=1,
         kind=None,
         route=route,
+        memory=None,
     )
 
 

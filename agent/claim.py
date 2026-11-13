@@ -9,7 +9,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from agent import checkpoints, client, graph, lease, routes, tracing
+from agent import checkpoints, client, graph, lease, memory, routes, tracing
 from agent.model import model
 from agent.tools import ClaimContext
 from agent.tracing import Run
@@ -34,19 +34,21 @@ def fail(claim_id: str, reason: str) -> str:
 
 def build(llm: BaseChatModel | None, claim_id: str, run: Run | None) -> Any:
     """Build a claim's graph from its run's version of the configuration, or the
-    current one, on the route the settings give now."""
+    current one, on the route and with the memory the settings give now."""
     version = version_of(run)
     path = "current" if version is None else f"versions/{version}"
     with client.backend() as backend:
         config = backend.get(f"/api/configuration/{path}").json()
         found = backend.get(f"/api/claims/{claim_id}").json()
+    kind = run["kind"] if run else None
     claim = ClaimContext(
         claim_id=claim_id,
         policy_id=found["policy_id"],
         customer_id=found["customer_id"],
         version=config["version"],
-        kind=run["kind"] if run else None,
+        kind=kind,
         route=routes.choose(),
+        memory=memory.for_run(kind),
     )
     return graph.build(
         lambda: llm or model(config["model"], config["reasoning"]),

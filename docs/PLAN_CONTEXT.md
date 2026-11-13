@@ -32,7 +32,7 @@ The brief's five steps are phases 1 to 5, one each, with a commit at the end of 
 3. **The decision's calculation** is kept in a new `calculations` table, one row for each claim and attempt, replaced by each `calculate_payout`. "For this attempt" uses the claim's `attempts` column, so a claim sent back to the queue needs a fresh calculation.
 4. **A lookup's step holds structured detail.** Steps get a `detail` column (JSON, empty for the old kinds). A lookup step's detail is what was looked up, its file, and the file's system, owner and review date. A search of the documents has one entry for each file it found sections in. The dashboard groups the Context used panel by file from this detail, not by parsing the text.
 5. **When the Gateway refuses a payment**, a new operation, `POST /api/claims/{id}/hold` (`hold_payment`, the agent's key only, not in the agent's API document), moves an approved, unpaid claim in progress to waiting for sign-off. It records the Gateway's reason on the decision (`payment_refused`). The graph's `pay` then goes to `sign_off`, and a handler's sign-off pays as it does today. The sign-off panel shows the Gateway's refusal in place of "over the approval limit".
-6. **The memory saves in a node of its own, `remember`.** It sits between the end of the work and `close`, so after a restart it runs once and no more.
+6. **The memory saves in a node of its own, `remember`.** It sits between the decision and what follows it (`pay`, `sign_off` or `close`), so after a restart, or when a signed-off claim resumes at `sign_off`, it runs once and no more.
 
 ---
 
@@ -105,9 +105,9 @@ The brief's five steps are phases 1 to 5, one each, with a commit at the end of 
 - `search_memory(query)`, a model tool described as searching what we remember about this claim's customer from their earlier claims. It searches only `("customers", <this customer>)`, gives each memory's text, and leaves out the summary of the claim it's working on. On an error it gives the model the error as a refusal. The tool is there only with memory on and outside an evaluation, decided when the graph is built from the run's kind.
 - `backend/instructions/claim.md` names what the agent works from: the context layer's definitions, plans, rules, reference data and documents, and its memory of the customer, which adds to the claim history in our records (manual section 9) rather than replacing it. It stays written as goals. `backend/instructions/improver.md`'s sentence on the tools names the new ones.
 
-- [ ] `agent/tests/test_memory.py`, with a stand-in store: the two events after a decision, with the right actor, session and content (no story, no documents); nothing saved for a referral by the check or for an evaluation's copy; a search kept to the claim's customer that leaves out this claim's summary; no `search_memory` tool with memory off or in an evaluation; a store that fails leaves the decision and logs a warning, and a failed search is a refusal
-- [ ] `remember` runs once: work carried on after it saved saves nothing more
-- [ ] `npm run check` passes, and the commit goes through the pre-commit hook
+- [x] `agent/tests/test_memory.py`, with a stand-in store: the two events after a decision, with the right actor, session and content (no story, no documents); nothing saved for a referral by the check or for an evaluation's copy; a search kept to the claim's customer that leaves out this claim's summary; no `search_memory` tool with memory off or in an evaluation; a store that fails leaves the decision and logs a warning, and a failed search is a refusal
+- [x] `remember` runs once: work carried on after it saved saves nothing more
+- [x] `npm run check` passes, and the commit goes through the pre-commit hook
 
 ## Phase 5: Every step on the claim page
 

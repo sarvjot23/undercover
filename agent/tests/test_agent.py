@@ -74,7 +74,7 @@ def test_decline(requests):
 def claim_tools():
     """The model's tools on CLM-1001, on the direct route the settings give."""
     route = routes.choose()
-    found = tools.ClaimContext("CLM-1001", "POL-2001", "CUS-3001", 1, None, route)
+    found = tools.ClaimContext("CLM-1001", "POL-2001", "CUS-3001", 1, None, route, None)
     return {t.name: t for t in tools.for_claim(found)}
 
 

@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 from langchain_core.tools import BaseTool, tool
+from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
+from agent import memory
 from agent.direct import APP, CONTEXT
 from agent.mcp_bridge import Refused
 from agent.routes import Route
@@ -34,6 +36,8 @@ class ClaimContext:
     version: int
     kind: str | None
     route: Route
+    # The customer's memory, or None when memory is off or in an evaluation.
+    memory: BaseStore | None
 
 
 class Line(BaseModel):
@@ -195,6 +199,21 @@ def context_tools(claim: ClaimContext) -> list[BaseTool]:
     ]
 
 
+def memory_tools(claim: ClaimContext) -> list[BaseTool]:
+    """The search of the customer's memory, when the claim has one."""
+    store = claim.memory
+    if store is None:
+        return []
+
+    @tool
+    def search_memory(query: str) -> str:
+        """Search what we remember about this claim's customer from their earlier
+        claims. Our claim history still counts for repeat claims."""
+        return memory.search(store, claim.customer_id, claim.claim_id, query)
+
+    return [search_memory]
+
+
 def for_claim(claim: ClaimContext) -> list[BaseTool]:
     """Every tool the model has on this claim."""
-    return [*app_tools(claim), *context_tools(claim)]
+    return [*app_tools(claim), *context_tools(claim), *memory_tools(claim)]

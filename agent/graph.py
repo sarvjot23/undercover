@@ -1,6 +1,7 @@
 """The claim agent's graph: its state, nodes and edges, saved after every step."""
 
 import json
+import logging
 from collections.abc import Callable
 from functools import cache
 from typing import Annotated, Any, Literal, TypedDict
@@ -16,7 +17,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command, RetryPolicy, interrupt
 
-from agent import client, screening, tools
+from agent import client, memory, screening, tools
 from agent.direct import APP
 from agent.mcp_bridge import Refused
 from agent.tools import ClaimContext
@@ -28,6 +29,8 @@ RECURSION_LIMIT = 3 * MODEL_CALLS + 20
 STEP_LENGTH = 600
 # The dispatcher waits these out and carries the claim on, so the graph doesn't retry.
 PASSED_UP = (ModelRateLimitError, ModelTimeoutError)
+After = Literal["sign_off", "pay", "close"]
+log = logging.getLogger(__name__)
 
 
 class ClaimState(TypedDict):
@@ -146,6 +149,10 @@ def record_tool_result(
             section = json.loads(result.text)
             kind = "read"
             text = f"{section['name']} · {section['number']}. {section['title']}"
+        elif name == "search_memory":
+            query = request.tool_call["args"]["query"]
+            kind = "memory_search"
+            text = f"Searched memory for {query!r}: {result.text[:STEP_LENGTH]}"
         else:
             kind, text = "tool_result", f"{name}: {result.text[:STEP_LENGTH]}"
         key = f"{state['thread_id']}:{message.id}:{number}:result"
@@ -176,16 +183,45 @@ def after_record(state: ClaimState) -> str:
     return "tools" if message.tool_calls else END
 
 
-def after_tools(state: ClaimState) -> Literal["agent", "sign_off", "pay", "close"]:
-    """Ask the backend where the claim stands; it alone applies the limit."""
-    claim = standing(state["claim_id"])
-    if claim["decision"] is None:
-        return "agent"
+def after_tools(state: ClaimState) -> Literal["agent", "remember"]:
+    """Back to the model until it has recorded a decision."""
+    return "agent" if standing(state["claim_id"])["decision"] is None else "remember"
+
+
+def after_decision(claim: dict[str, Any]) -> After:
+    """Where a decided claim goes; the backend alone applies the limit."""
     if claim["status"] == "awaiting_sign_off":
         return "sign_off"
     if claim["status"] == "in_progress":
         return "pay"
     return "close"
+
+
+def remember_node(claim: ClaimContext) -> Any:
+    """Make the node that saves the claim and the decision the agent recorded to the
+    customer's memory, in code every time. It runs once, after the decision.
+
+    Nothing is saved without memory, in an evaluation or for an evaluation's copy.
+    The check's referrals never come this way. If AgentCore can't be reached, the
+    claim keeps its decision.
+    """
+
+    def remember(state: ClaimState) -> Command[After]:
+        claim_id = state["claim_id"]
+        found = standing(claim_id)
+        if claim.memory is not None and found["evaluation_id"] is None:
+            with client.backend() as backend:
+                full = backend.get(f"/api/claims/{claim_id}").json()
+            try:
+                saved = memory.save(claim.memory, full)
+            except Exception as error:  # noqa: BLE001 - the decision stands
+                log.warning("Couldn't save %s to memory: %s", claim_id, error)
+            else:
+                key = f"{state['thread_id']}:remember"
+                record_step(claim_id, "memory_save", saved[:STEP_LENGTH], key)
+        return Command(goto=after_decision(found))
+
+    return remember
 
 
 def sign_off(state: ClaimState) -> dict[str, Any]:
@@ -281,6 +317,9 @@ def build(
     )
     builder.add_node("record", record)
     builder.add_node("tools", ToolNode(claim_tools, wrap_tool_call=record_tool_result))
+    builder.add_node(
+        "remember", remember_node(claim), destinations=("sign_off", "pay", "close")
+    )
     builder.add_node("sign_off", sign_off)
     builder.add_node("pay", pay_node(claim), destinations=("sign_off", "close"))
     builder.add_node("close", close)
@@ -288,9 +327,7 @@ def build(
     builder.add_conditional_edges("check", after_check, ["agent", "close"])
     builder.add_edge("agent", "record")
     builder.add_conditional_edges("record", after_record, ["tools", END])
-    builder.add_conditional_edges(
-        "tools", after_tools, ["agent", "sign_off", "pay", "close"]
-    )
+    builder.add_conditional_edges("tools", after_tools, ["agent", "remember"])
     builder.add_edge("sign_off", "close")
     builder.add_edge("close", END)
-    return builder.compile(checkpointer=saver)
+    return builder.compile(checkpointer=saver, store=claim.memory)

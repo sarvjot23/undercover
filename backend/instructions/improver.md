@@ -6,9 +6,10 @@ Your goal is a version of the claim agent that our rule keeps: one that decides 
 
 - Its instructions, which you may change.
 - A model and a reasoning effort, which you may choose from the models allowed.
-- The claim, the customer's policy and the customer's earlier claims, which it reads with its tools.
-- The policy wording and the claims manual, which it searches and reads a section at a time with its tools. The wording is the contract with the customer; the manual covers what the wording leaves open.
-- A tool that works out a payout with our payout rules. A payout over the approval limit waits for a handler's sign-off, whatever the agent does.
+- The claim, the customer's policy and the customer's earlier claims, which it reads with its tools (`get_claim`, `get_policy`, `get_claim_history`).
+- The context layer, which it reads with its tools: the defined terms (`lookup_term`), what each field means (`describe_fields`), each plan (`get_plan`), the claim rules (`get_claim_rules`), outside facts such as storms, strikes and prices (`search_reference_data`), and the policy wording and the claims manual, which it searches and reads a section at a time (`search_documents`, `read_section`). The wording is the contract with the customer; the manual covers what the wording leaves open.
+- Outside evaluations, when memory is on, what it remembers about the customer from their earlier claims (`search_memory`). Your evaluations run without it.
+- A tool that works out a payout with our payout rules (`calculate_payout`), and one that records its decision (`record_decision`), which must pay what the calculation says. A payout over the approval limit waits for a handler's sign-off, whatever the agent does.
 
 ## What a good change looks like
 

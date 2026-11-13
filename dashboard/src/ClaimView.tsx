@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { Claim, Handler, Step } from "./api";
+import type { Claim, Decision, Handler, Step } from "./api";
 import { postForRefusal, postJson } from "./api";
+import { ContextUsed } from "./ContextUsed";
 import { date, dateTime, label, money, OUTCOME_LABELS } from "./format";
 import { ONLY_APPROVERS, useHandler } from "./handler";
 import { useJson } from "./hooks";
@@ -94,26 +95,10 @@ export function ClaimView({ claimId }: Readonly<{ claimId: string }>) {
             isCopy={evaluationId !== null}
             onSignedOff={reload}
           />
-          <Reads steps={steps.data ?? []} />
+          <ContextUsed steps={steps.data ?? []} />
           <PolicyPanel claim={claim} />
         </div>
       </div>
-    </section>
-  );
-}
-
-/** The sections of the wording and the manual the agent opened, in order. */
-function Reads({ steps }: Readonly<{ steps: Step[] }>) {
-  const reads = steps.filter((step) => step.kind === "read");
-  if (reads.length === 0) return null;
-  return (
-    <section className="panel" aria-labelledby="reads-heading">
-      <h3 id="reads-heading">What the agent read</h3>
-      <ol className="reads">
-        {reads.map((step) => (
-          <li key={step.step_id}>{step.text}</li>
-        ))}
-      </ol>
     </section>
   );
 }
@@ -181,16 +166,52 @@ function DecisionPanel({
         <span className="mono">{money(decision.payout)}</span>
       </p>
       <p>{decision.reasons}</p>
-      <p className="muted">Policy: {decision.policy_section}</p>
+      <dl className="facts">
+        <dt>Section</dt>
+        <dd>{decision.policy_section}</dd>
+        <dt>Decided by</dt>
+        <dd>{decision.decided_by}</dd>
+        <dt>When</dt>
+        <dd className="mono">{dateTime(decision.decided_at)}</dd>
+        <dt>Claims manual</dt>
+        <dd>
+          Version <span className="mono">{decision.manual_version}</span>
+        </dd>
+      </dl>
+      <Calculation decision={decision} />
       {payment && <PaymentLine claim={claim} handlers={handlers} />}
       {claim.status === "awaiting_sign_off" && !isCopy && (
         <SignOff
           claimId={claim.claim_id}
-          limit={decision.approval_limit}
+          decision={decision}
           onSignedOff={onSignedOff}
         />
       )}
     </div>
+  );
+}
+
+/** How an approval's payout was worked out, line by line. */
+function Calculation({ decision }: Readonly<{ decision: Decision }>) {
+  const { calculation } = decision;
+  if (!calculation) return null;
+  return (
+    <table className="items calculation" aria-label="Calculation">
+      <tbody>
+        {calculation.lines.map((line, index) => (
+          <tr key={`${String(index)}-${line.step}`}>
+            <td>{line.step}</td>
+            <td className="mono number">{money(line.amount)}</td>
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">Payout</th>
+          <td className="mono number">{money(calculation.payout)}</td>
+        </tr>
+      </tfoot>
+    </table>
   );
 }
 
@@ -219,16 +240,25 @@ function PaymentLine({
 
 function SignOff({
   claimId,
-  limit,
+  decision,
   onSignedOff,
-}: Readonly<{ claimId: string; limit: number; onSignedOff: () => void }>) {
+}: Readonly<{
+  claimId: string;
+  decision: Decision;
+  onSignedOff: () => void;
+}>) {
   const handler = useHandler();
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
-  const why = (
+  const why = decision.payment_refused ? (
     <p>
-      This payout is over the approval limit of {money(limit)}, so the payment
-      waits for a handler&rsquo;s sign-off.
+      The Gateway refused the payment, so it waits for a handler&rsquo;s
+      sign-off: {decision.payment_refused}
+    </p>
+  ) : (
+    <p>
+      This payout is over the approval limit of {money(decision.approval_limit)}
+      , so the payment waits for a handler&rsquo;s sign-off.
     </p>
   );
 

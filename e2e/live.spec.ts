@@ -14,7 +14,12 @@ test("the live view shows a dispatch as a board, stamps each claim and ends on t
   await start(request, "CLM-1020");
   await start(request, "CLM-1021");
   await request.post("/api/claims/CLM-1020/steps", {
-    data: { kind: "tool_call", text: "get_claim CLM-1020", key: "e2e-live-1" },
+    data: {
+      kind: "tool_call",
+      text: "get_claim CLM-1020",
+      key: "e2e-live-1",
+      detail: null,
+    },
   });
   const first = page.getByRole("article", { name: "Claim CLM-1020" });
   const second = page.getByRole("article", { name: "Claim CLM-1021" });

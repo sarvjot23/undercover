@@ -126,13 +126,13 @@ def stop_on(monkeypatch, kind, *, after, text=""):
     original = graph.record_step
     stopped = []
 
-    def stopping(claim_id, step_kind, step_text, key):
+    def stopping(claim_id, step_kind, step_text, key, detail=None):
         if step_kind == kind and step_text.startswith(text) and not stopped:
             stopped.append(key)
             if after:
-                original(claim_id, step_kind, step_text, key)
+                original(claim_id, step_kind, step_text, key, detail)
             raise Stopped
-        original(claim_id, step_kind, step_text, key)
+        original(claim_id, step_kind, step_text, key, detail)
 
     monkeypatch.setattr(graph, "record_step", stopping)
 

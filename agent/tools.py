@@ -214,6 +214,37 @@ def memory_tools(claim: ClaimContext) -> list[BaseTool]:
     return [search_memory]
 
 
+APP_TOOLS = (
+    "get_claim",
+    "get_policy",
+    "get_claim_history",
+    "calculate_payout",
+    "record_decision",
+)
+CONTEXT_TOOLS = (
+    "lookup_term",
+    "describe_fields",
+    "get_plan",
+    "get_claim_rules",
+    "search_reference_data",
+    "search_documents",
+    "read_section",
+)
+TARGETS = {
+    **dict.fromkeys(APP_TOOLS, APP),
+    **dict.fromkeys(CONTEXT_TOOLS, CONTEXT),
+}
+
+
+def routed_name(claim: ClaimContext, name: str) -> str:
+    """A tool's name as its route names it: the Gateway's, or the tool's own.
+
+    The memory search isn't on the Gateway, so it keeps its own name.
+    """
+    target = TARGETS.get(name)
+    return claim.route.tool_name(target, name) if target else name
+
+
 def for_claim(claim: ClaimContext) -> list[BaseTool]:
     """Every tool the model has on this claim."""
     return [*app_tools(claim), *context_tools(claim), *memory_tools(claim)]

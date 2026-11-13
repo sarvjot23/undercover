@@ -228,6 +228,8 @@ steps = Table(
     Column("text", Text, nullable=False),
     Column("key", Text, nullable=False),
     Column("at", Text, nullable=False),
+    # What a lookup looked up and where it came from, or who refused; else empty.
+    Column("detail", JSON),
     UniqueConstraint("claim_id", "key"),
 )
 # The claim agent's configuration, in versions: exactly one is current.

@@ -120,10 +120,10 @@ The brief's five steps are phases 1 to 5, one each, with a commit at the end of 
 - The decision panel shows the whole record: the decision, payout, section, reasons, who decided and when, the manual's version, the calculation line by line, and any sign-off. The sign-off panel says when the Gateway refused the payment.
 - In `docs/BRAND.md`'s look and the dashboard's plain words.
 
-- [ ] Vitest: each step kind, a refusal by the Gateway and one by section 14, the Context used panel grouping by file with sources and no repeats, the decision panel with a calculation, and the sign-off panel after a Gateway refusal
-- [ ] Python: the steps route returns the detail, and the agent records Gateway names on the Gateway route and its own names otherwise
-- [ ] An end-to-end test: a claim with lookups and a decision with a calculation shows the Context used panel and the calculation
-- [ ] `npm run check` passes with coverage of at least 80%, and the commit goes through the pre-commit hook
+- [x] Vitest: each step kind, a refusal by the Gateway and one by section 14, the Context used panel grouping by file with sources and no repeats, the decision panel with a calculation, and the sign-off panel after a Gateway refusal
+- [x] Python: the steps route returns the detail, and the agent records Gateway names on the Gateway route and its own names otherwise
+- [x] An end-to-end test: a claim with lookups and a decision with a calculation shows the Context used panel and the calculation
+- [x] `npm run check` passes with coverage of at least 80%, and the commit goes through the pre-commit hook
 
 ## Phase 6: The live checks and the handover
 

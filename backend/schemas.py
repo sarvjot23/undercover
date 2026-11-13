@@ -1,7 +1,7 @@
 """The request bodies of the backend's API."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -55,14 +55,18 @@ class Step(BaseModel):
         "check",
         "tool_call",
         "tool_result",
-        "read",
+        "lookup",
         "memory_search",
         "memory_save",
+        "refusal",
         "answer",
         "error",
     ]
     text: str
     key: str
+    # A lookup's detail is what was looked up and the files it came from, each with
+    # its source; a refusal's is who refused. Other kinds have none.
+    detail: dict[str, Any] | None
 
 
 class Hold(BaseModel):

@@ -368,7 +368,7 @@ select {
 
 .step {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 96px 1fr;
   gap: 12px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -382,6 +382,17 @@ select {
   text-transform: uppercase;
   color: var(--muted);
   padding-top: 2px;
+}
+
+.step-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.step-source {
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 .step-text {
@@ -399,13 +410,46 @@ select {
   font-weight: 600;
 }
 
-.step-read .step-kind {
+.step-lookup .step-kind,
+.step-memory_search .step-kind,
+.step-memory_save .step-kind {
   color: var(--accent-text);
 }
 
-.step-read .step-text {
+.step-lookup .step-text,
+.step-memory_search .step-text,
+.step-memory_save .step-text {
   font-family: var(--sans);
+}
+
+.step-lookup .step-text {
   font-weight: 600;
+}
+
+.step-refusal {
+  background: var(--burnished);
+  color: #121212;
+}
+
+.step-refusal .step-kind {
+  color: #121212;
+}
+
+.context-file + .context-file {
+  margin-top: 12px;
+}
+
+.context-file h4 {
+  margin: 0;
+}
+
+.context-file p {
+  margin: 2px 0 4px;
+  font-size: 0.85rem;
+}
+
+.calculation {
+  margin-top: 12px;
 }
 
 .step-error .step-kind {

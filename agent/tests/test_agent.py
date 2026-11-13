@@ -58,9 +58,10 @@ def test_a_record_section_14_refuses_is_put_right_and_tried_again(requests):
         *decision("approve", 420.0),
         AIMessage(content="Approved."),
     )
-    refusal = next(s["text"] for s in steps() if s["kind"] == "tool_result")
-    assert refusal.startswith("record_decision: Refused by the app:")
-    assert "Claims manual section 14" in refusal
+    refusal = next(s for s in steps() if s["kind"] == "refusal")
+    assert refusal["text"].startswith("record_decision: Refused by the app:")
+    assert "Claims manual section 14" in refusal["text"]
+    assert refusal["detail"] == {"by": "the app"}
     assert claim()["decision"]["payout"] == 420.0
 
 
@@ -186,8 +187,20 @@ def test_reads_the_manual_a_section_at_a_time(requests):
         AIMessage(content="Approved."),
     )
     kinds = [step["kind"] for step in steps()]
-    assert kinds[:4] == ["tool_call", "tool_result", "tool_call", "read"]
+    assert kinds[:4] == ["tool_call", "lookup", "tool_call", "lookup"]
     assert steps()[3]["text"] == "Claims manual · 7. Interpretation notes"
+    manual = {
+        "file": "claims_manual.md",
+        "system": "Claims operations",
+        "owner": "Head of claims operations",
+        "reviewed": "2026-09-01",
+    }
+    assert steps()[1]["text"] == "The documents, for “giraffes”"
+    assert steps()[1]["detail"]["files"] == [manual]
+    assert steps()[3]["detail"] == {
+        "looked_up": "Claims manual · 7. Interpretation notes",
+        "files": [manual],
+    }
 
 
 def test_a_missing_section_is_a_refusal_not_a_read(requests):
@@ -196,7 +209,8 @@ def test_a_missing_section_is_a_refusal_not_a_read(requests):
         *decision("refer", 0),
         AIMessage(content="Referred."),
     )
-    assert steps()[1]["kind"] == "tool_result"
+    assert steps()[1]["kind"] == "refusal"
+    assert steps()[1]["detail"] == {"by": "the context layer"}
     assert steps()[1]["text"] == (
         "read_section: Refused by the context layer: "
         "Error executing tool read_section: No section 99 in the claims manual"

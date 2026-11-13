@@ -6,7 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Step } from "./api";
+import type { SourceFile, Step } from "./api";
 import { ClaimView } from "./ClaimView";
 import { claim, dana, marcus, pathOf, renderAs, stubBackend } from "./testing";
 
@@ -22,8 +22,9 @@ const handlers = [dana, marcus];
 const step: Step = {
   step_id: 1,
   kind: "tool_call",
-  text: 'get_claim {"claim_id": "CLM-1001"}',
+  text: "get_claim {}",
   at: "2026-10-21T12:00:00+00:00",
+  detail: null,
 };
 
 const approval = {
@@ -32,7 +33,24 @@ const approval = {
   reasons: "Covered by the wording.",
   policy_section: "5. Baggage and Personal Effects",
   decided_at: "2026-10-21T12:00:00+00:00",
+  decided_by: "UnderCover Agent, version 1",
+  manual_version: "2026.2",
+  calculation: {
+    lines: [
+      { step: "Clinic visit", amount: 1300 },
+      { step: "Less the deductible", amount: -100 },
+    ],
+    payout: 1200,
+  },
   approval_limit: 800,
+  payment_refused: null,
+};
+
+const decline = {
+  ...approval,
+  decision: "decline" as const,
+  payout: 0,
+  calculation: null,
 };
 
 function calls(fetchMock: ReturnType<typeof stubBackend>, path: string) {
@@ -99,7 +117,13 @@ it("runs the agent and follows its steps until it decides", async () => {
     await screen.findByText(/^Approved/, {}, { timeout: 3000 }),
   ).toBeDefined();
 
-  const answer: Step = { ...step, step_id: 2, kind: "answer", text: "Paid." };
+  const answer: Step = {
+    step_id: 2,
+    kind: "answer",
+    text: "Paid.",
+    at: "",
+    detail: null,
+  };
   routes["/api/claims/CLM-1001/steps"] = [step, answer];
   routes["/api/claims/CLM-1001"] = claim({
     status: "decided",
@@ -212,7 +236,7 @@ it("shows a decline and a policy with add-ons and no history", async () => {
   stubBackend({
     "/api/claims/CLM-1001": claim({
       status: "decided",
-      decision: { ...approval, decision: "decline", payout: 0 },
+      decision: decline,
       policy: { ...base.policy, add_ons: ["electronics_plus"] },
       customer: { ...base.customer, previous_claims: [] },
     }),
@@ -224,13 +248,36 @@ it("shows a decline and a policy with add-ons and no history", async () => {
   expect(screen.getByText("None.")).toBeDefined();
 });
 
-it("lists the sections the agent read, and its failed attempts", async () => {
-  const read = (step_id: number, text: string): Step => ({
+const wording: SourceFile = {
+  file: "policy_wording.md",
+  system: "Legal",
+  owner: "Legal",
+  reviewed: "2026-09-01",
+};
+const manual: SourceFile = {
+  file: "claims_manual.md",
+  system: "Claims operations",
+  owner: "Head of claims operations",
+  reviewed: "2026-09-01",
+};
+const glossary: SourceFile = {
+  file: "glossary.yaml",
+  system: "The policy wording, version 2026.1",
+  owner: "Legal",
+  reviewed: "2026-08-15",
+};
+
+function lookup(step_id: number, looked_up: string, files: SourceFile[]): Step {
+  return {
     step_id,
-    kind: "read",
-    text,
-    at: "2026-10-29T12:00:00+00:00",
-  });
+    kind: "lookup",
+    text: looked_up,
+    at: "",
+    detail: { looked_up, files },
+  };
+}
+
+it("lists the context the agent used by file, once each, and its failed attempts", async () => {
   stubBackend({
     "/api/claims/CLM-1005": claim({
       claim_id: "CLM-1005",
@@ -239,32 +286,101 @@ it("lists the sections the agent read, and its failed attempts", async () => {
     }),
     "/api/claims/CLM-1005/steps": [
       step,
-      read(2, "Policy wording · 6. Passport and Travel Documents"),
-      read(3, "Claims manual · 7. Interpretation notes"),
+      lookup(2, "The term “Unattended”", [glossary]),
+      lookup(3, "The documents, for “receipts”", [wording, manual]),
+      lookup(4, "Claims manual · 7. Interpretation notes", [manual]),
+      lookup(5, "Claims manual · 7. Interpretation notes", [manual]),
+      lookup(6, "The documents, for “zeppelin”", []),
       {
-        step_id: 4,
+        step_id: 7,
         kind: "error",
         text: "The agent's run failed: timed out",
         at: "",
+        detail: null,
       },
     ],
     "/api/handlers": handlers,
   });
   render(<ClaimView claimId="CLM-1005" />);
-  const reads = await screen.findByRole("region", {
-    name: "What the agent read",
-  });
-  expect(
-    Array.from(reads.querySelectorAll("li")).map((item) => item.textContent),
-  ).toEqual([
-    "Policy wording · 6. Passport and Travel Documents",
+  const used = await screen.findByRole("region", { name: "Context used" });
+  const files = Array.from(used.querySelectorAll("section"));
+  expect(files.map((file) => file.getAttribute("aria-label"))).toEqual([
+    "glossary.yaml",
+    "policy_wording.md",
+    "claims_manual.md",
+  ]);
+  const listed = (file: Element | undefined) =>
+    Array.from(file?.querySelectorAll("li") ?? []).map(
+      (item) => item.textContent,
+    );
+  expect(listed(files[2])).toEqual([
+    "The documents, for “receipts”",
     "Claims manual · 7. Interpretation notes",
   ]);
+  expect(files[0]?.textContent).toContain(
+    "The policy wording, version 2026.1, owned by Legal, reviewed",
+  );
   expect(screen.getByText("Left for a handler")).toBeDefined();
   expect(screen.getByText(/failed attempts/).textContent).toBe(
     "2 failed attempts",
   );
-  expect(screen.getAllByText("Read")).toHaveLength(2);
+});
+
+it("shows the whole decision record with its calculation", async () => {
+  stubBackend({
+    "/api/claims/CLM-1001": claim({ status: "decided", decision: approval }),
+    "/api/claims/CLM-1001/steps": [],
+    "/api/handlers": handlers,
+  });
+  render(<ClaimView claimId="CLM-1001" />);
+  const calculation = await screen.findByRole("table", { name: "Calculation" });
+  expect(
+    Array.from(calculation.querySelectorAll("tr")).map(
+      (row) => row.textContent,
+    ),
+  ).toEqual([
+    "Clinic visit$1,300.00",
+    "Less the deductible-$100.00",
+    "Payout$1,200.00",
+  ]);
+  expect(screen.getByText("UnderCover Agent, version 1")).toBeDefined();
+  expect(screen.getByText("2026.2")).toBeDefined();
+  expect(screen.getByText("5. Baggage and Personal Effects")).toBeDefined();
+});
+
+it("shows no calculation on a decline", async () => {
+  stubBackend({
+    "/api/claims/CLM-1001": claim({ status: "decided", decision: decline }),
+    "/api/claims/CLM-1001/steps": [],
+  });
+  render(<ClaimView claimId="CLM-1001" />);
+  expect(await screen.findByText(/^Declined/)).toBeDefined();
+  expect(screen.queryByRole("table", { name: "Calculation" })).toBeNull();
+});
+
+it("says the Gateway refused the payment on the sign-off panel", async () => {
+  stubBackend({
+    "/api/claims/CLM-1001": claim({
+      status: "awaiting_sign_off",
+      decision: {
+        ...approval,
+        payout: 900,
+        approval_limit: 1500,
+        payment_refused: "Tool Execution Denied: payments over $1,000",
+      },
+    }),
+    "/api/claims/CLM-1001/steps": [],
+    "/api/handlers": handlers,
+  });
+  renderAs(dana, <ClaimView claimId="CLM-1001" />);
+  expect(
+    await screen.findByText(/The Gateway refused the payment/),
+  ).toBeDefined();
+  expect(screen.getByText(/Tool Execution Denied/)).toBeDefined();
+  expect(screen.queryByText(/over the approval limit/)).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Sign off as Dana Whitfield" }),
+  ).toBeDefined();
 });
 
 it("shows a copy for an evaluation with no sign-off form and no run button", async () => {
@@ -302,12 +418,22 @@ it("shows the security check's result as the first step", async () => {
         reasons: "The security check found an instruction in the claim.",
         policy_section: "Security check: instructions found in the claim",
         decided_at: "2026-11-07T12:00:00+00:00",
+        decided_by: "Security check",
+        manual_version: "2026.2",
+        calculation: null,
         approval_limit: 800,
+        payment_refused: null,
       },
     }),
     "/api/claims/CLM-1901/steps": [
-      { step_id: 1, kind: "check", text: found, at: "" },
-      { step_id: 2, kind: "answer", text: "CLM-1901: refer $0.00", at: "" },
+      { step_id: 1, kind: "check", text: found, at: "", detail: null },
+      {
+        step_id: 2,
+        kind: "answer",
+        text: "CLM-1901: refer $0.00",
+        at: "",
+        detail: null,
+      },
     ],
     "/api/handlers": handlers,
   });

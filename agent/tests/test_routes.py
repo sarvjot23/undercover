@@ -112,10 +112,49 @@ def test_a_tool_the_gateway_refuses_is_a_refusal_and_work_goes_on(
             ),
         )
     assert report == f"{CLAIM}: refer $0.00"
-    refusal = next(text for text in steps() if text.startswith("calculate_payout:"))
-    assert refusal.startswith("calculate_payout: Refused by the Gateway:")
-    assert "Tool Execution Denied" in refusal
+    name = "undercover-app___calculate_payout"
+    refusal = next(step for step in recorded() if step["kind"] == "refusal")
+    assert refusal["text"].startswith(f"{name}: Refused by the Gateway:")
+    assert "Tool Execution Denied" in refusal["text"]
+    assert refusal["detail"] == {"by": "the Gateway"}
     assert "undercover-app___record_decision" in forbidden.state.calls
+
+
+def recorded():
+    found = api().get(f"/api/claims/{CLAIM}/steps").json()
+    return [step for step in found if step["kind"] != "check"]
+
+
+def work_with_a_lookup():
+    return claim_agent.run(
+        CLAIM,
+        "thread-1",
+        script(
+            call("lookup_term", term="Unattended"),
+            *stubs.decide("refer", 0, CLAIM),
+        ),
+    )
+
+
+def test_steps_name_the_gateways_tools_on_the_gateway_route(
+    requests, unsigned, monkeypatch
+):
+    with serving(standin(lambda name, arguments: False)) as url:
+        on_gateway(monkeypatch, f"{url}/mcp")
+        work_with_a_lookup()
+    calls = [step["text"] for step in recorded() if step["kind"] == "tool_call"]
+    assert calls[0] == 'undercover-context___lookup_term {"term": "Unattended"}'
+    assert calls[1].startswith("undercover-app___record_decision ")
+    lookup = next(step for step in recorded() if step["kind"] == "lookup")
+    assert lookup["text"] == "The term “Unattended”"
+    assert lookup["detail"]["files"][0]["file"] == "glossary.yaml"
+
+
+def test_steps_name_the_tools_by_their_own_names_on_the_direct_route(requests):
+    work_with_a_lookup()
+    calls = [step["text"] for step in recorded() if step["kind"] == "tool_call"]
+    assert calls[0] == 'lookup_term {"term": "Unattended"}'
+    assert calls[1].startswith("record_decision ")
 
 
 def test_a_payment_the_gateway_refuses_waits_for_a_sign_off(

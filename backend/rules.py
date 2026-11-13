@@ -2,16 +2,26 @@
 
 import json
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import Connection, RowMapping, Select, Table, literal, select
+from sqlalchemy import JSON, Connection, RowMapping, Select, Table, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
 from backend import db
 from backend.db import claims, decisions, payments, sign_offs, steps
 
 MAX_ATTEMPTS = 2
+# The steps of the agent's work in the middle of a claim, before it has its answer.
+AT_WORK = (
+    "tool_call",
+    "tool_result",
+    "lookup",
+    "memory_search",
+    "memory_save",
+    "refusal",
+)
 
 LOOKUPS: dict[str, tuple[Table, str]] = {
     "policy": (db.policies, "policy_id"),
@@ -106,7 +116,7 @@ def is_working(status: str, last_step: str | None) -> bool:
     """Whether the agent is at work: in progress, or not yet given its answer."""
     if status == "awaiting_sign_off":
         return False
-    return status == "in_progress" or last_step in ("tool_call", "tool_result", "read")
+    return status == "in_progress" or last_step in AT_WORK
 
 
 def move(conn: Connection, claim_id: str, before: str, after: str) -> None:
@@ -130,21 +140,23 @@ def insert_once(conn: Connection, table: Table, **values: Any) -> bool:
     return conn.execute(statement).rowcount > 0
 
 
-def add(conn: Connection, claim_id: str, kind: str, text: str, key: str) -> bool:
-    """Record a step on a claim that exists, in one statement; a repeat key is ignored.
+def add(conn: Connection, claim_id: str, step: Mapping[str, Any]) -> bool:
+    """Record a step (its kind, text, key and detail) on a claim that exists, in one
+    statement; a repeat key is ignored.
 
     Say whether a step was written.
     """
     values = select(
         claims.c.claim_id,
-        literal(kind),
-        literal(text),
-        literal(key),
+        literal(step["kind"]),
+        literal(step["text"]),
+        literal(step["key"]),
         literal(db.now()),
+        literal(step["detail"], JSON),
     ).where(claims.c.claim_id == claim_id)
     statement = (
         insert(steps)
-        .from_select(["claim_id", "kind", "text", "key", "at"], values)
+        .from_select(["claim_id", "kind", "text", "key", "at", "detail"], values)
         .on_conflict_do_nothing()
     )
     return conn.execute(statement).rowcount > 0
@@ -167,5 +179,6 @@ def fail(conn: Connection, claim_id: str, reason: str) -> str:
         .where(claims.c.claim_id == claim_id)
         .values(attempts=attempts, thread_id=None)
     )
-    add(conn, claim_id, "error", reason, f"error-{uuid.uuid4().hex}")
+    error = {"kind": "error", "text": reason, "key": f"error-{uuid.uuid4().hex}"}
+    add(conn, claim_id, {**error, "detail": None})
     return after

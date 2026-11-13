@@ -161,7 +161,7 @@ def start_claim(claim_id: str, start: ClaimStart, conn: Db) -> dict[str, str]:
 @router.post("/{claim_id}/steps", operation_id="add_step", dependencies=keys.AGENT)
 def add_step(claim_id: str, step: Step, conn: SingleStatementDb) -> dict[str, str]:
     """Record one step of the agent's work on a claim, once for each key."""
-    if not add(conn, claim_id, step.kind, step.text, step.key):
+    if not add(conn, claim_id, step.model_dump()):
         find_claim(conn, claim_id)
     return {"claim_id": claim_id, "kind": step.kind}
 

@@ -4,10 +4,43 @@ const KINDS: Record<Step["kind"], string> = {
   check: "Security check",
   tool_call: "Calls",
   tool_result: "Result",
-  read: "Read",
+  lookup: "Looked up",
+  memory_search: "Searched memory",
+  memory_save: "Saved to memory",
+  refusal: "Refused",
   answer: "Answer",
   error: "Error",
 };
+
+/** The step's label: a refusal says who refused, such as the Gateway. */
+function kindOf(step: Step): string {
+  return step.kind === "refusal"
+    ? `Refused by ${step.detail.by}`
+    : KINDS[step.kind];
+}
+
+/** The step's text; a refusal's leaves out who refused, which its label says. */
+function textOf(step: Step): string {
+  return step.kind === "refusal"
+    ? step.text.replace(`Refused by ${step.detail.by}: `, "")
+    : step.text;
+}
+
+/** Where a lookup's answer came from: each file with its system. */
+function Sources({ step }: Readonly<{ step: Step }>) {
+  if (step.kind !== "lookup") return null;
+  if (step.detail.files.length === 0) {
+    return <span className="step-source">Nothing found</span>;
+  }
+  return (
+    <span className="step-source">
+      From{" "}
+      {step.detail.files
+        .map((file) => `${file.file} (${file.system})`)
+        .join(", ")}
+    </span>
+  );
+}
 
 export function Steps({ steps }: Readonly<{ steps: Step[] }>) {
   if (steps.length === 0) {
@@ -19,8 +52,11 @@ export function Steps({ steps }: Readonly<{ steps: Step[] }>) {
     <ol className="steps">
       {steps.map((step) => (
         <li key={step.step_id} className={`step step-${step.kind}`}>
-          <span className="step-kind">{KINDS[step.kind]}</span>
-          <span className="step-text">{step.text}</span>
+          <span className="step-kind">{kindOf(step)}</span>
+          <span className="step-body">
+            <span className="step-text">{textOf(step)}</span>
+            <Sources step={step} />
+          </span>
         </li>
       ))}
     </ol>

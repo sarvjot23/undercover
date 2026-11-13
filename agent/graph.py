@@ -17,7 +17,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command, RetryPolicy, interrupt
 
-from agent import client, memory, screening, tools
+from agent import client, memory, screening, steps, tools
 from agent.direct import APP
 from agent.mcp_bridge import Refused
 from agent.tools import ClaimContext
@@ -26,7 +26,7 @@ MODEL_CALLS = 30
 RETRIES = 2
 RETRY_DELAY = 1.0
 RECURSION_LIMIT = 3 * MODEL_CALLS + 20
-STEP_LENGTH = 600
+STEP_LENGTH = steps.STEP_LENGTH
 # The dispatcher waits these out and carries the claim on, so the graph doesn't retry.
 PASSED_UP = (ModelRateLimitError, ModelTimeoutError)
 After = Literal["sign_off", "pay", "close"]
@@ -47,12 +47,14 @@ class TooManyModelCalls(Exception):
     """The agent has used all its model calls on this claim."""
 
 
-def record_step(claim_id: str, kind: str, text: str, key: str) -> None:
+def record_step(
+    claim_id: str, kind: str, text: str, key: str, detail: Any = None
+) -> None:
     """Record one step on the claim; the key means a repeat is ignored."""
     with client.backend() as backend:
         backend.post(
             f"/api/claims/{claim_id}/steps",
-            json={"kind": kind, "text": text, "key": key},
+            json={"kind": kind, "text": text, "key": key, "detail": detail},
         )
 
 
@@ -133,48 +135,50 @@ def after_check(state: ClaimState) -> Literal["agent", "close"]:
     return "agent" if standing(state["claim_id"])["decision"] is None else "close"
 
 
-def record_tool_result(
-    request: ToolCallRequest, execute: Callable[[ToolCallRequest], Any]
-) -> ToolMessage | Command[Any]:
-    """Run one tool and record its result; a section read is recorded as a read."""
-    result = execute(request)
-    if isinstance(result, ToolMessage):
-        state: Any = request.state
-        message = state["messages"][-1]
-        name = request.tool_call["name"]
-        number = [call["id"] for call in message.tool_calls].index(
-            request.tool_call["id"]
-        )
-        if name == "read_section" and not result.text.startswith("Refused"):
-            section = json.loads(result.text)
-            kind = "read"
-            text = f"{section['name']} · {section['number']}. {section['title']}"
-        elif name == "search_memory":
-            query = request.tool_call["args"]["query"]
-            kind = "memory_search"
-            text = f"Searched memory for {query!r}: {result.text[:STEP_LENGTH]}"
-        else:
-            kind, text = "tool_result", f"{name}: {result.text[:STEP_LENGTH]}"
-        key = f"{state['thread_id']}:{message.id}:{number}:result"
-        record_step(state["claim_id"], kind, text, key)
-    return result
+def tool_result_recorder(claim: ClaimContext) -> Any:
+    """Make the wrapper that runs one tool and records its result as a step: a
+    lookup, a memory search, a refusal or a plain result."""
+
+    def record_tool_result(
+        request: ToolCallRequest, execute: Callable[[ToolCallRequest], Any]
+    ) -> ToolMessage | Command[Any]:
+        result = execute(request)
+        if isinstance(result, ToolMessage):
+            state: Any = request.state
+            message = state["messages"][-1]
+            call = request.tool_call
+            number = [made["id"] for made in message.tool_calls].index(call["id"])
+            name = call["name"]
+            kind, text, detail = steps.describe(
+                name, tools.routed_name(claim, name), call["args"], result.text
+            )
+            key = f"{state['thread_id']}:{message.id}:{number}:result"
+            record_step(state["claim_id"], kind, text, key, detail)
+        return result
+
+    return record_tool_result
 
 
-def record(state: ClaimState) -> dict[str, Any]:
-    """Record the model's saved reply: its tool calls, or its answer."""
-    message: Any = state["messages"][-1]
-    prefix = f"{state['thread_id']}:{message.id}"
-    if not message.tool_calls:
-        record_step(state["claim_id"], "answer", message.text, f"{prefix}:answer")
-    for number, call in enumerate(message.tool_calls):
-        args = json.dumps(call["args"], ensure_ascii=False)
-        record_step(
-            state["claim_id"],
-            "tool_call",
-            f"{call['name']} {args}",
-            f"{prefix}:{number}:call",
-        )
-    return {}
+def record_node(claim: ClaimContext) -> Any:
+    """Make the node that records the model's saved reply: its tool calls, named as
+    the claim's route names them, or its answer."""
+
+    def record(state: ClaimState) -> dict[str, Any]:
+        message: Any = state["messages"][-1]
+        prefix = f"{state['thread_id']}:{message.id}"
+        if not message.tool_calls:
+            record_step(state["claim_id"], "answer", message.text, f"{prefix}:answer")
+        for number, call in enumerate(message.tool_calls):
+            args = json.dumps(call["args"], ensure_ascii=False)
+            record_step(
+                state["claim_id"],
+                "tool_call",
+                f"{tools.routed_name(claim, call['name'])} {args}",
+                f"{prefix}:{number}:call",
+            )
+        return {}
+
+    return record
 
 
 def after_record(state: ClaimState) -> str:
@@ -255,7 +259,8 @@ def pay_node(claim: ClaimContext) -> Any:
         except Refused as refused:
             if refused.by != "the Gateway":
                 raise RuntimeError(str(refused)) from refused
-            record_step(claim_id, "tool_result", f"{name}: {refused}", key)
+            by = {"by": refused.by}
+            record_step(claim_id, "refusal", f"{name}: {refused}", key, by)
             hold(claim_id, refused.reason)
             return Command(goto="sign_off")
         record_step(claim_id, "tool_result", f"{name}: Paid ${amount:,.2f}", key)
@@ -315,8 +320,10 @@ def build(
     builder.add_node(
         "agent", agent_node(make_llm, instructions, claim_tools), retry_policy=retry
     )
-    builder.add_node("record", record)
-    builder.add_node("tools", ToolNode(claim_tools, wrap_tool_call=record_tool_result))
+    builder.add_node("record", record_node(claim))
+    builder.add_node(
+        "tools", ToolNode(claim_tools, wrap_tool_call=tool_result_recorder(claim))
+    )
     builder.add_node(
         "remember", remember_node(claim), destinations=("sign_off", "pay", "close")
     )

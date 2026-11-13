@@ -189,7 +189,7 @@ def test_a_held_claim_is_not_being_worked(client):
     decide(client, "CLM-1002", payout=1200.0)
     client.post(
         "/api/claims/CLM-1002/steps",
-        json={"kind": "tool_result", "text": "Recorded", "key": "a"},
+        json={"kind": "tool_result", "text": "Recorded", "key": "a", "detail": None},
     )
     assert not client.get("/api/claims/CLM-1002").json()["agent_working"]
 
@@ -209,7 +209,7 @@ def test_a_failure_forgets_the_thread(client):
 
 
 def test_a_repeated_step_key_leaves_one_step(client):
-    step = {"kind": "read", "text": "Section 3", "key": "same"}
+    step = {"kind": "tool_result", "text": "Section 3", "key": "same", "detail": None}
     client.post("/api/claims/CLM-1001/steps", json=step)
     client.post("/api/claims/CLM-1001/steps", json=step)
     client.post("/api/claims/CLM-1002/steps", json=step)
@@ -265,13 +265,45 @@ def test_decision_needs_a_claim_in_progress(client):
 
 def test_steps_are_recorded_in_order(client):
     for kind, text in [("tool_call", "get_claim"), ("answer", "Approved")]:
-        step = {"kind": kind, "text": text, "key": kind}
+        step = {"kind": kind, "text": text, "key": kind, "detail": None}
         client.post("/api/claims/CLM-1001/steps", json=step)
     steps = client.get("/api/claims/CLM-1001/steps").json()
     assert [(step["kind"], step["text"]) for step in steps] == [
         ("tool_call", "get_claim"),
         ("answer", "Approved"),
     ]
+
+
+LOOKUP = {
+    "looked_up": "The term unattended",
+    "files": [
+        {
+            "file": "glossary.yaml",
+            "system": "The policy wording, version 2026.1",
+            "owner": "Legal",
+            "reviewed": "2026-09-01",
+        }
+    ],
+}
+
+
+def test_the_steps_route_returns_each_steps_detail(client):
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "t"})
+    for kind, detail in [("lookup", LOOKUP), ("tool_call", None)]:
+        step = {"kind": kind, "text": "lookup_term", "key": kind, "detail": detail}
+        assert client.post("/api/claims/CLM-1001/steps", json=step).status_code == 200
+    lookup, call = client.get("/api/claims/CLM-1001/steps").json()
+    assert lookup["detail"] == LOOKUP
+    assert call["detail"] is None
+
+
+@pytest.mark.parametrize("kind", ["lookup", "memory_search", "memory_save", "refusal"])
+def test_the_agent_is_at_work_after_each_new_kind_of_step(client, kind):
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "t"})
+    deciding.record(client, "CLM-1001", "refer", 0)
+    step = {"kind": kind, "text": "A step", "key": kind, "detail": None}
+    client.post("/api/claims/CLM-1001/steps", json=step)
+    assert client.get("/api/claims/CLM-1001").json()["agent_working"]
 
 
 def test_steps_of_unknown_claim(client):
@@ -353,10 +385,10 @@ def test_agent_working_until_its_answer(client):
     assert working()
     decide(client, "CLM-1001", decision="refer", payout=0)
     assert not working()
-    step = {"kind": "tool_call", "text": "record_decision", "key": "a"}
+    step = {"kind": "tool_call", "text": "record_decision", "key": "a", "detail": None}
     client.post("/api/claims/CLM-1001/steps", json=step)
     assert working()
-    answer = {"kind": "answer", "text": "Done", "key": "b"}
+    answer = {"kind": "answer", "text": "Done", "key": "b", "detail": None}
     client.post("/api/claims/CLM-1001/steps", json=answer)
     assert not working()
 

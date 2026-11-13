@@ -1,5 +1,13 @@
 import { expect, test } from "./fixtures";
-import { createDispatch, decide, endRun, pay, received, start } from "./api";
+import {
+  createDispatch,
+  decide,
+  endRun,
+  pay,
+  received,
+  record,
+  start,
+} from "./api";
 
 test("starting a dispatch on the dashboard reaches the agent's service with N", async ({
   page,
@@ -109,22 +117,55 @@ test("a claim that fails twice is left for a handler", async ({
   );
 });
 
-test("a claim page lists the sections the agent read", async ({
+test("a claim page shows the context the agent used and the calculation", async ({
   page,
   request,
 }) => {
-  for (const text of [
-    "Policy wording · 6. Passport and Travel Documents",
-    "Claims manual · 7. Interpretation notes",
-  ]) {
-    await request.post("/api/claims/CLM-1006/steps", {
-      data: { kind: "read", text, key: text },
+  const manual = {
+    file: "claims_manual.md",
+    system: "Claims operations",
+    owner: "Head of claims operations",
+    reviewed: "2026-09-01",
+  };
+  const glossary = {
+    file: "glossary.yaml",
+    system: "The policy wording, version 2026.1",
+    owner: "Legal",
+    reviewed: "2026-09-01",
+  };
+  expect((await start(request, "CLM-1006")).ok()).toBe(true);
+  const lookups = [
+    ["The term “Unattended”", [glossary]],
+    ["Claims manual · 7. Interpretation notes", [manual]],
+    ["Claims manual · 7. Interpretation notes", [manual]],
+  ] as const;
+  for (const [index, [lookedUp, files]] of lookups.entries()) {
+    const step = await request.post("/api/claims/CLM-1006/steps", {
+      data: {
+        kind: "lookup",
+        text: lookedUp,
+        key: `e2e-lookup-${String(index)}`,
+        detail: { looked_up: lookedUp, files },
+      },
     });
+    expect(step.ok()).toBe(true);
   }
+  await record(request, "CLM-1006", "approve", 325);
   await page.goto("/#/claims/CLM-1006");
-  const reads = page.getByRole("region", { name: "What the agent read" });
-  await expect(reads.getByRole("listitem")).toHaveText([
-    "Policy wording · 6. Passport and Travel Documents",
-    "Claims manual · 7. Interpretation notes",
-  ]);
+
+  await expect(page.getByText("Looked up")).toHaveCount(3);
+  const used = page.getByRole("region", { name: "Context used" });
+  await expect(used.getByRole("region")).toHaveCount(2);
+  await expect(
+    used
+      .getByRole("region", { name: "claims_manual.md" })
+      .getByRole("listitem"),
+  ).toHaveText(["Claims manual · 7. Interpretation notes"]);
+  await expect(
+    used.getByRole("region", { name: "glossary.yaml" }),
+  ).toContainText("The policy wording, version 2026.1, owned by Legal");
+
+  const calculation = page.getByRole("table", { name: "Calculation" });
+  await expect(calculation.getByRole("row").last()).toHaveText("Payout$325.00");
+  await expect(page.getByText("UnderCover Agent, version 1")).toBeVisible();
 });

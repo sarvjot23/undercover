@@ -41,14 +41,29 @@ export interface PreviousClaim {
   amount_paid: number;
 }
 
+/** One line of a payout calculation, as the payout rules gave it. */
+export interface CalculationLine {
+  step: string;
+  amount: number;
+}
+
+/** The decision record of claims manual section 14. */
 export interface Decision {
   decision: Outcome;
   payout: number;
   reasons: string;
   policy_section: string;
   decided_at: string;
+  /** Who or what made the decision, such as "UnderCover Agent, version 3". */
+  decided_by: string;
+  /** The claims manual's version in force (section 13). */
+  manual_version: string;
+  /** How an approval's payout was worked out; none for a decline or referral. */
+  calculation: { lines: CalculationLine[]; payout: number } | null;
   /** The approval limit the decision was made under. */
   approval_limit: number;
+  /** Why the Gateway refused the payment, when it did. */
+  payment_refused: string | null;
 }
 
 export interface Payment {
@@ -104,12 +119,40 @@ export interface Claim {
   payment: Payment | null;
 }
 
-export interface Step {
+/** A file in the context layer, with where it comes from. */
+export interface SourceFile {
+  file: string;
+  system: string;
+  owner: string;
+  reviewed: string;
+}
+
+/** What a lookup looked up, and the files it came from. */
+export interface LookupDetail {
+  looked_up: string;
+  files: SourceFile[];
+}
+
+interface StepBase {
   step_id: number;
-  kind: "check" | "tool_call" | "tool_result" | "read" | "answer" | "error";
   text: string;
   at: string;
 }
+
+export type Step =
+  | (StepBase & { kind: "lookup"; detail: LookupDetail })
+  | (StepBase & { kind: "refusal"; detail: { by: string } })
+  | (StepBase & { kind: "memory_search"; detail: { query: string } })
+  | (StepBase & {
+      kind:
+        | "check"
+        | "tool_call"
+        | "tool_result"
+        | "memory_save"
+        | "answer"
+        | "error";
+      detail: null;
+    });
 
 export type SetName = "evaluation" | "held_out";
 

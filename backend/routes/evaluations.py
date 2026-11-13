@@ -9,16 +9,19 @@ from backend import keys, measures, runs
 from backend.auth import SignedIn
 from backend.db import SingleStatementDb
 from backend.db import runs as run_table
-from backend.routes.runs import ask_to_start
-from backend.schemas import EvaluationStart
+from backend.routes.runs import start_run
+from backend.schemas import EvaluationStart, RunRecord
 
 router = APIRouter(prefix="/api/evaluations")
 
 
 @router.post("", operation_id="start_evaluation", status_code=202)
-def start_evaluation(start: EvaluationStart, _: SignedIn) -> dict[str, bool]:
-    """Ask the agent's service to evaluate the agent on a labelled set."""
-    return ask_to_start("/evaluations", start.model_dump())
+def start_evaluation(start: EvaluationStart, _: SignedIn) -> dict[str, Any]:
+    """Create an evaluation of the agent on a labelled set, for the agent to work."""
+    record = RunRecord(
+        kind="evaluation", version=None, round_id=None, **start.model_dump()
+    )
+    return start_run(record)
 
 
 @router.get("", operation_id="list_evaluations", dependencies=keys.HANDLER)

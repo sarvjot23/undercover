@@ -2,6 +2,7 @@ import pytest
 
 from backend import agent_service
 from backend.tests import deciding
+from backend.tests.agent_answers import ACCEPTED, STOPPED, refused_with
 from backend.tests.signing import as_handler
 
 DISPATCH = {
@@ -63,7 +64,7 @@ def test_a_dispatch_takes_the_claims_in_progress_then_the_oldest_waiting(client)
 
 def test_a_dispatch_never_takes_an_evaluations_copies(client):
     evaluation = create(client, EVALUATION).json()
-    client.post(f"/api/runs/{evaluation['run_id']}/stop")
+    client.post(f"/api/runs/{evaluation['run_id']}/stop", json=STOPPED)
     dispatch = create(client).json()
     ids = [entry["claim_id"] for entry in dispatch["claims"]]
     assert len(ids) == 26
@@ -90,7 +91,10 @@ def test_a_finished_run_makes_way_for_the_next(client):
 
 def test_a_stopped_run_shows_as_stopped(client):
     run_id = create(client).json()["run_id"]
-    assert client.post(f"/api/runs/{run_id}/stop").json()["status"] == "stopped"
+    assert (
+        client.post(f"/api/runs/{run_id}/stop", json=STOPPED).json()["status"]
+        == "stopped"
+    )
     assert (
         client.get("/api/runs/current", headers=as_handler()).json()["status"]
         == "stopped"
@@ -184,27 +188,37 @@ def test_a_dispatch_is_asked_of_the_agents_service_with_n(client, monkeypatch):
     asked = []
     monkeypatch.setattr(
         agent_service,
-        "ask",
-        lambda path, body: asked.append((path, body)) or agent_service.Answer(202, ""),
+        "send",
+        lambda payload: asked.append(payload) or ACCEPTED,
     )
     started = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert started.status_code == 202
-    assert asked == [("/dispatches", {"n": 5})]
+    run_id = started.json()["run_id"]
+    assert asked == [{"operation": "work_run", "run_id": run_id}]
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert (run["kind"], run["n"], run["status"]) == ("dispatch", 5, "running")
 
 
 def test_a_dispatch_refused_by_the_service_is_refused(client, monkeypatch):
-    refusal = agent_service.Answer(409, "A dispatch or evaluation is already running")
-    monkeypatch.setattr(agent_service, "ask", lambda path, body: refusal)
+    refusal = refused_with("A dispatch or evaluation is already running")
+    monkeypatch.setattr(agent_service, "send", lambda payload: refusal)
     refused = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert refused.status_code == 409
     assert refused.json()["detail"] == "A dispatch or evaluation is already running"
 
 
-def test_a_dispatch_needs_the_agents_service(client, monkeypatch):
-    monkeypatch.setattr(agent_service, "ask", lambda path, body: None)
+def test_a_dispatch_needs_the_agent(client):
     refused = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
     assert refused.status_code == 503
-    assert refused.json()["detail"] == "The agent's service isn't running"
+    assert refused.json()["detail"] == "The agent isn't running"
+
+
+def test_a_dispatch_the_agent_may_have_started_says_to_reload(client, monkeypatch):
+    unknown = agent_service.Answer("unknown", agent_service.UNKNOWN, {})
+    monkeypatch.setattr(agent_service, "send", lambda payload: unknown)
+    answer = client.post("/api/dispatches", json={"n": 5}, headers=as_handler())
+    assert answer.status_code == 504
+    assert "Reload the page" in answer.json()["detail"]
 
 
 @pytest.mark.parametrize("n", [0, 26])

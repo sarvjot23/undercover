@@ -67,6 +67,7 @@ def create(conn: Connection, handler_id: str) -> RowMapping:
             version_before=versions.current(conn)["version"],
             started_by=handler_id,
             started_at=db.now(),
+            heard_at=db.now(),
         )
     )
     round_id = int(result.inserted_primary_key[0])  # type: ignore[index]
@@ -112,8 +113,9 @@ def propose(conn: Connection, round_id: int, proposal: dict[str, Any]) -> None:
 
 def approve(
     conn: Connection, row: RowMapping, proposal: dict[str, Any], by: str
-) -> None:
-    """Save an approved proposal as a new version: a change isn't current yet."""
+) -> int:
+    """Save an approved proposal as a new version, and return its number: a change
+    isn't current yet."""
     if proposal["kind"] == "change":
         version = versions.next_number(conn, config_versions)
         conn.execute(
@@ -130,10 +132,11 @@ def approve(
             )
         )
         update(conn, row["round_id"], version_tried=version, reason=proposal["reason"])
-        return
+        return version
+    version = versions.next_number(conn, recipe_versions)
     conn.execute(
         recipe_versions.insert().values(
-            version=versions.next_number(conn, recipe_versions),
+            version=version,
             recipe=proposal["recipe"],
             reason=proposal["reason"],
             proposed_by="improver",
@@ -141,19 +144,20 @@ def approve(
             approved_at=db.now(),
         )
     )
+    return version
 
 
 def decide(
     conn: Connection, round_id: int, decision: str, message: str, handler_id: str
-) -> None:
-    """Record a handler's approval or rejection of the proposal waiting."""
+) -> int:
+    """Record a handler's approval or rejection of the proposal waiting, and return
+    the review's id, which the agent reads it by."""
     row = writable(conn, round_id)
     if row["proposal"] is None:
         raise HTTPException(409, f"Round {round_id} has nothing waiting for approval")
     proposal = json.loads(row["proposal"])
-    if decision == "approve":
-        approve(conn, row, proposal, handler_id)
-    conn.execute(
+    made = approve(conn, row, proposal, handler_id) if decision == "approve" else None
+    result = conn.execute(
         round_events.insert().values(
             round_id=round_id,
             decision=decision,
@@ -161,6 +165,8 @@ def decide(
             handler_id=handler_id,
             message=message,
             at=db.now(),
+            body=proposal,
+            made=made,
         )
     )
     update(
@@ -170,6 +176,40 @@ def decide(
         stage="improving",
         progress=None,
         status="working",
+        heard_at=db.now(),
+    )
+    return int(result.inserted_primary_key[0])  # type: ignore[index]
+
+
+def find_review(conn: Connection, round_id: int, event_id: int) -> RowMapping:
+    """A handler's review of one of the round's proposals, or 404."""
+    query = select(round_events).where(
+        round_events.c.round_id == round_id, round_events.c.event_id == event_id
+    )
+    row = conn.execute(query).mappings().first()
+    if row is None:
+        raise HTTPException(404, f"Round {round_id} has no review {event_id}")
+    return row
+
+
+def undo_review(conn: Connection, round_id: int, event_id: int) -> None:
+    """Undo a review the agent never took: the version an approval made goes, and
+    the proposal waits for a review again."""
+    review = find_review(conn, round_id, event_id)
+    proposal = review["body"]
+    if review["made"] is not None:
+        table = config_versions if proposal["kind"] == "change" else recipe_versions
+        conn.execute(table.delete().where(table.c.version == review["made"]))
+    if review["made"] is not None and proposal["kind"] == "change":
+        update(conn, round_id, version_tried=None, reason=None)
+    conn.execute(round_events.delete().where(round_events.c.event_id == event_id))
+    update(
+        conn,
+        round_id,
+        proposal=json.dumps(proposal),
+        stage=f"{proposal['kind']}_waiting",
+        progress=None,
+        status="waiting",
     )
 
 
@@ -224,9 +264,11 @@ def judge_version(conn: Connection, round_id: int, unaffordable: bool) -> None:
     )
 
 
-def end(conn: Connection, round_id: int, status: str) -> None:
-    """Finish or stop an open round. A version tried with no verdict is rolled back,
-    and never becomes the current version."""
+def end(
+    conn: Connection, round_id: int, status: str, reason: str | None = None
+) -> None:
+    """Finish an open round, or stop it with the reason. A version tried with no
+    verdict is rolled back, and never becomes the current version."""
     row = writable(conn, round_id)
     values: dict[str, Any] = {}
     if row["version_tried"] is not None and row["verdict"] is None:
@@ -239,6 +281,7 @@ def end(conn: Connection, round_id: int, status: str) -> None:
         progress=None,
         proposal=None,
         finished_at=db.now(),
+        stop_reason=reason,
         **values,
     )
 

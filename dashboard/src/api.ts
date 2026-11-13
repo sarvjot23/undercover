@@ -213,6 +213,8 @@ export interface Run {
   reasoning: string;
   total: number;
   status: "running" | "finished" | "stopped";
+  /** Why it stopped, such as "The agent stopped answering". */
+  stop_reason: string | null;
   started_at: string;
   finished_at: string | null;
   claims: RunClaim[];
@@ -447,6 +449,8 @@ export interface Round {
   recipe_version: number;
   settings: PlatformSettings;
   status: "working" | "waiting" | "finished" | "stopped";
+  /** Why it stopped, when the agent or the app stopped it. */
+  stop_reason: string | null;
   stage: RoundStage;
   progress: string | null;
   proposal: ChangeProposal | RecipeProposal | null;

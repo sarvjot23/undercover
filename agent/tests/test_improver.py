@@ -7,9 +7,11 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from agent import claim, dispatcher, improver, rounds, service, tracing
+from agent import claim, dispatcher, improver, rounds, tracing
+from agent.tests.invoking import connect
 from agent.tests.stubs import StubModel, call
-from backend import evaluations, spending
+from backend import db, evaluations, spending, work
+from backend import rounds as rounds_record
 from backend.api import app
 from backend.tests.signing import as_agent, as_handler
 
@@ -20,7 +22,7 @@ CHANGE = {
     "reason": "The misses had a document missing.",
 }
 RECIPE = {"recipe": "1. Call read_results.\n2. Propose one rule.", "reason": "Smaller."}
-APPROVE = {"decision": "approve", "message": "", "handler_id": "HND-01"}
+APPROVE = {"decision": "approve", "message": ""}
 REJECTION = "Too broad: it would refer every claim."
 COST = 0.001
 
@@ -84,9 +86,7 @@ def small(monkeypatch):
         claim, "model", lambda name, reasoning: DecidingModel(messages=iter([]))
     )
     monkeypatch.setattr(dispatcher, "FIRST_WAIT", 0.0)
-    yield
-    if service.busy.locked():
-        service.let_go()
+    connect(monkeypatch)
 
 
 def plays(monkeypatch, model):
@@ -94,22 +94,28 @@ def plays(monkeypatch, model):
     return model
 
 
-def agent_service():
-    return TestClient(service.app)
-
-
 def api():
     return TestClient(app, headers=as_agent())
 
 
 def start_round():
-    started = agent_service().post("/rounds", json={"handler_id": "HND-01"})
+    """Dana starts a round: the app opens it and asks the agent to work it."""
+    started = api().post("/api/rounds", headers=as_handler())
     assert started.status_code == 202
     return started.json()["round_id"]
 
 
 def decide(round_id, decision=APPROVE):
-    return agent_service().post(f"/rounds/{round_id}/decision", json=decision)
+    """Dana reviews the proposal: the app records it and asks the agent on."""
+    return api().post(
+        f"/api/rounds/{round_id}/decision", json=decision, headers=as_handler()
+    )
+
+
+def open_round():
+    """A round the app has opened, working."""
+    with db.engine().begin() as conn:
+        return rounds_record.create(conn, "HND-01")["round_id"]
 
 
 def found(round_id):
@@ -183,7 +189,6 @@ def test_a_round_from_start_to_finish(requests, small, monkeypatch):
     )
     assert done["spent"] > 0
     assert {kwargs["parallel_tool_calls"] for kwargs in model.bound} == {False}
-    assert not service.busy.locked()
 
 
 def test_a_proposal_outside_the_models_allowed_goes_back_without_a_pause(
@@ -210,12 +215,14 @@ def test_an_approval_is_refused_while_a_dispatch_runs(requests, small, monkeypat
     release = threading.Event()
     monkeypatch.setattr(dispatcher, "dispatch", lambda run, n: release.wait(10))
     running = threading.Thread(
-        target=lambda: agent_service().post("/dispatches", json={"n": 3})
+        target=lambda: api().post(
+            "/api/dispatches", json={"n": 3}, headers=as_handler()
+        )
     )
     running.start()
     try:
         for _ in range(100):
-            if service.doing["what"].startswith("Dispatch"):
+            if api().get("/api/runs/running").json():
                 break
             time.sleep(0.05)
         refused = decide(round_id)
@@ -290,37 +297,35 @@ def test_a_stopped_round_records_nothing_more(requests, small, monkeypatch):
     assert refused.status_code == 409
     assert refused.json()["detail"] == f"Round {round_id} is stopped"
     assert found(round_id)["version_tried"] is None
-    assert not service.busy.locked()
 
 
 def test_a_stopped_round_makes_no_more_model_calls(requests, monkeypatch):
-    round_id = api().post("/api/rounds/records", json={"handler_id": "HND-01"})
-    round_id = round_id.json()["round_id"]
-    api().post(f"/api/rounds/{round_id}/halt")
+    round_id = open_round()
+    api().post(f"/api/rounds/{round_id}/halt", json={"reason": "A test"})
     guard = improver.RoundGuard(round_id)
     assert guard.before_model({}, None) == {"jump_to": "end"}
 
 
-def test_a_round_waiting_survives_a_restart_and_one_working_is_stopped(
+def test_a_round_waiting_for_a_review_is_left_and_one_gone_quiet_is_stopped(
     requests, small, monkeypatch
 ):
-    plays(
-        monkeypatch,
-        improver_script(
-            call("propose_change", **CHANGE),
-            call("propose_recipe", **RECIPE),
-        ),
-    )
+    plays(monkeypatch, improver_script(call("propose_change", **CHANGE)))
     round_id = start_round()
-    service.stop_leftovers()
+    with db.engine().begin() as conn:
+        work.stop_quiet(conn)
     assert found(round_id)["status"] == "waiting"
-    decide(round_id)
-    assert found(round_id)["stage"] == "recipe_waiting"
     api().post(f"/api/rounds/{round_id}/stop", headers=as_handler())
 
-    working = api().post("/api/rounds/records", json={"handler_id": "HND-01"}).json()
-    service.stop_leftovers()
-    assert found(working["round_id"])["status"] == "stopped"
+    with db.engine().begin() as conn:
+        quiet = rounds_record.create(conn, "HND-01")["round_id"]
+        rounds_record.update(conn, quiet, heard_at="2000-01-01T00:00:00+00:00")
+    started = api().post("/api/dispatches", json={"n": 1}, headers=as_handler())
+    assert started.status_code == 202
+    gone = found(quiet)
+    assert (gone["status"], gone["stop_reason"]) == (
+        "stopped",
+        "The agent stopped answering",
+    )
 
 
 def test_a_round_needs_nothing_first_once_the_current_version_has_its_runs(
@@ -341,8 +346,7 @@ def test_a_round_needs_nothing_first_once_the_current_version_has_its_runs(
 
 
 def test_the_improvers_calls_are_recorded_with_its_round(requests):
-    round_id = api().post("/api/rounds/records", json={"handler_id": "HND-01"})
-    round_id = round_id.json()["round_id"]
+    round_id = open_round()
     guard = improver.RoundGuard(round_id)
     reply = AIMessage(
         content="",
@@ -377,6 +381,5 @@ def test_a_rounds_traces_share_a_session_and_its_evaluations_carry_its_tag():
 def test_the_improver_is_built_on_luna_at_medium(requests, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)
-    round_id = api().post("/api/rounds/records", json={"handler_id": "HND-01"})
-    agent = improver.build(round_id.json()["round_id"], rounds.evaluate_version)
+    agent = improver.build(open_round(), rounds.evaluate_version)
     assert agent.name == "improver"

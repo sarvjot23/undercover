@@ -1,7 +1,7 @@
 import { expect, MARCUS, switchTo, test } from "./fixtures";
-import { received } from "./api";
+import { latest } from "./api";
 
-test("starting a round reaches the agent's service with the handler", async ({
+test("a round started on the page, its proposal approved and the round carried on", async ({
   page,
   request,
 }) => {
@@ -9,34 +9,14 @@ test("starting a round reaches the agent's service with the handler", async ({
   await page.getByRole("button", { name: "Start a round" }).click();
   const dialog = page.getByRole("dialog", { name: "Start a round?" });
   await dialog.getByRole("button", { name: "Start a round" }).click();
+
+  // The app opens the round and asks the agent to work it; the stand-in for the
+  // agent makes a proposal, which waits for a handler.
+  let roundId = 0;
   await expect(async () => {
-    expect(await received(request)).toContainEqual({
-      path: "/rounds",
-      body: { handler_id: "HND-01" },
-    });
+    roundId = (await latest(request, "work_round")).round_id;
+    expect(roundId).toBeGreaterThan(0);
   }).toPass();
-});
-
-test("a proposal played out through the API is approved on the page", async ({
-  page,
-  request,
-}) => {
-  // The test plays the agent's service: it opens a round and records a proposal.
-  const created = await request.post("/api/rounds/records", {
-    data: { handler_id: "HND-01" },
-  });
-  const round = (await created.json()) as { round_id: number };
-  const path = `/api/rounds/${String(round.round_id)}`;
-  await request.post(`${path}/proposals/change`, {
-    data: {
-      instructions: "Refer a claim when a required document is missing.",
-      model: "openai/gpt-6-luna",
-      reasoning: "medium",
-      reason: "Three misses had a document missing.",
-    },
-  });
-
-  await page.goto("/#/improvement");
   const steps = page.getByRole("list", { name: "Where the round has got to" });
   await expect(steps.locator('[aria-current="step"]')).toHaveText(
     "A change waiting for approval",
@@ -64,21 +44,17 @@ test("a proposal played out through the API is approved on the page", async ({
     .getByRole("dialog", { name: "Approve this change?" })
     .getByRole("button", { name: "Approve" })
     .click();
-  await expect(async () => {
-    expect(await received(request)).toContainEqual({
-      path: `/rounds/${String(round.round_id)}/decision`,
-      body: { decision: "approve", message: "", handler_id: "HND-01" },
-    });
-  }).toPass();
 
-  // As the service would, record the decision; the page moves on.
-  await request.post(`${path}/decisions`, {
-    data: { decision: "approve", message: "", handler_id: "HND-01" },
-  });
-  await expect(steps.locator('[aria-current="step"]')).toHaveText(
-    "The improver at work",
-  );
-  await request.post(`${path}/finish`);
+  // The app records the review and asks the agent to carry the round on, by the
+  // review's id; the stand-in reads it back, then finishes the round.
+  await expect(async () => {
+    const carried = await latest(request, "carry_round_on");
+    expect(carried.round_id).toBe(roundId);
+    const review = await request.get(
+      `/api/rounds/${String(roundId)}/reviews/${String(carried.proposal_id)}`,
+    );
+    expect(await review.json()).toEqual({ decision: "approve", message: "" });
+  }).toPass();
   const rounds = page.getByRole("table", { name: "Rounds" });
   await expect(rounds).toContainText("Approved the change: Dana Whitfield");
 });

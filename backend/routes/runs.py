@@ -3,20 +3,17 @@
 import uuid
 from typing import Any
 
-import httpx
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, select
 
-from backend import agent_service, db, grading, keys, runs
+from backend import agent_service, db, grading, keys, runs, work
 from backend.auth import SignedIn
 from backend.db import Db, SingleStatementDb
 from backend.db import runs as run_table
 from backend.rules import find_claim
-from backend.schemas import DispatchStart, RunRecord
+from backend.schemas import DispatchStart, RunRecord, StopReason
 
 router = APIRouter(prefix="/api")
-
-SERVICE_AWAY = "The agent's service isn't running"
 
 
 def thread_id_for(claim_id: str) -> str:
@@ -24,17 +21,32 @@ def thread_id_for(claim_id: str) -> str:
     return f"{claim_id}-{uuid.uuid4().hex[:8]}"
 
 
-def ask_to_start(path: str, body: dict[str, object]) -> dict[str, bool]:
-    """Ask the agent's service to start some work, passing on a refusal or absence.
+# What the handler hears when the agent didn't take the work, or may have.
+NOT_TAKEN_STATUS = 503
+UNKNOWN_STATUS = 504
 
-    A refusal says why, such as what is running.
-    """
-    answer = agent_service.ask(path, body)
-    if answer is None:
-        raise HTTPException(503, SERVICE_AWAY)
-    if not httpx.codes.is_success(answer.status):
-        raise HTTPException(answer.status, answer.detail or runs.ALREADY_RUNNING)
-    return {"accepted": True}
+
+def ask_agent(payload: dict[str, Any]) -> dict[str, Any]:
+    """Ask the agent to do some work, and return its answer when it took it."""
+    return answered(agent_service.send(payload))
+
+
+def taken(answer: agent_service.Answer) -> bool:
+    """Whether the agent may have taken the work: it did, or nobody knows."""
+    return answer.outcome in ("accepted", "unknown")
+
+
+def answered(answer: agent_service.Answer) -> dict[str, Any]:
+    """The agent's answer when it took the work. A refusal comes through as a 409
+    saying why; work the agent didn't take as a 503, and a timeout, which may have
+    started it, as a 504."""
+    if answer.outcome == "refused":
+        raise HTTPException(409, answer.detail or runs.ALREADY_RUNNING)
+    if answer.outcome == "not_taken":
+        raise HTTPException(NOT_TAKEN_STATUS, answer.detail)
+    if answer.outcome == "unknown":
+        raise HTTPException(UNKNOWN_STATUS, answer.detail)
+    return answer.body
 
 
 @router.post("/claims/{claim_id}/run", operation_id="run_claim")
@@ -43,20 +55,41 @@ def run_claim(claim_id: str, _: SignedIn, conn: Db) -> dict[str, str]:
     if find_claim(conn, claim_id)["status"] != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is not waiting")
     thread_id = thread_id_for(claim_id)
-    if not agent_service.tell(f"/claims/{claim_id}/run", {"thread_id": thread_id}):
-        raise HTTPException(503, SERVICE_AWAY)
+    ask_agent({"operation": "work_claim", "claim_id": claim_id, "thread_id": thread_id})
     return {"claim_id": claim_id, "thread_id": thread_id}
 
 
+def start_run(record: RunRecord) -> dict[str, Any]:
+    """Create a dispatch or an evaluation, while nothing else of the agent's work is
+    going, and ask the agent to work it. If the agent didn't take it, it's stopped."""
+    with db.engine().begin() as conn:
+        work.begin(conn)
+        run_id = runs.start(conn, record)
+    answer = agent_service.send({"operation": "work_run", "run_id": run_id})
+    if not taken(answer):
+        with db.engine().begin() as conn:
+            work.stop_run(conn, run_id, answer.detail)
+    answered(answer)
+    return {"accepted": True, "run_id": run_id}
+
+
 @router.post("/dispatches", operation_id="start_dispatch", status_code=202)
-def start_dispatch(start: DispatchStart, _: SignedIn) -> dict[str, bool]:
-    """Ask the agent's service to dispatch the queue with N claim agents at once."""
-    return ask_to_start("/dispatches", start.model_dump())
+def start_dispatch(start: DispatchStart, _: SignedIn) -> dict[str, Any]:
+    """Create a dispatch of the queue with N claim agents at once, for the agent."""
+    record = RunRecord(
+        kind="dispatch",
+        n=start.n,
+        set_name=None,
+        tiny=False,
+        version=None,
+        round_id=None,
+    )
+    return start_run(record)
 
 
 @router.post("/runs", operation_id="create_run", dependencies=keys.AGENT)
 def create_run(record: RunRecord, conn: Db) -> dict[str, Any]:
-    """Create a dispatch or an evaluation with its claims, for the agent's service."""
+    """Create one of a round's evaluations with its claims, for the agent."""
     if (record.kind == "evaluation") != (record.set_name is not None):
         raise HTTPException(422, "An evaluation, and only an evaluation, has a set")
     run_id = runs.start(conn, record)
@@ -115,8 +148,19 @@ def finish_run(run_id: int) -> dict[str, Any]:
 
 
 @router.post("/runs/{run_id}/stop", operation_id="stop_run", dependencies=keys.AGENT)
-def stop_run(run_id: int, conn: Db) -> dict[str, Any]:
-    """Mark a run stopped, as the agent's service does with one left from before."""
-    runs.end(conn, run_id, "stopped")
+def stop_run(run_id: int, stop: StopReason, conn: Db) -> dict[str, Any]:
+    """Mark a run stopped with the reason, as the agent does when its work fails."""
+    runs.end(conn, run_id, "stopped", stop.reason)
     conn.commit()
     return describe_run(run_id, conn)
+
+
+@router.post(
+    "/runs/{run_id}/heard", operation_id="hear_from_run", dependencies=keys.AGENT
+)
+def hear_from_run(run_id: int, conn: SingleStatementDb) -> dict[str, Any]:
+    """Note that the agent is still working on a run."""
+    conn.execute(
+        run_table.update().where(run_table.c.run_id == run_id).values(heard_at=db.now())
+    )
+    return {"run_id": run_id}

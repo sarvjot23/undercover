@@ -1,10 +1,12 @@
 import json
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from backend import agent_service, db, evaluations, rounds
 from backend.tests import deciding
+from backend.tests.agent_answers import ACCEPTED, STOPPED, refused_with
 from backend.tests.signing import MARCUS, as_handler
 
 RUN = {"kind": "evaluation", "n": 25, "tiny": False}
@@ -28,7 +30,19 @@ def small(monkeypatch):
 
 
 def start(client, handler_id="HND-01"):
-    return client.post("/api/rounds/records", json={"handler_id": handler_id}).json()
+    """Open a round as the app does, before it asks the agent to work it."""
+    with db.engine().begin() as conn:
+        return rounds.describe(conn, rounds.create(conn, handler_id))
+
+
+def review(round_id, decision, message=""):
+    """Record Dana's review of the proposal as the app does, or its refusal."""
+    try:
+        with db.engine().begin() as conn:
+            rounds.decide(conn, round_id, decision, message, "HND-01")
+    except HTTPException as refused:
+        return refused.status_code
+    return 200
 
 
 def key(set_name):
@@ -65,10 +79,7 @@ def evaluate_version(client, round_id, version, right):
 
 def propose_and_approve(client, round_id):
     client.post(f"/api/rounds/{round_id}/proposals/change", json=CHANGE)
-    client.post(
-        f"/api/rounds/{round_id}/decisions",
-        json={"decision": "approve", "message": "", "handler_id": "HND-01"},
-    )
+    review(round_id, "approve", "")
 
 
 def current(client):
@@ -82,9 +93,8 @@ def test_a_round_opens_on_a_copy_of_the_settings_and_the_latest_recipe(client):
     assert found["version_before"] == 1
     assert found["thread_id"].startswith(f"round-{found['round_id']}-")
     assert found["settings"]["round_spending_limit"] == 0.5
-    refused = client.post("/api/rounds/records", json={"handler_id": "HND-01"})
-    assert refused.status_code == 409
-    assert refused.json()["detail"] == f"Round {found['round_id']} is open"
+    with pytest.raises(HTTPException, match=f"Round {found['round_id']} is open"):
+        start(client)
 
 
 def test_the_current_version_needs_its_first_evaluations(client, small):
@@ -113,10 +123,7 @@ def test_a_proposal_changes_nothing_until_it_is_approved(client):
         len(client.get("/api/configuration/versions", headers=as_handler()).json()) == 1
     )
 
-    client.post(
-        f"/api/rounds/{round_id}/decisions",
-        json={"decision": "approve", "message": "", "handler_id": "HND-01"},
-    )
+    review(round_id, "approve", "")
     approved = client.get(f"/api/rounds/{round_id}").json()
     assert approved["version_tried"] == 2
     assert approved["status"] == "working"
@@ -128,19 +135,12 @@ def test_a_proposal_changes_nothing_until_it_is_approved(client):
 def test_a_rejection_records_who_and_why_and_saves_nothing(client):
     round_id = start(client)["round_id"]
     client.post(f"/api/rounds/{round_id}/proposals/change", json=CHANGE)
-    client.post(
-        f"/api/rounds/{round_id}/decisions",
-        json={"decision": "reject", "message": "Too broad.", "handler_id": "HND-01"},
-    )
+    review(round_id, "reject", "Too broad.")
     found = client.get(f"/api/rounds/{round_id}").json()
     assert found["version_tried"] is None
     assert found["proposal"] is None
     assert found["events"][0]["message"] == "Too broad."
-    again = client.post(
-        f"/api/rounds/{round_id}/decisions",
-        json={"decision": "approve", "message": "", "handler_id": "HND-01"},
-    )
-    assert again.status_code == 409
+    assert review(round_id, "approve") == 409
 
 
 def test_a_recipe_approved_becomes_the_next_rounds_recipe(client):
@@ -151,10 +151,7 @@ def test_a_recipe_approved_becomes_the_next_rounds_recipe(client):
     )
     proposal = client.get(f"/api/rounds/{round_id}").json()["proposal"]
     assert {"kind": "add", "text": "2. Think."} in proposal["diff"]
-    client.post(
-        f"/api/rounds/{round_id}/decisions",
-        json={"decision": "approve", "message": "", "handler_id": "HND-01"},
-    )
+    review(round_id, "approve", "")
     client.post(f"/api/rounds/{round_id}/finish")
     recipes = client.get("/api/recipes", headers=as_handler()).json()
     assert recipes[0]["version"] == 2
@@ -223,7 +220,7 @@ def test_a_version_whose_evaluations_were_stopped_is_rolled_back(client, small):
     evaluate(client, round_id, 2, "evaluation", right=True)
     body = {**RUN, "set_name": "held_out", "version": 2, "round_id": round_id}
     run = client.post("/api/runs", json=body).json()
-    client.post(f"/api/runs/{run['run_id']}/stop")
+    client.post(f"/api/runs/{run['run_id']}/stop", json=STOPPED)
     judged = client.post(
         f"/api/rounds/{round_id}/verdict", json={"unaffordable": False}
     ).json()
@@ -318,10 +315,7 @@ def test_a_model_with_no_runs_is_estimated_from_the_current_one(client, small):
         f"/api/rounds/{round_id}/proposals/change",
         json={**CHANGE, "model": "google/gemini-3.5-flash-lite", "reasoning": "low"},
     )
-    client.post(
-        f"/api/rounds/{round_id}/decisions",
-        json={"decision": "approve", "message": "", "handler_id": "HND-01"},
-    )
+    review(round_id, "approve", "")
     estimate = client.get(f"/api/rounds/{round_id}/spending").json()["estimate"]
     # Flash Lite's output price is 5 times Luna's, its input price 3 times.
     assert estimate == pytest.approx(75 * 0.002 * 5)
@@ -340,16 +334,20 @@ def test_a_start_is_asked_of_the_service_with_the_handler(client, monkeypatch):
     asked = []
     monkeypatch.setattr(
         agent_service,
-        "ask",
-        lambda path, body: asked.append((path, body)) or agent_service.Answer(202, ""),
+        "send",
+        lambda payload: asked.append(payload) or ACCEPTED,
     )
-    assert client.post("/api/rounds", headers=as_handler()).status_code == 202
-    assert asked == [("/rounds", {"handler_id": "HND-01"})]
+    started = client.post("/api/rounds", headers=as_handler())
+    assert started.status_code == 202
+    round_id = started.json()["round_id"]
+    assert asked == [{"operation": "work_round", "round_id": round_id}]
+    found = client.get(f"/api/rounds/{round_id}").json()
+    assert (found["status"], found["started_by"]) == ("working", "HND-01")
 
 
 def test_a_refusal_from_the_service_names_what_is_running(client, monkeypatch):
-    refusal = agent_service.Answer(409, "Dispatch 7 is running")
-    monkeypatch.setattr(agent_service, "ask", lambda path, body: refusal)
+    refusal = refused_with("Dispatch 7 is running")
+    monkeypatch.setattr(agent_service, "send", lambda payload: refusal)
     round_id = start(client)["round_id"]
     client.post(f"/api/rounds/{round_id}/proposals/change", json=CHANGE)
     refused = client.post(
@@ -405,6 +403,9 @@ def test_marcus_can_do_nothing_with_a_round(client, path, body, action):
 
 def test_a_round_left_working_can_be_halted(client):
     round_id = start(client)["round_id"]
-    assert client.post(f"/api/rounds/{round_id}/halt").json()["status"] == "stopped"
+    assert (
+        client.post(f"/api/rounds/{round_id}/halt", json=STOPPED).json()["status"]
+        == "stopped"
+    )
     with db.engine().connect() as conn:
         assert rounds.open_round(conn) is None

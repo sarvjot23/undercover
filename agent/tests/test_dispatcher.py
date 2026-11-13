@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.callbacks import BaseCallbackHandler
 
-from agent import checkpoints, client, dispatcher, graph, service, tracing
+from agent import checkpoints, client, dispatcher, graph, tracing
 from agent import claim as claim_agent
 from agent.tests import stubs
 from agent.tests.stubs import BrokenModel, RateLimitedModel, call, script
@@ -334,7 +334,8 @@ def test_an_evaluation_of_the_tiny_claims_leaves_the_queue_as_it_was(requests, m
     assert rows["CLM-1021"]["reasons"].startswith("The wording settles it.")
     assert all(row["started"] for row in found["claims"])
     assert found["scores"]["decision_accuracy"] == pytest.approx(4 / 5)
-    assert all(not c["claim_id"].startswith("EV") for c in service.backend_claims())
+    queue = api().get("/api/claims").json()
+    assert all(not c["claim_id"].startswith("EV") for c in queue)
 
 
 def test_an_error_outside_the_graph_never_stops_the_dispatch(

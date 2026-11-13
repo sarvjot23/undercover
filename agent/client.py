@@ -4,6 +4,7 @@ import os
 
 import httpx
 
+# The app's address: UNDERCOVER_API, which the deployment sets on Runtime.
 BACKEND_URL = "http://127.0.0.1:8000"
 # Longer than the backend waits for a database connection, so a busy swarm waits.
 TIMEOUT = 150
@@ -17,7 +18,11 @@ def key_header() -> dict[str, str]:
 
 def backend() -> httpx.Client:
     """Return a client for the UnderCover backend."""
-    return httpx.Client(base_url=BACKEND_URL, timeout=TIMEOUT, headers=key_header())
+    return httpx.Client(
+        base_url=os.getenv("UNDERCOVER_API") or BACKEND_URL,
+        timeout=TIMEOUT,
+        headers=key_header(),
+    )
 
 
 def reply(response: httpx.Response) -> str:

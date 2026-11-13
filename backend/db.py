@@ -165,6 +165,9 @@ runs = Table(
     Column("status", Text, nullable=False),
     Column("started_at", Text, nullable=False),
     Column("finished_at", Text),
+    # When the app last heard the agent was working on it, and why it stopped.
+    Column("heard_at", Text),
+    Column("stop_reason", Text),
     Index(
         "one_run_at_a_time",
         "status",
@@ -292,6 +295,9 @@ rounds = Table(
     Column("started_by", Text, nullable=False),
     Column("started_at", Text, nullable=False),
     Column("finished_at", Text),
+    # When the app last heard the agent was working on it, and why it stopped.
+    Column("heard_at", Text),
+    Column("stop_reason", Text),
 )
 # Each approval or rejection of an improver's proposal, by whom and why.
 round_events = Table(
@@ -304,6 +310,17 @@ round_events = Table(
     Column("handler_id", Text, nullable=False),
     Column("message", Text, nullable=False),
     Column("at", Text, nullable=False),
+    # The whole proposal reviewed, and the version an approval made, so a review
+    # the agent never took can be undone.
+    Column("body", JSON),
+    Column("made", Integer),
+)
+# One row, written to lock out a second start while the app checks what's going.
+agent_work = Table(
+    "agent_work",
+    metadata,
+    Column("work_id", Integer, primary_key=True),
+    Column("taken_at", Text, nullable=False),
 )
 settings = Table(
     "settings",

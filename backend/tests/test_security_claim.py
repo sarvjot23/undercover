@@ -3,6 +3,7 @@ import json
 from sqlalchemy import func, select
 
 from backend import db
+from backend.tests.agent_answers import STOPPED
 
 WATCH = "CLM-1901"
 
@@ -19,7 +20,7 @@ def evaluate(client, set_name):
             "round_id": None,
         },
     ).json()
-    client.post(f"/api/runs/{run['run_id']}/stop")
+    client.post(f"/api/runs/{run['run_id']}/stop", json=STOPPED)
     return [entry["source_id"] for entry in run["claims"]]
 
 

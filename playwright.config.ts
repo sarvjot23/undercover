@@ -8,12 +8,15 @@ import { AGENT_KEY } from "./e2e/api";
 const database =
   process.env.UNDERCOVER_E2E_DB ??
   join(tmpdir(), `undercover-e2e-${String(Date.now())}.db`);
-// The tests play the agent's part, against a stand-in for its service on its own port.
+// The tests play the agent's part, against a stand-in for its AgentCore app on its
+// own port; the Runtime route is off, so no test calls AWS.
 process.env.UNDERCOVER_E2E_DB = database;
 // Handlers sign in at a stand-in for Supabase Auth, never Supabase itself.
 const SUPABASE = "http://127.0.0.1:8004";
 // The judge is a stand-in too, never OpenRouter.
 const JUDGE = "http://127.0.0.1:8005";
+// The end-to-end backend, which the stand-in for the agent plays its part through.
+const BACKEND = "http://127.0.0.1:8001";
 
 export default defineConfig({
   testDir: "e2e",
@@ -24,7 +27,8 @@ export default defineConfig({
   webServer: [
     {
       command: "node e2e/agent-standin.ts",
-      url: "http://127.0.0.1:8003/health",
+      url: "http://127.0.0.1:8003/ping",
+      env: { UNDERCOVER_API_KEY: AGENT_KEY, UNDERCOVER_API: BACKEND },
     },
     {
       command: "node e2e/auth-standin.ts",
@@ -40,6 +44,7 @@ export default defineConfig({
       env: {
         UNDERCOVER_DB: database,
         UNDERCOVER_AGENT: "http://127.0.0.1:8003",
+        UNDERCOVER_AGENT_RUNTIME: "",
         VITE_SUPABASE_URL: SUPABASE,
         JUDGE_URL: JUDGE,
         UNDERCOVER_API_KEY: AGENT_KEY,

@@ -69,8 +69,9 @@ export function EvaluationView({ runId }: Readonly<{ runId: number }>) {
       )}
       {evaluation.status === "stopped" && (
         <p role="status">
-          Stopped partway, so it has no measures. These are the claims it got
-          through.
+          Stopped partway
+          {evaluation.stop_reason && ` (${evaluation.stop_reason})`}, so it has
+          no measures. These are the claims it got through.
         </p>
       )}
       {scores && (

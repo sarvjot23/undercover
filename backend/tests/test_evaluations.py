@@ -2,6 +2,7 @@ import pytest
 
 from backend import agent_service, measures, scoring
 from backend.tests import deciding
+from backend.tests.agent_answers import ACCEPTED, STOPPED
 from backend.tests.signing import as_handler
 
 TINY = ["CLM-1007", "CLM-1015", "CLM-1017", "CLM-1020", "CLM-1021"]
@@ -46,7 +47,7 @@ def test_an_evaluation_works_copies_of_its_set_with_new_ids(client):
 def test_the_whole_set_and_the_held_out_set(client):
     whole = evaluate(client, tiny=False)
     assert whole["total"] == 25
-    client.post(f"/api/runs/{whole['run_id']}/stop")
+    client.post(f"/api/runs/{whole['run_id']}/stop", json=STOPPED)
     held_out = evaluate(client, "held_out")
     assert [e["source_id"] for e in held_out["claims"]] == HELD_OUT_TINY
 
@@ -155,7 +156,7 @@ def test_a_finished_evaluation_is_scored_from_its_own_records(client):
 def test_a_stopped_evaluation_shows_as_stopped_with_no_measures(client):
     run = evaluate(client)
     decide(client, run["claims"][0]["claim_id"], "refer", 0)
-    client.post(f"/api/runs/{run['run_id']}/stop")
+    client.post(f"/api/runs/{run['run_id']}/stop", json=STOPPED)
     found = client.get(f"/api/evaluations/{run['run_id']}", headers=as_handler()).json()
     assert found["status"] == "stopped"
     assert found["scores"] is None
@@ -166,7 +167,7 @@ def test_evaluations_are_listed_newest_first(client):
     first = evaluate(client)
     client.post(f"/api/runs/{first['run_id']}/finish")
     second = evaluate(client, "held_out")
-    client.post(f"/api/runs/{second['run_id']}/stop")
+    client.post(f"/api/runs/{second['run_id']}/stop", json=STOPPED)
     listed = client.get("/api/evaluations", headers=as_handler()).json()
     assert [e["run_id"] for e in listed] == [second["run_id"], first["run_id"]]
 
@@ -193,15 +194,22 @@ def test_an_evaluation_is_asked_of_the_agents_service(client, monkeypatch):
     asked = []
     monkeypatch.setattr(
         agent_service,
-        "ask",
-        lambda path, body: asked.append((path, body)) or agent_service.Answer(202, ""),
+        "send",
+        lambda payload: asked.append(payload) or ACCEPTED,
     )
     body = {"set_name": "held_out", "tiny": True, "n": 5}
-    assert (
-        client.post("/api/evaluations", json=body, headers=as_handler()).status_code
-        == 202
+    started = client.post("/api/evaluations", json=body, headers=as_handler())
+    assert started.status_code == 202
+    run_id = started.json()["run_id"]
+    assert asked == [{"operation": "work_run", "run_id": run_id}]
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert (run["kind"], run["set_name"], run["tiny"], run["n"]) == (
+        "evaluation",
+        "held_out",
+        True,
+        5,
     )
-    assert asked == [("/evaluations", body)]
+    assert run["status"] == "running"
 
 
 def test_an_ended_evaluations_measures_are_worked_out_once(client, monkeypatch):

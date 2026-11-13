@@ -1,5 +1,5 @@
 import { expect, MARCUS, switchTo, test } from "./fixtures";
-import { decide, pay } from "./api";
+import { decide, pay, received } from "./api";
 
 test("a claim in full", async ({ page }) => {
   await page.goto("/");
@@ -56,10 +56,9 @@ test("an approval over $800 waits for a sign-off, which pays it", async ({
 
   // The agent is only told to close its paused work: it pays nothing.
   await expect(async () => {
-    const received = await request.get("http://127.0.0.1:8003/received");
-    expect(await received.json()).toContainEqual({
-      path: "/claims/CLM-1014/resume",
-      body: {},
+    expect(await received(request)).toContainEqual({
+      operation: "resume_claim",
+      claim_id: "CLM-1014",
     });
   }).toPass();
 });
@@ -95,10 +94,9 @@ test("a decision sent back with a note waits for the agent", async ({
 
   // The agent is asked to take the claim and decide again.
   await expect(async () => {
-    const received = await request.get("http://127.0.0.1:8003/received");
-    expect(await received.json()).toContainEqual({
-      path: "/claims/CLM-1009/resume",
-      body: {},
+    expect(await received(request)).toContainEqual({
+      operation: "resume_claim",
+      claim_id: "CLM-1009",
     });
   }).toPass();
 });

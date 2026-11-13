@@ -3,12 +3,32 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from agent import checkpoints, client, graph, model
+from agent import checkpoints, client, entrypoint, graph, model, ready
 from agent.tests.serving import serving
 from agent.tests.stubs import Backend, StubChecker
 from backend.api import app
 from backend.tests import judging, signing
 from context.server import build_server
+
+# Nothing listens here, so a request to the agent is refused at once.
+CLOSED = "http://127.0.0.1:9"
+
+
+@pytest.fixture(autouse=True)
+def no_agent(monkeypatch) -> None:
+    """No test reaches AWS or a running agent: the laptop route goes to a closed
+    port, and the Runtime route is off."""
+    monkeypatch.setenv("UNDERCOVER_AGENT", CLOSED)
+    monkeypatch.delenv("UNDERCOVER_AGENT_RUNTIME", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def agent_ready(monkeypatch) -> None:
+    """The agent counts as ready, with the test key, and runs its work inline, so a
+    test sees it done; tests of getting ready and of the threads undo this."""
+    monkeypatch.setitem(ready.state, "ready", True)
+    monkeypatch.setenv("UNDERCOVER_API_KEY", signing.AGENT_KEY)
+    monkeypatch.setattr(entrypoint, "spawn", lambda work: work())
 
 
 @pytest.fixture(autouse=True)

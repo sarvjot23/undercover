@@ -1,12 +1,12 @@
 import logging
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from backend import agent_service, db, rules
 from backend.api import app
 from backend.tests import deciding
+from backend.tests.agent_answers import ACCEPTED
 from backend.tests.signing import as_handler
 
 
@@ -323,10 +323,18 @@ def test_fail_sends_the_claim_back_to_waiting(client):
 
 def test_run_asks_the_agents_service(client, monkeypatch):
     told = []
-    monkeypatch.setattr(agent_service, "tell", lambda *args: told.append(args) or True)
+    monkeypatch.setattr(
+        agent_service, "send", lambda payload: told.append(payload) or ACCEPTED
+    )
     started = client.post("/api/claims/CLM-1001/run", headers=as_handler()).json()
     assert started["thread_id"].startswith("CLM-1001-")
-    assert told == [("/claims/CLM-1001/run", {"thread_id": started["thread_id"]})]
+    assert told == [
+        {
+            "operation": "work_claim",
+            "claim_id": "CLM-1001",
+            "thread_id": started["thread_id"],
+        }
+    ]
 
 
 def test_run_needs_the_agents_service(client):
@@ -365,19 +373,6 @@ def test_a_sign_off_stands_when_the_agent_cannot_be_reached(client, caplog):
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "decided"
     assert claim["payment"]["signed_off_by"] == "HND-01"
-
-
-def test_the_link_to_the_agents_service(monkeypatch):
-    calls = []
-
-    def post(url, json, timeout):
-        calls.append((url, json))
-        return httpx.Response(200)
-
-    monkeypatch.setattr(agent_service.httpx, "post", post)
-    monkeypatch.setenv("UNDERCOVER_AGENT", "http://127.0.0.1:8003")
-    assert agent_service.tell("/dispatches", {"n": 3})
-    assert calls == [("http://127.0.0.1:8003/dispatches", {"n": 3})]
 
 
 def test_agent_working_until_its_answer(client):
@@ -440,15 +435,6 @@ def test_never_decided_or_paid_twice(client):
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["decision"]["decision"] == "approve"
     assert claim["payment"]["amount"] == 420.0
-
-
-def test_the_link_says_when_the_service_is_away(monkeypatch):
-    def post(url, json, timeout):
-        raise httpx.ConnectError("refused")
-
-    monkeypatch.setattr(agent_service.httpx, "post", post)
-    assert agent_service.ask("/dispatches", {"n": 3}) is None
-    assert not agent_service.tell("/dispatches", {"n": 3})
 
 
 def hold(client, claim_id="CLM-1001", **kwargs):

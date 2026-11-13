@@ -253,6 +253,9 @@ function RoundsTable({
                 <Badge tone={ROUND_TONES[round.status]}>
                   {ROUND_STATUS[round.status]}
                 </Badge>
+                {round.stop_reason && (
+                  <div className="muted">{round.stop_reason}</div>
+                )}
               </td>
               <td>
                 {round.tried ? (

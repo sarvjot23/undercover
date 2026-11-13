@@ -19,6 +19,8 @@ from agent.tracing import Run
 ATTEMPTS = 4
 FIRST_WAIT = 5.0
 NOT_STARTED = "not started, the round is stopped or has spent its limit"
+FAILED = "The agent's work on it failed"
+CUT_SHORT = "The round is stopped or has spent its limit"
 
 
 class Dispatch(TypedDict):
@@ -115,9 +117,12 @@ def dispatch(run: Run, n: int) -> list[str]:
         result = build().invoke({"run": run, "results": []}, {"max_concurrency": n})
     except Exception:
         with client.backend() as backend:
-            backend.post(f"{path}/stop")
+            backend.post(f"{path}/stop", json={"reason": FAILED})
         raise
     cut_short = any(NOT_STARTED in report for report in result["results"])
     with client.backend() as backend:
-        backend.post(f"{path}/stop" if cut_short else f"{path}/finish")
+        if cut_short:
+            backend.post(f"{path}/stop", json={"reason": CUT_SHORT})
+        else:
+            backend.post(f"{path}/finish")
     return result["results"]

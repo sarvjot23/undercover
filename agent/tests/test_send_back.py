@@ -1,8 +1,9 @@
 from fastapi.testclient import TestClient
 
 from agent import claim as claim_agent
-from agent import graph, service
+from agent import graph
 from agent.tests import stubs
+from agent.tests.invoking import invoke
 from agent.tests.stubs import script
 from agent.tracing import Run
 from backend import agent_service
@@ -144,20 +145,15 @@ def test_a_claim_with_no_saved_progress_starts_afresh_with_the_note(
     assert NOTE in first[1].text
 
 
-def agent_service_client():
-    return TestClient(service.app)
-
-
 def test_resume_takes_a_sent_back_claim_before_it_answers(requests, monkeypatch):
     hold()
     send_back(monkeypatch)
     resumed = []
     monkeypatch.setattr(claim_agent, "carry_on", lambda *args: resumed.append(args))
-    answer = agent_service_client().post(f"/claims/{CLAIM}/resume")
-    assert answer.status_code == 200
+    answer = invoke({"operation": "resume_claim", "claim_id": CLAIM})
+    assert answer.json() == {"accepted": True}
     assert claim()["status"] == "in_progress"
     assert resumed[0][0] == CLAIM
     assert resumed[0][3] is not None
-    again = agent_service_client().post(f"/claims/{CLAIM}/resume")
-    assert again.status_code == 409
-    assert again.json()["detail"] == f"Claim {CLAIM} isn't paused with an answer"
+    again = invoke({"operation": "resume_claim", "claim_id": CLAIM})
+    assert again.json() == {"refused": f"Claim {CLAIM} isn't paused with an answer"}

@@ -54,6 +54,7 @@ def start(conn: Connection, record: RunRecord) -> int:
                 total=0,
                 status="running",
                 started_at=db.now(),
+                heard_at=db.now(),
             )
         )
     except IntegrityError:
@@ -85,12 +86,13 @@ def find_run(conn: Connection, run_id: int) -> RowMapping:
     return row
 
 
-def end(conn: Connection, run_id: int, status: str) -> None:
-    """End a running run as finished or stopped; its claims carry on next time."""
+def end(conn: Connection, run_id: int, status: str, reason: str | None = None) -> None:
+    """End a running run as finished, or stopped with the reason; its claims carry
+    on next time."""
     update = (
         runs.update()
         .where(runs.c.run_id == run_id, runs.c.status == "running")
-        .values(status=status, finished_at=db.now())
+        .values(status=status, finished_at=db.now(), stop_reason=reason)
     )
     if conn.execute(update).rowcount == 0:
         raise HTTPException(409, f"Run {run_id} is {find_run(conn, run_id)['status']}")

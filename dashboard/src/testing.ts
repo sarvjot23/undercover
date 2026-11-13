@@ -129,6 +129,7 @@ export function runClaim(overrides: Partial<RunClaim> = {}): RunClaim {
 export function runRecord(overrides: Partial<Run> = {}): Run {
   return {
     run_id: 1,
+    stop_reason: null,
     kind: "dispatch",
     n: 3,
     set_name: null,

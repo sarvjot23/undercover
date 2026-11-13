@@ -29,11 +29,6 @@ def rounds(round_id: int) -> str:
     return f"/api/rounds/{round_id}"
 
 
-def create(handler_id: str) -> dict[str, Any]:
-    """Open a round, started by this handler."""
-    return call("POST", "/api/rounds/records", {"handler_id": handler_id})
-
-
 def find(round_id: int) -> dict[str, Any]:
     """A round as the backend records it."""
     return call("GET", rounds(round_id))
@@ -80,10 +75,10 @@ def propose(round_id: int, kind: str, proposal: dict[str, Any]) -> None:
     call("POST", f"{rounds(round_id)}/proposals/{kind}", proposal)
 
 
-def decide(round_id: int, decision: str, message: str, handler_id: str) -> None:
-    """Record a handler's decision on the proposal, before the improver resumes."""
-    body = {"decision": decision, "message": message, "handler_id": handler_id}
-    call("POST", f"{rounds(round_id)}/decisions", body)
+def review(round_id: int, proposal_id: int) -> dict[str, Any]:
+    """A handler's review of a proposal, as the app recorded it: the decision and
+    the reason."""
+    return call("GET", f"{rounds(round_id)}/reviews/{proposal_id}")
 
 
 def judge(round_id: int, unaffordable: bool) -> dict[str, Any]:
@@ -96,9 +91,9 @@ def finish(round_id: int) -> None:
     call("POST", f"{rounds(round_id)}/finish")
 
 
-def halt(round_id: int) -> None:
-    """Mark a round left working as stopped."""
-    call("POST", f"{rounds(round_id)}/halt")
+def halt(round_id: int, reason: str) -> None:
+    """Mark a round whose work failed as stopped, with its running evaluation."""
+    call("POST", f"{rounds(round_id)}/halt", {"reason": reason})
 
 
 def create_evaluation(round_id: int, version: int, set_name: str, n: int) -> Any:

@@ -118,7 +118,8 @@ class EvaluationStart(BaseModel):
 
 
 class RunRecord(BaseModel):
-    """A dispatch or an evaluation, as the agent's service starts it.
+    """A dispatch or an evaluation, as the app creates it, or a round's evaluation,
+    as the agent creates it.
 
     With no version it uses the current one; a round's evaluation names its own.
     """
@@ -150,10 +151,10 @@ class WorkSession(BaseModel):
     finished: datetime
 
 
-class RoundStart(BaseModel):
-    """The handler who started a round, as the agent's service passes it on."""
+class StopReason(BaseModel):
+    """Why the agent stopped its work on a run or a round."""
 
-    handler_id: str
+    reason: str = Field(min_length=1)
 
 
 class RoundProgress(BaseModel):
@@ -184,12 +185,6 @@ class RoundDecision(BaseModel):
 
     decision: Literal["approve", "reject"]
     message: str
-
-
-class RecordedDecision(RoundDecision):
-    """A decision on a proposal, with the handler, as the agent's service records it."""
-
-    handler_id: str
 
 
 class Verdict(BaseModel):

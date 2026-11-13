@@ -93,15 +93,15 @@ Why: an AgentCore app runs the same way on the laptop and on Runtime, so the age
 
 Done when:
 
-- [ ] Tests through `TestClient` with stand-ins for the work and for Identity: importing the agent opens nothing; on Runtime the first request fetches each credential into its setting once
-- [ ] Each operation accepts work and refuses it; a payload with an input missing, or an unknown operation, gets a 400 saying what's wrong
-- [ ] `/ping` is `HealthyBusy` while work is going, and `Healthy` once it has finished or failed
-- [ ] Off Runtime, a request without the key gets a 401 and the health check doesn't; on Runtime a request without it is let through
-- [ ] The app's laptop route with stand-ins: the key, the payload, an acceptance, a refusal passed on, a failed connection, an error answer, and a timeout or a cut-off answer that changes nothing
-- [ ] The app's Runtime route with a stand-in boto3 client: the session id (33 characters or more, new each time), the payload, an acceptance, a refusal, a failed connection, a `ClientError`, and a read timeout or cut-off answer that changes nothing
-- [ ] `npm run check` passes, with `check:runtime` among its checks
-- [ ] With `npm run dev` stopped, `uv run --env-file .env --isolated --only-group runtime python -m runtime.main` serves the agent on port 8080, and `{"operation": "health"}` posted to `/invocations` answers `{"healthy": true}`
-- [ ] **Skipped (no AWS):** the agent on Runtime answering through `invoke_agent_runtime`, and its credentials fetched from AgentCore Identity. Both are covered by the stand-in tests above and run once `agentcore deploy` and `UNDERCOVER_AGENT_RUNTIME` are set up
+- [x] Tests through `TestClient` with stand-ins for the work and for Identity: importing the agent opens nothing; on Runtime the first request fetches each credential into its setting once
+- [x] Each operation accepts work and refuses it; a payload with an input missing, or an unknown operation, gets a 400 saying what's wrong
+- [x] `/ping` is `HealthyBusy` while work is going, and `Healthy` once it has finished or failed
+- [x] Off Runtime, a request without the key gets a 401 and the health check doesn't; on Runtime a request without it is let through
+- [x] The app's laptop route with stand-ins: the key, the payload, an acceptance, a refusal passed on, a failed connection, an error answer, and a timeout or a cut-off answer that changes nothing
+- [x] The app's Runtime route with a stand-in boto3 client: the session id (33 characters or more, new each time), the payload, an acceptance, a refusal, a failed connection, a `ClientError`, and a read timeout or cut-off answer that changes nothing
+- [x] `npm run check` passes, with `check:runtime` among its checks
+- [ ] (Checked live in phase 5, with the other live checks) With `npm run dev` stopped, `uv run --env-file .env --isolated --only-group runtime python -m runtime.main` serves the agent on port 8080, and `{"operation": "health"}` posted to `/invocations` answers `{"healthy": true}`
+- [x] **Skipped (no AWS):** the agent on Runtime answering through `invoke_agent_runtime`, and its credentials fetched from AgentCore Identity. Both are covered by the stand-in tests above and run once `agentcore deploy` and `UNDERCOVER_AGENT_RUNTIME` are set up
 
 ## Phase 4: The app keeps one run at a time
 
@@ -116,18 +116,20 @@ Why: on Runtime each dispatch has a session, a process, of its own, so the agent
 - **The dashboard** shows a run's and a round's reason for stopping.
 - **The end-to-end stand-in** gets the app's address and the agent's key, and finishes each run it's given, so later starts aren't refused.
 
+Phases 3 and 4 share one commit, as 1 and 2 do: phase 4 was started in the same files while phase 3's full check ran (it passed: 457 Python, 111 TypeScript and 24 end-to-end tests).
+
 Done when:
 
-- [ ] Tests: a second start refused while a dispatch, an evaluation or a working round is going, with what's going named
-- [ ] Two starts at the same moment: one goes through
-- [ ] A start after the work went quiet for five minutes marks it stopped with "The agent stopped answering" (a round with its evaluation) and goes ahead
-- [ ] A start the agent didn't take is undone (run stopped with the reason, round stopped); a timeout leaves the work going
-- [ ] A review the agent didn't take is undone, and the proposal waits for a review again
-- [ ] A failed run stops only itself; a failed round stops itself and its running evaluation
-- [ ] A resume runs beside a dispatch
-- [ ] The end-to-end tests pass with the app creating runs, rounds and reviews
-- [ ] `npm run check` passes
-- [ ] With `npm run dev` running, a dispatch at N=25 works the queue, and starting another while it runs is refused on the dashboard
+- [x] Tests: a second start refused while a dispatch, an evaluation or a working round is going, with what's going named
+- [x] Two starts at the same moment: one goes through
+- [x] A start after the work went quiet for five minutes marks it stopped with "The agent stopped answering" (a round with its evaluation) and goes ahead
+- [x] A start the agent didn't take is undone (run stopped with the reason, round stopped); a timeout leaves the work going
+- [x] A review the agent didn't take is undone, and the proposal waits for a review again
+- [x] A failed run stops only itself; a failed round stops itself and its running evaluation
+- [x] A resume runs beside a dispatch
+- [x] The end-to-end tests pass with the app creating runs, rounds and reviews
+- [x] `npm run check` passes
+- [ ] (Checked live in phase 5) With `npm run dev` running, a dispatch at N=25 works the queue, and starting another while it runs is refused on the dashboard
 
 ## Phase 5: The live checks and the handover
 

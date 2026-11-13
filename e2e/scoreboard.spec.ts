@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { decide, endRun, pay, REASONS, received } from "./api";
+import { decide, endRun, latest, pay, REASONS } from "./api";
 
 test("starting an evaluation on the Scoreboard page reaches the agent's service", async ({
   page,
@@ -17,10 +17,17 @@ test("starting an evaluation on the Scoreboard page reaches the agent's service"
     .getByRole("spinbutton", { name: "Claim agents at once" })
     .fill("5");
   await page.getByRole("button", { name: "Start an evaluation" }).click();
+  // The app creates the evaluation and asks the agent to work it.
   await expect(async () => {
-    expect(await received(request)).toContainEqual({
-      path: "/evaluations",
-      body: { set_name: "held_out", tiny: true, n: 5 },
+    const asked = await latest(request, "work_run");
+    const run = (await (
+      await request.get(`/api/runs/${String(asked.run_id)}`)
+    ).json()) as Record<string, unknown>;
+    expect(run).toMatchObject({
+      kind: "evaluation",
+      set_name: "held_out",
+      tiny: true,
+      n: 5,
     });
   }).toPass();
 });

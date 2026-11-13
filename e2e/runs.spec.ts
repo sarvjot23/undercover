@@ -4,7 +4,7 @@ import {
   decide,
   endRun,
   pay,
-  received,
+  latest,
   record,
   start,
 } from "./api";
@@ -21,11 +21,13 @@ test("starting a dispatch on the dashboard reaches the agent's service with N", 
   await agents.fill("5");
   await page.getByRole("button", { name: "Start a dispatch" }).click();
   await expect(page).toHaveURL(/#\/live$/);
+  // The app creates the dispatch and asks the agent to work it.
   await expect(async () => {
-    expect(await received(request)).toContainEqual({
-      path: "/dispatches",
-      body: { n: 5 },
-    });
+    const asked = await latest(request, "work_run");
+    const run = (await (
+      await request.get(`/api/runs/${String(asked.run_id)}`)
+    ).json()) as { kind: string; n: number };
+    expect(run).toMatchObject({ kind: "dispatch", n: 5 });
   }).toPass();
 });
 

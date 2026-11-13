@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from backend import allowed, db, diffs, versions
+from backend.tests.agent_answers import STOPPED
 from backend.tests.signing import as_handler
 
 RUN = {"n": 3, "tiny": False, "round_id": None}
@@ -81,7 +82,7 @@ def test_a_versions_scores_count_only_the_whole_set_evaluations_of_rounds(client
 def test_a_stopped_or_unfinished_evaluation_doesnt_count(client):
     body = {**RUN, "kind": "evaluation", "set_name": "evaluation", "version": None}
     run = client.post("/api/runs", json={**body, "round_id": 1}).json()
-    client.post(f"/api/runs/{run['run_id']}/stop")
+    client.post(f"/api/runs/{run['run_id']}/stop", json=STOPPED)
     with db.engine().connect() as conn:
         assert versions.scores(conn, 1) == {"evaluation": None, "held_out": None}
 

@@ -22,7 +22,9 @@ def pool(url: str) -> ConnectionPool[Any]:
     """Open this process's pool of at most 4 connections, in our own schema."""
     settings: dict[str, Any] = {
         "autocommit": True,
-        "prepare_threshold": 0,
+        # No prepared statements, so the pool works through either of Supabase's
+        # poolers: the transaction pooler can't keep them.
+        "prepare_threshold": None,
         "row_factory": dict_row,
         "options": f"-c search_path={SCHEMA}",
     }

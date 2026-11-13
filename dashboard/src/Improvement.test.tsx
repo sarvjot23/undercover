@@ -43,6 +43,7 @@ const settings: SettingsRecord["settings"] = {
 function round(overrides: Partial<Round> = {}): Round {
   return {
     round_id: 1,
+    stop_reason: null,
     thread_id: "round-1-abc",
     recipe_version: 1,
     settings,
@@ -274,11 +275,20 @@ it("says why a decision was refused", async () => {
 });
 
 it("lists the rounds newest first with their scores, verdicts and approvals", async () => {
-  open([round({ round_id: 2, status: "stopped", stage: "stopped" }), finished]);
+  open([
+    round({
+      round_id: 2,
+      status: "stopped",
+      stage: "stopped",
+      stop_reason: "The agent stopped answering",
+    }),
+    finished,
+  ]);
   render(<App />);
   const table = await screen.findByRole("table", { name: "Rounds" });
   const rows = within(table).getAllByRole("row").slice(1);
   expect(rows[0]?.textContent).toContain("Stopped");
+  expect(rows[0]?.textContent).toContain("The agent stopped answering");
   const done = rows[1]?.textContent ?? "";
   expect(done).toContain("Version 2");
   expect(done).toContain("80% to 88%");

@@ -19,7 +19,8 @@ export function RunPanel({ run }: Readonly<{ run: Run | null | undefined }>) {
       <div className="run-head">
         <h3 id="run-heading">The latest dispatch</h3>
         <span className="muted">
-          {RUN_LABELS[run.status]} &middot;{" "}
+          {RUN_LABELS[run.status]}
+          {run.stop_reason && `: ${run.stop_reason}`} &middot;{" "}
           <span className="mono">{run.n}</span> claim agents at once &middot;{" "}
           <span className="mono">{done}</span> of{" "}
           <span className="mono">{run.total}</span> claims done

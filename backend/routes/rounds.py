@@ -6,18 +6,17 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend import agent_service, db, improver_view, keys, rounds, versions
+from backend import agent_service, db, improver_view, keys, rounds, versions, work
 from backend.auth import over_the_limit
 from backend.db import Db, SingleStatementDb
-from backend.routes.runs import ask_to_start
+from backend.routes.runs import answered, taken
 from backend.schemas import (
     ChangeProposal,
     RecipeProposal,
-    RecordedDecision,
     RoundDecision,
     RoundProgress,
-    RoundStart,
     RoundUsage,
+    StopReason,
     Verdict,
 )
 
@@ -61,9 +60,18 @@ def get_round(round_id: int, conn: SingleStatementDb) -> dict[str, Any]:
 
 
 @router.post("", operation_id="start_round", status_code=202)
-def start_round(handler: Starter) -> dict[str, bool]:
-    """Ask the agent's service to start a round of improvement."""
-    return ask_to_start("/rounds", {"handler_id": handler["handler_id"]})
+def start_round(handler: Starter) -> dict[str, Any]:
+    """Open a round of improvement and ask the agent to work it."""
+    # Only while nothing else of the agent's work is going; stopped if not taken.
+    with db.engine().begin() as conn:
+        work.begin(conn)
+        round_id = rounds.create(conn, handler["handler_id"])["round_id"]
+    answer = agent_service.send({"operation": "work_round", "round_id": round_id})
+    if not taken(answer):
+        with db.engine().begin() as conn:
+            rounds.end(conn, round_id, "stopped", answer.detail)
+    answered(answer)
+    return {"accepted": True, "round_id": round_id}
 
 
 @router.post("/{round_id}/stop", operation_id="stop_round")
@@ -71,7 +79,7 @@ def stop_round(round_id: int, _: Stopper, conn: Db) -> dict[str, Any]:
     """Stop an open round; the service starts nothing more for it."""
     rounds.end(conn, round_id, "stopped")
     conn.commit()
-    agent_service.tell(f"/rounds/{round_id}/stop", {})
+    agent_service.send({"operation": "stop_round", "round_id": round_id})
     return describe_round(round_id, conn)
 
 
@@ -79,27 +87,30 @@ def stop_round(round_id: int, _: Stopper, conn: Db) -> dict[str, Any]:
 def decide_on_proposal(
     round_id: int, decision: RoundDecision, handler: Decider
 ) -> dict[str, bool]:
-    """Approve or reject the proposal waiting; the service records it and resumes."""
+    """Approve or reject the proposal waiting, and ask the agent to carry on."""
+    # If the agent didn't take it, the review is undone.
     if decision.decision == "reject" and not decision.message.strip():
         raise HTTPException(422, "A rejection needs a reason for the improver")
-    # No connection is held while the service records the decision through us.
-    with db.engine().connect() as conn:
-        waiting = rounds.find(conn, round_id)["proposal"]
-    if waiting is None:
-        raise HTTPException(409, f"Round {round_id} has nothing waiting for approval")
-    body = {**decision.model_dump(), "handler_id": handler["handler_id"]}
-    return ask_to_start(f"/rounds/{round_id}/decision", body)
+    with db.engine().begin() as conn:
+        work.begin(conn)
+        event_id = rounds.decide(
+            conn,
+            round_id,
+            decision.decision,
+            decision.message,
+            handler["handler_id"],
+        )
+    answer = agent_service.send(
+        {"operation": "carry_round_on", "round_id": round_id, "proposal_id": event_id}
+    )
+    if not taken(answer):
+        with db.engine().begin() as conn:
+            rounds.undo_review(conn, round_id, event_id)
+    answered(answer)
+    return {"accepted": True}
 
 
 # The agent's service records a round's work.
-
-
-@router.post("/records", operation_id="create_round", dependencies=keys.AGENT)
-def create_round(start: RoundStart, conn: Db) -> dict[str, Any]:
-    """Open a round on a copy of the settings, for the agent's service."""
-    row = rounds.create(conn, start.handler_id)
-    conn.commit()
-    return rounds.describe(conn, row)
 
 
 @router.get(
@@ -183,20 +194,26 @@ def propose_recipe(round_id: int, proposal: RecipeProposal, conn: Db) -> dict[st
     return describe_round(round_id, conn)
 
 
-@router.post(
-    "/{round_id}/decisions",
-    operation_id="record_decision_on_proposal",
+@router.get(
+    "/{round_id}/reviews/{proposal_id}",
+    operation_id="get_review",
     dependencies=keys.AGENT,
 )
-def record_decision_on_proposal(
-    round_id: int, decision: RecordedDecision, conn: Db
+def get_review(
+    round_id: int, proposal_id: int, conn: SingleStatementDb
 ) -> dict[str, Any]:
-    """Record a handler's decision on a proposal, before the improver resumes."""
-    rounds.decide(
-        conn, round_id, decision.decision, decision.message, decision.handler_id
-    )
-    conn.commit()
-    return describe_round(round_id, conn)
+    """Get a handler's review of a proposal: the decision and the reason."""
+    review = rounds.find_review(conn, round_id, proposal_id)
+    return {"decision": review["decision"], "message": review["message"]}
+
+
+@router.post(
+    "/{round_id}/heard", operation_id="hear_from_round", dependencies=keys.AGENT
+)
+def hear_from_round(round_id: int, conn: SingleStatementDb) -> dict[str, Any]:
+    """Note that the agent is still working on a round and its evaluation."""
+    rounds.update(conn, round_id, heard_at=db.now())
+    return {"round_id": round_id}
 
 
 @router.post(
@@ -218,9 +235,9 @@ def finish_round(round_id: int, conn: Db) -> dict[str, Any]:
 
 
 @router.post("/{round_id}/halt", operation_id="halt_round", dependencies=keys.AGENT)
-def halt_round(round_id: int, conn: Db) -> dict[str, Any]:
-    """Mark a round stopped, as the agent's service does with one left working."""
-    rounds.end(conn, round_id, "stopped")
+def halt_round(round_id: int, stop: StopReason, conn: Db) -> dict[str, Any]:
+    """Mark a round stopped with the reason, and its running evaluation."""
+    work.stop_round(conn, round_id, stop.reason)
     conn.commit()
     return describe_round(round_id, conn)
 

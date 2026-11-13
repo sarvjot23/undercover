@@ -79,7 +79,8 @@ export async function decide(
   await record(request, claimId, decision, payout);
 }
 
-/** Create a dispatch without starting the agent, so the test can play its part. */
+/** Create a dispatch as the app does, without asking the agent, so the test can
+ * play its part. */
 export async function createDispatch(
   request: APIRequestContext,
   n = 3,
@@ -116,14 +117,26 @@ export async function endRun(
   runId: number,
   how: "finish" | "stop" = "finish",
 ) {
-  const response = await request.post(`/api/runs/${String(runId)}/${how}`);
+  const response = await request.post(`/api/runs/${String(runId)}/${how}`, {
+    data: how === "stop" ? { reason: "Stopped by the end-to-end test" } : {},
+  });
   expect(response.ok()).toBe(true);
 }
 
-/** What the stand-in for the agent's service has been asked. */
-export async function received(
-  request: APIRequestContext,
-): Promise<{ path: string; body: unknown }[]> {
+/** The payloads the stand-in for the agent has been given. */
+export async function received(request: APIRequestContext): Promise<unknown[]> {
   const response = await request.get("http://127.0.0.1:8003/received");
-  return (await response.json()) as { path: string; body: unknown }[];
+  return (await response.json()) as unknown[];
+}
+
+/** The latest payload of this operation the stand-in for the agent was given. */
+export async function latest(
+  request: APIRequestContext,
+  operation: string,
+): Promise<Record<string, number>> {
+  const found = (await received(request)) as Record<string, number | string>[];
+  const matching = found.filter((payload) => payload.operation === operation);
+  const last = matching.at(-1);
+  expect(last).toBeDefined();
+  return last as Record<string, number>;
 }

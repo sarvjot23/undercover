@@ -247,12 +247,15 @@ function History({
 
 function ConversationView({
   conversationId,
+  sent,
   handler,
   refusal,
   sending,
   onSend,
 }: Readonly<{
   conversationId: string | null;
+  /** The conversation as the app answered the last message, until it's read. */
+  sent: Conversation | null;
   handler: Handler | null;
   refusal: string | null;
   sending: boolean;
@@ -263,7 +266,7 @@ function ConversationView({
     pollWhileWorking,
   );
   const body = useRef<HTMLDivElement>(null);
-  const shown = conversationId ? conversation : null;
+  const shown = conversationId ? (conversation ?? sent) : null;
   const turns = shown?.turns ?? [];
   const lastSteps = turns.at(-1)?.steps.length ?? 0;
   useEffect(() => {
@@ -314,6 +317,7 @@ export function Copilot({
   const [refusal, setRefusal] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [version, setVersion] = useState(0);
+  const [sent, setSent] = useState<Conversation | null>(null);
   const { data: conversations, reload } =
     useJson<ConversationSummary[]>("/api/conversations");
 
@@ -326,11 +330,17 @@ export function Copilot({
         setRefusal(sent.refusal);
         return;
       }
+      setSent(sent.conversation);
       setConversationId(sent.conversation.conversation_id);
       setVersion((v) => v + 1);
       reload();
     });
   };
+
+  const sentHere =
+    conversationId !== null && sent?.conversation_id === conversationId
+      ? sent
+      : null;
 
   return (
     <aside className="copilot" aria-label="Copilot">
@@ -386,6 +396,7 @@ export function Copilot({
         handler={handler}
         refusal={refusal}
         sending={sending}
+        sent={sentHere}
         onSend={send}
       />
       <p className="copilot-foot muted">

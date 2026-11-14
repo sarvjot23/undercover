@@ -348,3 +348,26 @@ it("gives one model call in the singular", () => {
     turnLine(turn({ model_calls: 1, cost: 0, ended_at: turn().started_at })),
   ).toBe("1 model call · $0.00 · 0s");
 });
+
+it("keeps the box disabled from the moment a message is sent", async () => {
+  const working = conversation(
+    turn({ status: "working", answer: null, steps: [] }),
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify(working)));
+      }
+      if (pathOf(input) === "/api/conversations") {
+        return Promise.resolve(new Response(JSON.stringify([])));
+      }
+      return new Promise<Response>(() => undefined); // the first read is slow
+    }),
+  );
+  render(<Copilot handler={dana} onCollapse={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "What needs me today?" }));
+  expect(await screen.findByRole("status")).toBeDefined();
+  const box = screen.getByRole("textbox", { name: "Ask the Copilot" });
+  expect((box as HTMLTextAreaElement).disabled).toBe(true);
+});

@@ -208,7 +208,7 @@ Done when:
 - [x] Tests: on Runtime (an `AGENTCORE_CREDENTIAL_*_NAME` set, Identity stubbed) the Copilot fetches only `OPENROUTER_API_KEY` and `DATABASE_URL`, never `UNDERCOVER_API_KEY`
 - [x] `npm run check:runtime` imports `runtime.main` and `runtime.copilot` with only the `runtime` group installed
 - [x] `uv run --isolated --no-dev --only-group runtime python -m runtime.copilot` serves the health check on port 8080: `{"healthy": true}`
-- [ ] `npm run dev` starts the Copilot on 127.0.0.1:8081 beside the rest, and a message posted to the app as Dana reaches it and is answered (checked live in phase 6)
+- [x] `npm run dev` starts the Copilot on 127.0.0.1:8081 beside the rest, and a message posted to the app as Dana reaches it and is answered (checked live in phase 6)
 - [ ] **Skipped (no AWS):** `agentcore deploy` of both runtimes and a health check on `undercover_default_copilot`. That's the deployment notebook's job.
 - [x] `npm run check` passes
 
@@ -271,16 +271,16 @@ Why: the brief's handover conversation, on the real model, checked against our r
 
 Done when:
 
-- [ ] Before `npm run dev`: `runtime/copilot.py` serves the health check with only the `runtime` group installed (`{"healthy": true}`)
-- [ ] Question 1: a dispatch of 10 starts as Dana, the Copilot waits for it in code while the queue moves beside the sidebar, and it answers with the payouts held for sign-off and anything referred or left for a handler, each matching the queue
-- [ ] Question 2: the answer explains the hold from the claim, its steps and the context layer, with cards for each
-- [ ] Question 3: the claim is sent back with Dana's note; the claim page shows the note "Sent back by Dana Whitfield", and the agent decides it again
-- [ ] Question 4: the confirmation card shows another held claim, its customer, amount and reason, matching the claim's page; "Sign off and pay" pays it, and the claim page shows it paid and signed off by Dana Whitfield
-- [ ] Question 5: an evaluation of the whole held-out set runs, and every figure in the table matches the Scoreboard (straight through and accuracy), Settings (the accuracy objective) and the claims' pages (payouts over the limit and their sign-offs)
-- [ ] After restarting `npm run dev`, the conversation opens from the list with all its turns and cards, and a sixth question is answered with the earlier ones in mind
-- [ ] As Marcus Oyelaran, asking to sign off is declined with the reason and no card
-- [ ] The sidebar checked in light and dark mode through the Playwright MCP server, or Playwright's library if the server doesn't connect, saying so
-- [ ] The spend of the live checks reported, from the recorded usage and the turns' costs
+- [x] Before `npm run dev`: `runtime/copilot.py` serves the health check with only the `runtime` group installed (`{"healthy": true}`)
+- [x] Question 1: a dispatch of 10 starts as Dana, the Copilot waits for it in code while the queue moves beside the sidebar, and it answers with the payouts held for sign-off and anything referred or left for a handler, each matching the queue
+- [x] Question 2: the answer explains the hold from the claim, its steps and the context layer, with cards for each (asked again after the instructions were made clearer: the first answer used the claim alone)
+- [x] Question 3: the claim is sent back with Dana's note; the claim page shows the note "Sent back by Dana Whitfield", and the agent decides it again
+- [x] Question 4 (asked again after the instructions were made clearer: the first answer asked which claim): the confirmation card shows another held claim, its customer, amount and reason, matching the claim's page; "Sign off and pay" pays it, and the claim page shows it paid and signed off by Dana Whitfield
+- [x] Question 5: an evaluation of the whole held-out set runs, and every figure in the table matches the Scoreboard (straight through and accuracy), Settings (the accuracy objective) and the claims' pages (payouts over the limit and their sign-offs)
+- [x] After restarting `npm run dev`, the conversation opens from the list with all its turns and cards, and a sixth question is answered with the earlier ones in mind
+- [x] As Marcus Oyelaran, asking to sign off is declined with the reason and no card
+- [x] The sidebar checked in light and dark mode through the Playwright MCP server, or Playwright's library if the server doesn't connect, saying so
+- [x] The spend of the live checks reported, from the recorded usage and the turns' costs
 - [ ] **Skipped (no AWS):** the memory on the deployed product. That's the deployment notebook's job: it tells the Copilot a preference, starts a new conversation and sees it remembered.
-- [ ] `docs/SPEC.md`, `docs/TECH_STACK.md`, `docs/CODE_STANDARDS.md`, `docs/PROCESS.md` and `docs/STATUS.md` describe the product as it now is
-- [ ] `npm run check` passes with `.env` moved out of the way
+- [x] `docs/SPEC.md`, `docs/TECH_STACK.md`, `docs/CODE_STANDARDS.md`, `docs/PROCESS.md` and `docs/STATUS.md` describe the product as it now is
+- [x] `npm run check` passes with `.env` moved out of the way

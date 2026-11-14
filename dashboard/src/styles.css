@@ -2072,3 +2072,18 @@ button {
     animation: none;
   }
 }
+
+/* Beside the open sidebar the page is narrower: the tagline gives way, and the
+   handler's name moves under the nav when the line runs out. */
+.copilot-open .tagline {
+  display: none;
+}
+
+.copilot-open .masthead {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.copilot-open .who {
+  margin-left: auto;
+}

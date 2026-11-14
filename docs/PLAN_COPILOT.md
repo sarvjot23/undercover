@@ -134,17 +134,17 @@ Why: this is the Copilot itself, the loop, its tools and the pause before paying
 
 Done when (tests with a stub model, the app on SQLite, the context layer in the test process and a stand-in store):
 
-- [ ] The loop: a lookup, then an answer; each tool call is a card that goes from working to done with its time, and a context-layer card names its file and owner
-- [ ] A refusal from the app reaches the model and its card shows refused with the reason
-- [ ] Marcus asking to sign off or send back is refused in code with the reason, and no call reaches the app
-- [ ] The pause: `sign_off_claim` pauses with a card read from the records, even when the model's message names a different amount; a Copilot built afresh on the same saved state resumes with `{"confirmed": true}`, signs off as the handler and pays once, and no tool before the pause runs again
-- [ ] Cancel: resuming with `{"confirmed": false}` pays nothing, and the model is told the handler cancelled
-- [ ] The sign-in is in no checkpoint, config, step or memory event (each searched for the token's text), and no request carries `X-API-Key` with `UNDERCOVER_API_KEY` set
-- [ ] At 25 model calls the turn ends with a short answer saying so
-- [ ] A turn after one that stopped mid-step starts cleanly: its unanswered tool call is answered and the model is called with a valid history
-- [ ] Memory: the lookup searches only the handler's namespace and records a card with what it found; after the turn exactly two events are saved, the message and the answer; with memory off there's no card and no save
-- [ ] On the Gateway (the stand-in Gateway), only the context layer's seven tools are loaded, and cards show their own names
-- [ ] `npm run check` passes
+- [x] The loop: a lookup, then an answer; each tool call is a card that goes from working to done with its time, and a context-layer card names its file and owner
+- [x] A refusal from the app reaches the model and its card shows refused with the reason
+- [x] Marcus asking to sign off or send back is refused in code with the reason, and no call reaches the app
+- [x] The pause: `sign_off_claim` pauses with a card read from the records, even when the model's message names a different amount; a Copilot built afresh on the same saved state resumes with `{"confirmed": true}`, signs off as the handler and pays once, and no tool before the pause runs again
+- [x] Cancel: resuming with `{"confirmed": false}` pays nothing, and the model is told the handler cancelled
+- [x] The sign-in is in no checkpoint, config, step or memory event (each searched for the token's text), and no request carries `X-API-Key` with `UNDERCOVER_API_KEY` set
+- [x] At 25 model calls the turn ends with a short answer saying so
+- [x] A turn after one that stopped mid-step starts cleanly: its unanswered tool call is answered and the model is called with a valid history
+- [x] Memory: the lookup searches only the handler's namespace and records a card with what it found; after the turn exactly two events are saved, the message and the answer; with memory off there's no card and no save
+- [x] On the Gateway (the stand-in Gateway), only the context layer's seven tools are loaded, and cards show their own names
+- [x] `npm run check` passes
 
 ## Phase 3: Waiting for the work, and the success criteria
 

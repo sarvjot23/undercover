@@ -1,5 +1,6 @@
-"""The models behind the UnderCover Agent: the claim agent's, built from a version
-of its configuration, and the security check's, which no version changes."""
+"""The models behind the UnderCover Agent and the Copilot: the claim agent's, built
+from a version of its configuration, the security check's, which no version changes,
+and the Copilot's."""
 
 import os
 
@@ -41,3 +42,13 @@ def check_model() -> ChatOpenAI:
     """The security check's model: Luna at no reasoning, or MODEL_NAME with none."""
     free = platform_model()
     return chat(free or CHECK_MODEL, None if free else CHECK_EFFORT)
+
+
+COPILOT_MODEL = "openai/gpt-6-luna"
+COPILOT_EFFORT = "low"
+
+
+def copilot_model() -> ChatOpenAI:
+    """The Copilot's model: Luna at low reasoning, or MODEL_NAME with none."""
+    free = platform_model()
+    return chat(free or COPILOT_MODEL, None if free else COPILOT_EFFORT)

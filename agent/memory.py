@@ -1,4 +1,5 @@
-"""The claim agent's memory of each customer, in AgentCore Memory.
+"""The claim agent's memory of each customer, and the Copilot's of each handler, in
+AgentCore Memory.
 
 On when UNDERCOVER_MEMORY_ID is set, in the AWS CLI's region, outside evaluations.
 Each customer's memories are used only for that customer's claims (claims manual
@@ -81,3 +82,41 @@ def search(memory: BaseStore, customer_id: str, claim_id: str, query: str) -> st
         if not any(this_claim in path for path in item.value.get("namespaces", []))
     ]
     return "\n".join(texts) or "Nothing remembered about this customer yet."
+
+
+# The Copilot's memory of each handler, in a Memory of its own: the handler is the
+# actor, and the conversation the session. Notes land under /handlers/<handler>/.
+RECALL_LIMIT = 5
+
+
+def for_copilot() -> BaseStore | None:
+    """The Copilot's memory, read from the settings now; none when it's off."""
+    memory_id = os.getenv("UNDERCOVER_COPILOT_MEMORY_ID")
+    if not memory_id:
+        return None
+    return AgentCoreMemoryStore(
+        memory_id=memory_id, region_name=boto3.Session().region_name
+    )
+
+
+def recall(memory: BaseStore, handler_id: str, query: str) -> list[str]:
+    """What the Copilot remembers about this handler that bears on the message,
+    and nothing about anyone else. A store that can't be reached finds nothing."""
+    try:
+        found = memory.search(("handlers", handler_id), query=query, limit=RECALL_LIMIT)
+    except Exception:  # noqa: BLE001 - the turn goes on without its memory
+        log.warning("The Copilot's memory couldn't be searched", exc_info=True)
+        return []
+    return [item.value["content"] for item in found]
+
+
+def save_turn(
+    memory: BaseStore, handler_id: str, conversation_id: str, message: str, answer: str
+) -> None:
+    """Save the handler's message and the Copilot's answer, and nothing else."""
+    namespace = (handler_id, conversation_id)
+    try:
+        memory.put(namespace, uuid.uuid4().hex, {"message": HumanMessage(message)})
+        memory.put(namespace, uuid.uuid4().hex, {"message": AIMessage(answer)})
+    except Exception:  # noqa: BLE001 - the answer stands without its memory
+        log.warning("The Copilot's memory couldn't be saved", exc_info=True)

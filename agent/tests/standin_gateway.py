@@ -15,8 +15,9 @@ from mcp.shared.exceptions import McpError
 from starlette.applications import Starlette
 from starlette.routing import Route
 
-from agent.direct import APP, OPERATIONS, Direct
+from agent.direct import APP, CONTEXT, OPERATIONS, Direct
 from agent.mcp_bridge import Refused
+from agent.steps import LOOKUPS
 
 Forbid = Callable[[str, dict[str, Any]], bool]
 
@@ -39,9 +40,10 @@ def gateway(forbid: Forbid) -> Starlette:
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
         return [
-            types.Tool(name=f"{APP}___{name}", inputSchema={"type": "object"})
-            for name in OPERATIONS
-        ]  # The context layer's tools are passed on too, without being listed.
+            types.Tool(name=f"{target}___{name}", inputSchema={"type": "object"})
+            for target, names in ((APP, OPERATIONS), (CONTEXT, LOOKUPS))
+            for name in names
+        ]
 
     async def call_tool(request: types.CallToolRequest) -> types.ServerResult:
         name = request.params.name

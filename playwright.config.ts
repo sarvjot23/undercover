@@ -9,7 +9,8 @@ const database =
   process.env.UNDERCOVER_E2E_DB ??
   join(tmpdir(), `undercover-e2e-${String(Date.now())}.db`);
 // The tests play the agent's part, against a stand-in for its AgentCore app on its
-// own port; the Runtime route is off, so no test calls AWS.
+// own port, and a stand-in Copilot plays scripted turns; the Runtime routes are off,
+// so no test calls AWS.
 process.env.UNDERCOVER_E2E_DB = database;
 // Handlers sign in at a stand-in for Supabase Auth, never Supabase itself.
 const SUPABASE = "http://127.0.0.1:8004";
@@ -31,6 +32,11 @@ export default defineConfig({
       env: { UNDERCOVER_API_KEY: AGENT_KEY, UNDERCOVER_API: BACKEND },
     },
     {
+      command: "node e2e/copilot-standin.ts",
+      url: "http://127.0.0.1:8007/ping",
+      env: { UNDERCOVER_API: BACKEND },
+    },
+    {
       command: "node e2e/auth-standin.ts",
       url: `${SUPABASE}/health`,
     },
@@ -45,6 +51,8 @@ export default defineConfig({
         UNDERCOVER_DB: database,
         UNDERCOVER_AGENT: "http://127.0.0.1:8003",
         UNDERCOVER_AGENT_RUNTIME: "",
+        UNDERCOVER_COPILOT: "http://127.0.0.1:8007",
+        UNDERCOVER_COPILOT_RUNTIME: "",
         VITE_SUPABASE_URL: SUPABASE,
         JUDGE_URL: JUDGE,
         UNDERCOVER_API_KEY: AGENT_KEY,

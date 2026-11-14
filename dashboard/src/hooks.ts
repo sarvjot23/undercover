@@ -50,6 +50,7 @@ export interface Loaded<T> {
 /**
  * Fetch JSON from the backend. `every` gives the wait in ms before fetching
  * again, as a number or from the data just loaded; 0 stops. Pass a stable value.
+ * An empty path fetches nothing.
  */
 export function useJson<T>(
   path: string,
@@ -60,6 +61,7 @@ export function useJson<T>(
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
+    if (!path) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const load = () => {

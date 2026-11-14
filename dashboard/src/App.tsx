@@ -2,6 +2,8 @@ import type { Handler } from "./api";
 import { signOut, useSession } from "./auth";
 import { ClaimView } from "./ClaimView";
 import { Configuration } from "./Configuration";
+import { Copilot, CopilotTab } from "./Copilot";
+import { useCopilotOpen } from "./conversations";
 import { EvaluationView } from "./EvaluationView";
 import { HandlerContext } from "./handler";
 import { Improvement } from "./Improvement";
@@ -25,19 +27,40 @@ function SignedIn({ email }: Readonly<{ email: string }>) {
   const route = useRoute();
   const { data: handlers } = useJson<Handler[]>("/api/handlers");
   const handler = handlers?.find((found) => found.email === email) ?? null;
+  const [open, setOpen] = useCopilotOpen();
+  const live = route.view === "live";
+  const sidebar = open ? (
+    <Copilot
+      handler={handler}
+      onCollapse={() => {
+        setOpen(false);
+      }}
+    />
+  ) : (
+    <CopilotTab
+      onOpen={() => {
+        setOpen(true);
+      }}
+    />
+  );
 
   return (
     <HandlerContext value={handler}>
-      {route.view === "live" ? (
-        <LiveView />
-      ) : (
-        <div className="page">
-          <Masthead route={route} handler={handler} email={email} />
-          <main>
-            <Page route={route} />
-          </main>
-        </div>
-      )}
+      <div
+        className={`shell${open ? " copilot-open" : ""}${live ? " on-live" : ""}`}
+      >
+        {live ? (
+          <LiveView />
+        ) : (
+          <div className="page">
+            <Masthead route={route} handler={handler} email={email} />
+            <main>
+              <Page route={route} />
+            </main>
+          </div>
+        )}
+        {sidebar}
+      </div>
     </HandlerContext>
   );
 }

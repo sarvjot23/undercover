@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ConfigVersion, VersionDiff } from "./api";
@@ -118,7 +119,7 @@ it("shows the current version, every version and the diff in color", async () =>
   expect(
     await screen.findByRole("heading", { name: "Version 1" }),
   ).toBeDefined();
-  expect(screen.queryByRole("textbox")).toBeNull();
+  expect(within(screen.getByRole("main")).queryByRole("textbox")).toBeNull();
 });
 
 it("says when the configuration can't load", async () => {

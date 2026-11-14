@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -61,7 +62,11 @@ it("signs a handler in and shows the queue, with no sign-up", async () => {
   expect(screen.queryByRole("link")).toBeNull();
 
   fillIn(dana.email, "the password");
-  expect(await screen.findByText("Dana Whitfield")).toBeDefined();
+  expect(
+    await within(await screen.findByRole("banner")).findByText(
+      "Dana Whitfield",
+    ),
+  ).toBeDefined();
   expect(await screen.findByRole("link", { name: "CLM-1001" })).toBeDefined();
   const signedIn = fetchMock.mock.calls.find(
     ([input]) => pathOf(input) === TOKEN_URL,

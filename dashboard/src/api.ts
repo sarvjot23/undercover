@@ -385,6 +385,27 @@ export async function postJson<T>(path: string, body?: object): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** Send an action, and return what the backend answered, or its reason when it
+ * refuses. */
+export async function postForResult(
+  path: string,
+  body?: object,
+): Promise<{ data: unknown } | { refusal: string }> {
+  try {
+    const response = await post(path, body);
+    const answer = (await response.json()) as { detail?: unknown };
+    if (response.ok) return { data: answer };
+    return {
+      refusal:
+        typeof answer.detail === "string"
+          ? answer.detail
+          : "The backend refused it.",
+    };
+  } catch {
+    return { refusal: "The backend is not responding." };
+  }
+}
+
 /** Send an action, and return the backend's reason when it refuses, or null. */
 export async function postForRefusal(
   path: string,

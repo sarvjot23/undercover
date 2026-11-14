@@ -10,6 +10,7 @@ export const AUTH_AWAY = "Sign-in isn't responding. Try again in a moment.";
 export const isSetUp = () => true;
 export const signIn = vi.fn(() => Promise.resolve(null));
 export const signOut = vi.fn(() => Promise.resolve());
+export const freshToken = vi.fn(() => Promise.resolve());
 
 export function accessToken(): Promise<string | null> {
   const email = whoIsSignedIn();

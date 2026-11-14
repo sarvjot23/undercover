@@ -24,7 +24,9 @@ test("a handler signs in, sees who is signed in, and signs out", async ({
   page,
 }) => {
   await signIn(page, DANA);
-  await expect(page.getByText("Dana Whitfield")).toBeVisible();
+  await expect(
+    page.getByRole("banner").getByText("Dana Whitfield"),
+  ).toBeVisible();
   await expect(page.getByText("Senior Claims Handler")).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();

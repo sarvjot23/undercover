@@ -216,7 +216,7 @@ Done when:
 
 Why: this is what the handlers see. It needs to feel polished, keep the page beside it usable, and show each step as it happens.
 
-- **Layout** (`dashboard/src/Copilot.tsx` and its parts, `dashboard/src/copilot.ts` for its types and API calls):
+- **Layout** (`dashboard/src/Copilot.tsx`, its cards in `dashboard/src/CopilotCards.tsx`, and `dashboard/src/conversations.ts` for its types and API calls; `copilot.ts` would clash with `Copilot.tsx` on Windows):
   - A sidebar on the right of every signed-in page, open the first time.
   - It collapses to a slim tab with an icon of its own, and the browser remembers the choice.
   - The page beside it stays fully usable.
@@ -247,11 +247,11 @@ Why: this is what the handlers see. It needs to feel polished, keep the page bes
 
 Done when:
 
-- [ ] Vitest: messages left and right; markdown with a table; claim ids as links; each card's icon, name, input and states with timings; a card opens to its detail; the confirmation card's buttons send `true` and `false`; the box disabled while working and asking for the confirmation while one waits; the greeting by first name with suggestions; the conversation list newest first; collapse remembered; `freshToken` renews under 20 minutes and not over
-- [ ] Playwright with the stand-in Copilot: a question shows the lookup, action and refusal cards as they arrive, then the formatted answer; the confirmation card's "Sign off and pay" carries the turn on, and "Cancel" too; after a reload the waiting card is still there; a new conversation and an earlier one from the list both open
-- [ ] Every existing end-to-end test passes with the sidebar open
-- [ ] On a narrow window (390px) the sidebar opens over the page and closes to its tab
-- [ ] `npm run check` passes
+- [x] Vitest: messages left and right; markdown with a table; claim ids as links; each card's icon, name, input and states with timings; a card opens to its detail; the confirmation card's buttons send `true` and `false`; the box disabled while working and asking for the confirmation while one waits; the greeting by first name with suggestions; the conversation list newest first; collapse remembered; `freshToken` renews under 20 minutes and not over
+- [x] Playwright with the stand-in Copilot: a question shows the lookup, action and refusal cards as they arrive, then the formatted answer; the confirmation card's "Sign off and pay" carries the turn on, and "Cancel" too; after a reload the waiting card is still there; a new conversation and an earlier one from the list both open
+- [x] Every existing end-to-end test passes with the sidebar open
+- [x] On a narrow window (390px) the sidebar opens over the page and closes to its tab
+- [x] `npm run check` passes
 
 ## Phase 6: The live checks and the handover
 

@@ -52,6 +52,30 @@ export async function accessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+/** Supabase's sign-ins last an hour; renew one with less than this left. */
+export const RENEW_WITHIN_SECONDS = 20 * 60;
+
+/** Whether a session ending at this time, in seconds, should be renewed now. */
+export function needsRenewal(
+  expiresAt: number | undefined,
+  now = Date.now() / 1000,
+): boolean {
+  return expiresAt === undefined || expiresAt - now < RENEW_WITHIN_SECONDS;
+}
+
+/**
+ * Renew the handler's sign-in when it has less than 20 minutes left, before a
+ * message to the Copilot or an answer to its confirmation: the Copilot works with
+ * it for as long as a turn takes.
+ */
+export async function freshToken(): Promise<void> {
+  if (!isSetUp()) return;
+  const { data } = await supabase().auth.getSession();
+  if (data.session && needsRenewal(data.session.expires_at)) {
+    await supabase().auth.refreshSession();
+  }
+}
+
 /** The session: undefined while it loads, null when nobody is signed in. */
 export function useSession(): Session | null | undefined {
   const [session, setSession] = useState<Session | null | undefined>(() =>

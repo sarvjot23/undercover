@@ -62,7 +62,9 @@ it("shows the queue with each claim's status", async () => {
 it("counts the claims in each state", async () => {
   stubBackend({ "/api/claims": queue });
   render(<App />);
-  const tiles = await screen.findAllByRole("listitem");
+  const tiles = await within(screen.getByRole("main")).findAllByRole(
+    "listitem",
+  );
   expect(tiles.map((tile) => tile.textContent)).toEqual([
     "1Waiting",
     "0In progress",
@@ -286,7 +288,8 @@ it("shows the summary from the records once the dispatch ends", async () => {
 it("shows who is signed in, with a way to sign out", async () => {
   stubBackend({ "/api/claims": queue, "/api/handlers": [dana, marcus] });
   render(<App />);
-  expect(await screen.findByText("Dana Whitfield")).toBeDefined();
+  const masthead = screen.getByRole("banner");
+  expect(await within(masthead).findByText("Dana Whitfield")).toBeDefined();
   expect(screen.getByText("Senior Claims Handler")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   expect(signOut).toHaveBeenCalled();

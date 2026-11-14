@@ -29,7 +29,7 @@ test("the configuration shows version 1 read only", async ({ page }) => {
   await expect(page.getByLabel("The instructions in version 1")).toContainText(
     "You are the UnderCover Agent.",
   );
-  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("textbox")).toHaveCount(0);
 });
 
 test("the old Instructions address opens the configuration", async ({

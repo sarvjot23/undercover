@@ -39,6 +39,20 @@ def list_evaluations(conn: SingleStatementDb) -> list[dict[str, Any]]:
     return found
 
 
+@router.get(
+    "/{run_id}/measures",
+    operation_id="get_evaluation_measures",
+    dependencies=keys.HANDLER,
+)
+def get_evaluation_measures(run_id: int, conn: SingleStatementDb) -> dict[str, Any]:
+    """Get an evaluation's status and measures, without its claims or the answers."""
+    row = runs.find_run(conn, run_id)
+    if row["kind"] != "evaluation":
+        raise HTTPException(404, f"No evaluation {run_id}")
+    evaluation = measures.evaluation(conn, row)
+    return {k: v for k, v in evaluation.items() if k != "claims"}
+
+
 @router.get("/{run_id}", operation_id="get_evaluation", dependencies=keys.HANDLER)
 def get_evaluation(run_id: int, conn: SingleStatementDb) -> dict[str, Any]:
     """Get an evaluation: each claim, the handler's answer beside the agent's."""

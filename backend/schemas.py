@@ -201,3 +201,61 @@ class RoundUsage(BaseModel):
     output_tokens: int = Field(ge=0)
     cost: float = Field(ge=0)
     key: str
+
+
+MESSAGE_LENGTH = 4000
+STEP_STATES = Literal["working", "done", "refused", "failed"]
+
+
+class CopilotMessage(BaseModel):
+    """A handler's message to the Copilot."""
+
+    message: str = Field(max_length=MESSAGE_LENGTH)
+
+    @field_validator("message")
+    @classmethod
+    def not_blank(cls, message: str) -> str:
+        """A message of only spaces asks nothing."""
+        if not message.strip():
+            raise ValueError("Ask the Copilot something")
+        return message.strip()
+
+
+class CopilotConfirmation(BaseModel):
+    """The handler's answer to the confirmation card: sign off and pay, or cancel."""
+
+    confirmed: bool
+
+
+class CopilotStep(BaseModel):
+    """One of the Copilot's steps, as its card shows it."""
+
+    kind: Literal["claims", "customers", "context", "work", "memory", "action"]
+    tool: str
+    input: str
+    state: STEP_STATES
+    seconds: float = Field(ge=0)
+    asked: str
+    answer: str
+    reason: str
+    sources: list[dict[str, Any]]
+
+
+class TurnFinish(BaseModel):
+    """The Copilot's answer to a turn, with its model calls and their cost."""
+
+    answer: str
+    model_calls: int = Field(ge=0)
+    cost: float = Field(ge=0)
+
+
+class TurnPause(BaseModel):
+    """What the confirmation card shows: the claim, customer, amount and reason."""
+
+    confirmation: dict[str, Any]
+
+
+class TurnFailure(BaseModel):
+    """Why a turn failed."""
+
+    reason: str = Field(min_length=1)

@@ -10,6 +10,7 @@ from backend import agent_api, db, static
 from backend.routes import (
     claims,
     configuration,
+    copilot,
     evaluations,
     library,
     records,
@@ -40,6 +41,8 @@ app.include_router(configuration.router)
 app.include_router(settings.router)
 app.include_router(rounds.router)
 app.include_router(records.router)
+app.include_router(copilot.router)
+app.include_router(copilot.turns)
 app.include_router(agent_api.router)
 
 

@@ -322,6 +322,56 @@ agent_work = Table(
     Column("work_id", Integer, primary_key=True),
     Column("taken_at", Text, nullable=False),
 )
+# The Copilot's conversations, each its handler's alone. working_turn is the turn
+# working or waiting for a confirmation, so a second message can't start beside it.
+conversations = Table(
+    "conversations",
+    metadata,
+    Column("conversation_id", Text, primary_key=True),
+    Column("handler_id", Text, nullable=False),
+    Column("title", Text, nullable=False),
+    Column("started_at", Text, nullable=False),
+    Column("working_turn", Integer),
+)
+# Each message to the Copilot and where its turn stands: working, waiting for a
+# confirmation, done, failed or stopped. Never the handler's sign-in.
+copilot_turns = Table(
+    "copilot_turns",
+    metadata,
+    Column("turn_id", Integer, primary_key=True, autoincrement=True),
+    Column("conversation_id", Text, nullable=False),
+    Column("message", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("started_at", Text, nullable=False),
+    # When the handler answered the confirmation, which starts the turn's clock again.
+    Column("answered_at", Text),
+    Column("ended_at", Text),
+    Column("answer", Text),
+    Column("model_calls", Integer),
+    Column("cost", Float),
+    Column("error", Text),
+    Column("confirmation", JSON),
+    Column("confirmed", Boolean),
+)
+# The steps the sidebar shows as cards, each recorded once by its key and updated.
+copilot_steps = Table(
+    "copilot_steps",
+    metadata,
+    Column("step_id", Integer, primary_key=True, autoincrement=True),
+    Column("turn_id", Integer, nullable=False),
+    Column("key", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("tool", Text, nullable=False),
+    Column("input", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("started_at", Text, nullable=False),
+    Column("seconds", Float, nullable=False),
+    Column("asked", Text, nullable=False),
+    Column("answer", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("sources", JSON, nullable=False),
+    UniqueConstraint("turn_id", "key"),
+)
 settings = Table(
     "settings",
     metadata,

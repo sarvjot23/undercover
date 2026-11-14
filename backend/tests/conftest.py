@@ -12,10 +12,12 @@ CLOSED = "http://127.0.0.1:9"
 
 @pytest.fixture(autouse=True)
 def no_agent(monkeypatch) -> None:
-    """No test reaches AWS or a running agent: the laptop route goes to a closed
-    port, and the Runtime route is off."""
+    """No test reaches AWS, a running agent or a running Copilot: the laptop routes
+    go to a closed port, and the Runtime routes are off."""
     monkeypatch.setenv("UNDERCOVER_AGENT", CLOSED)
     monkeypatch.delenv("UNDERCOVER_AGENT_RUNTIME", raising=False)
+    monkeypatch.setenv("UNDERCOVER_COPILOT", CLOSED)
+    monkeypatch.delenv("UNDERCOVER_COPILOT_RUNTIME", raising=False)
 
 
 @pytest.fixture

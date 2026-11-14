@@ -304,6 +304,8 @@ def test_the_agent_tells_the_app_every_minute_while_it_works(requests, monkeypat
     path = f"/api/runs/{run_id}/heard"
     wait_for(lambda: requests.count(path) >= 2)
     release.set()
+    # The work ends before the next test, which pings.
+    wait_for(lambda: ping() == "Healthy")
 
 
 def test_the_ping_is_busy_while_work_goes_on_and_healthy_after(requests, monkeypatch):

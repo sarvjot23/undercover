@@ -42,7 +42,7 @@ Done when:
 - [x] `resume_claim` refuses a claim that isn't paused, with the reason
 - [x] The sign-off answers with the updated claim when the agent can't be reached, and logs a warning
 - [x] `npm run check` passes
-- [ ] (Checked live in phase 5, as the brief asks) With `npm run dev` running, a claim over the limit pauses, and signing it off on the dashboard pays it and ends the agent's work (its last step is the agent's closing line)
+- [x] (Checked live in phase 5, as the brief asks) With `npm run dev` running, a claim over the limit pauses, and signing it off on the dashboard pays it and ends the agent's work (its last step is the agent's closing line)
 
 ## Phase 2: Sign off or send back
 
@@ -74,7 +74,7 @@ Done when:
 - [x] Vitest: the two buttons, the required note and its limit, the sent-back decisions with their notes, the queue's badge, "Waiting for the next dispatch"
 - [x] An end-to-end test sends a claim back and sees it in the queue and on its page
 - [x] `npm run check` passes
-- [ ] (Checked live in phase 5, as the brief asks) With `npm run dev` running, a claim sent back with a note is decided again by the agent, and the claim page shows both decisions and the note, checked in the browser (through the Playwright MCP server, or Playwright's library from a script if the MCP server doesn't connect, as in the last build)
+- [x] (Checked live in phase 5, as the brief asks) With `npm run dev` running, a claim sent back with a note is decided again by the agent, and the claim page shows both decisions and the note, checked in the browser (through the Playwright MCP server, or Playwright's library from a script if the MCP server doesn't connect, as in the last build)
 
 ## Phase 3: The agent as an AgentCore app
 
@@ -100,7 +100,7 @@ Done when:
 - [x] The app's laptop route with stand-ins: the key, the payload, an acceptance, a refusal passed on, a failed connection, an error answer, and a timeout or a cut-off answer that changes nothing
 - [x] The app's Runtime route with a stand-in boto3 client: the session id (33 characters or more, new each time), the payload, an acceptance, a refusal, a failed connection, a `ClientError`, and a read timeout or cut-off answer that changes nothing
 - [x] `npm run check` passes, with `check:runtime` among its checks
-- [ ] (Checked live in phase 5, with the other live checks) With `npm run dev` stopped, `uv run --env-file .env --isolated --only-group runtime python -m runtime.main` serves the agent on port 8080, and `{"operation": "health"}` posted to `/invocations` answers `{"healthy": true}`
+- [x] (Checked live in phase 5, with the other live checks) With `npm run dev` stopped, `uv run --env-file .env --isolated --only-group runtime python -m runtime.main` serves the agent on port 8080, and `{"operation": "health"}` posted to `/invocations` answers `{"healthy": true}`
 - [x] **Skipped (no AWS):** the agent on Runtime answering through `invoke_agent_runtime`, and its credentials fetched from AgentCore Identity. Both are covered by the stand-in tests above and run once `agentcore deploy` and `UNDERCOVER_AGENT_RUNTIME` are set up
 
 ## Phase 4: The app keeps one run at a time
@@ -129,19 +129,19 @@ Done when:
 - [x] A resume runs beside a dispatch
 - [x] The end-to-end tests pass with the app creating runs, rounds and reviews
 - [x] `npm run check` passes
-- [ ] (Checked live in phase 5) With `npm run dev` running, a dispatch at N=25 works the queue, and starting another while it runs is refused on the dashboard
+- [x] (Checked live in phase 5) With `npm run dev` running, a dispatch at N=25 works the queue, and starting another while it runs is refused on the dashboard
 
 ## Phase 5: The live checks and the handover
 
 After one `npm run seed`, with `npm run dev` running on the default model, on the direct route and with memory off:
 
-- [ ] A dispatch at N=25 works the queue
-- [ ] Signed in as Dana Whitfield: one claim over the limit sent back with a note and decided again by the agent, and another signed off
-- [ ] An evaluation of the evaluation set's five tiny claims
-- [ ] The claim pages of the sent-back and the signed-off claims checked in the browser: both decisions, the note, who sent it back and when, and the new decision
-- [ ] What the runs spent, from the recorded usage, reported
-- [ ] The agent answers its health check through `runtime/main.py` on the laptop
-- [ ] `npm run check` passes with `.env` moved out of the way
-- [ ] `docs/SPEC.md`, `docs/TECH_STACK.md` (with the agent on Runtime in its Deployment section), `docs/PROCESS.md`, `docs/CODE_STANDARDS.md` and `docs/STATUS.md` describe the product as it now is
+- [x] A dispatch at N=25 works the queue
+- [x] Signed in as Dana Whitfield: one claim over the limit sent back with a note and decided again by the agent, and another signed off
+- [x] An evaluation of the evaluation set's five tiny claims
+- [x] The claim pages of the sent-back and the signed-off claims checked in the browser: both decisions, the note, who sent it back and when, and the new decision
+- [x] What the runs spent, from the recorded usage, reported
+- [x] The agent answers its health check through `runtime/main.py` on the laptop
+- [x] `npm run check` passes with `.env` moved out of the way
+- [x] `docs/SPEC.md`, `docs/TECH_STACK.md` (with the agent on Runtime in its Deployment section), `docs/PROCESS.md`, `docs/CODE_STANDARDS.md` and `docs/STATUS.md` describe the product as it now is
 - [ ] **Skipped (no AWS):** Lab 2's deployment: `agentcore deploy`, the app on Lambda pointed at the runtime, and a dispatch and a send back on Runtime
-- [ ] Every box in this plan is ticked or marked skipped, and each phase has its own commit
+- [x] Every box in this plan is ticked or marked skipped. Phases 1 and 2 share a commit, as do 3 and 4 (see the notes above); phase 5 has its own

@@ -202,15 +202,15 @@ Why: the app needs something to send each turn to, which answers at once and wor
 
 Done when:
 
-- [ ] Tests through Starlette's `TestClient`: `health` answers `{"healthy": true}`; a wrong payload gets a 400 that doesn't contain the token; `turn` answers at once and `/ping` says `HealthyBusy` until the turn ends, then `Healthy`
-- [ ] Tests: a sign-in the app doesn't accept ends the turn with the reason and no model call
-- [ ] Tests: a turn that fails tells the app why, and the next message works; a turn that pauses tells the app the card, and an `answer` resumes it on a freshly built graph
-- [ ] Tests: on Runtime (an `AGENTCORE_CREDENTIAL_*_NAME` set, Identity stubbed) the Copilot fetches only `OPENROUTER_API_KEY` and `DATABASE_URL`, never `UNDERCOVER_API_KEY`
-- [ ] `npm run check:runtime` imports `runtime.main` and `runtime.copilot` with only the `runtime` group installed
-- [ ] `uv run --isolated --no-dev --only-group runtime python -m runtime.copilot` serves the health check on port 8080: `{"healthy": true}`
+- [x] Tests through Starlette's `TestClient`: `health` answers `{"healthy": true}`; a wrong payload gets a 400 that doesn't contain the token; `turn` answers at once and `/ping` says `HealthyBusy` until the turn ends, then `Healthy`
+- [x] Tests: a sign-in the app doesn't accept ends the turn with the reason and no model call
+- [x] Tests: a turn that fails tells the app why, and the next message works; a turn that pauses tells the app the card, and an `answer` resumes it on a freshly built graph
+- [x] Tests: on Runtime (an `AGENTCORE_CREDENTIAL_*_NAME` set, Identity stubbed) the Copilot fetches only `OPENROUTER_API_KEY` and `DATABASE_URL`, never `UNDERCOVER_API_KEY`
+- [x] `npm run check:runtime` imports `runtime.main` and `runtime.copilot` with only the `runtime` group installed
+- [x] `uv run --isolated --no-dev --only-group runtime python -m runtime.copilot` serves the health check on port 8080: `{"healthy": true}`
 - [ ] `npm run dev` starts the Copilot on 127.0.0.1:8081 beside the rest, and a message posted to the app as Dana reaches it and is answered (checked live in phase 6)
 - [ ] **Skipped (no AWS):** `agentcore deploy` of both runtimes and a health check on `undercover_default_copilot`. That's the deployment notebook's job.
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 5: The sidebar
 

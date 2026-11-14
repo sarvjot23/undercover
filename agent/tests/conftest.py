@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from agent import checkpoints, client, entrypoint, graph, model, ready
+from agent import checkpoints, client, copilot_app, entrypoint, graph, model, ready
 from agent.tests.serving import serving
 from agent.tests.stubs import Backend, StubChecker
 from backend.api import app
@@ -24,11 +24,14 @@ def no_agent(monkeypatch) -> None:
 
 @pytest.fixture(autouse=True)
 def agent_ready(monkeypatch) -> None:
-    """The agent counts as ready, with the test key, and runs its work inline, so a
-    test sees it done; tests of getting ready and of the threads undo this."""
+    """The agent and the Copilot count as ready, with the test key, and run their
+    work inline, so a test sees it done; tests of getting ready and of the threads
+    undo this."""
     monkeypatch.setitem(ready.state, "ready", True)
+    monkeypatch.setitem(ready.state, "copilot", True)
     monkeypatch.setenv("UNDERCOVER_API_KEY", signing.AGENT_KEY)
     monkeypatch.setattr(entrypoint, "spawn", lambda work: work())
+    monkeypatch.setattr(copilot_app, "spawn", lambda work: work())
 
 
 @pytest.fixture(autouse=True)

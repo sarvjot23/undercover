@@ -1,4 +1,4 @@
-"""Getting the agent ready on its first request, once in its process.
+"""Getting the agent, or the Copilot, ready on its first request, once in its process.
 
 Nothing happens on import: on Runtime's platform version V2 every session starts from
 one snapshot, so a key fetched or a connection opened before the first request would
@@ -17,9 +17,12 @@ from agent import checkpoints
 KEY_MISSING = "UNDERCOVER_API_KEY is missing, so the backend would refuse the agent"
 # The deployment names each credential's provider in AgentCore Identity.
 CREDENTIAL = re.compile(r"^AGENTCORE_CREDENTIAL_(\w+)_NAME$")
+# Both runtimes may read the project's three credentials; the Copilot fetches only
+# these, and never the agent's API key.
+COPILOT_CREDENTIALS = ("OPENROUTER_API_KEY", "DATABASE_URL")
 
 lock = threading.Lock()
-state = {"ready": False}
+state = {"ready": False, "copilot": False}
 
 
 def on_runtime() -> bool:
@@ -37,6 +40,21 @@ def fetch(provider: str) -> str:
     return value()
 
 
+def fetch_credentials(only: tuple[str, ...] | None) -> None:
+    """Fetch each credential the deployment names, or only these, into its setting."""
+    for name, provider in list(os.environ.items()):
+        found = CREDENTIAL.match(name)
+        if found and (only is None or found.group(1) in only):
+            os.environ[found.group(1)] = fetch(provider)
+
+
+def open_pool() -> None:
+    """Open the checkpoint pool, when there's a database."""
+    url = os.getenv("DATABASE_URL")
+    if url:
+        checkpoints.pool(url)
+
+
 def get_ready() -> None:
     """Get ready once: on Runtime, reseed the random numbers and fetch each
     credential into its setting; then check the key and open the checkpoint pool.
@@ -49,13 +67,25 @@ def get_ready() -> None:
             return
         if on_runtime():
             random.seed()
-            for name, provider in list(os.environ.items()):
-                found = CREDENTIAL.match(name)
-                if found:
-                    os.environ[found.group(1)] = fetch(provider)
+            fetch_credentials(None)
         if not os.getenv("UNDERCOVER_API_KEY"):
             raise RuntimeError(KEY_MISSING)
-        url = os.getenv("DATABASE_URL")
-        if url:
-            checkpoints.pool(url)
+        open_pool()
         state["ready"] = True
+
+
+def get_copilot_ready() -> None:
+    """Get the Copilot ready once: on Runtime, reseed the random numbers and fetch
+    only its two credentials; then open the checkpoint pool. It needs no key: all
+    it does carries the handler's sign-in.
+
+    If it fails, the request answers with the error and the next one tries again.
+    """
+    with lock:
+        if state["copilot"]:
+            return
+        if on_runtime():
+            random.seed()
+            fetch_credentials(COPILOT_CREDENTIALS)
+        open_pool()
+        state["copilot"] = True

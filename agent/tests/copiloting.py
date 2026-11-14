@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from agent import copilot_client
 from agent.copilot_tools import CopilotContext
-from backend import copilot_service
+from backend import agent_service, copilot_service
 from backend.agent_service import Answer
 from backend.api import app
 from backend.tests import deciding, signing
@@ -21,10 +21,12 @@ class Copilot:
 
     requests: list[httpx.Request] = field(default_factory=list)
     payloads: list[dict[str, Any]] = field(default_factory=list)
+    # What the app asked the claim agent to do, which takes everything.
+    agent_work: list[dict[str, Any]] = field(default_factory=list)
 
     def install(self, monkeypatch: Any) -> None:
         """Point the Copilot's connection at the app, and take every payload the
-        app sends the Copilot without running it."""
+        app sends the Copilot or the claim agent without running it."""
 
         def connect(token: str) -> Any:
             api = TestClient(app, headers={"Authorization": f"Bearer {token}"})
@@ -35,8 +37,13 @@ class Copilot:
             self.payloads.append(payload)
             return Answer("accepted", "", {"accepted": True})
 
+        def ask_agent(payload: dict[str, Any]) -> Answer:
+            self.agent_work.append(payload)
+            return Answer("accepted", "", {"accepted": True})
+
         monkeypatch.setattr(copilot_client, "connect", connect)
         monkeypatch.setattr(copilot_service, "send", send)
+        monkeypatch.setattr(agent_service, "send", ask_agent)
 
 
 def as_agent() -> TestClient:

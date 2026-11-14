@@ -94,7 +94,7 @@ def agents_at_once(context: CopilotContext, agents: int | None) -> int:
     """The claim agents the handler asked for, or the number in our settings."""
     if agents is not None:
         return agents
-    return int(ask(context, "GET", "/api/settings")["agents_at_once"])
+    return int(ask(context, "GET", "/api/settings")["settings"]["agents_at_once"])
 
 
 def started(context: CopilotContext, path: str, body: dict[str, Any]) -> str:

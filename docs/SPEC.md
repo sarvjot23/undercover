@@ -17,6 +17,12 @@ We want an AI agent, the UnderCover Agent, to work the queue the way a handler d
 
 Our goal is to handle claims straight through, as accurately as our handlers do.
 
+## The success criteria we agreed
+
+1. **Straight through:** at least 70% of claims handled straight through on the whole held-out set, measured by the straight-through share our evaluations record.
+2. **Accuracy:** the accuracy our evaluations record on the whole held-out set at or above our accuracy objective in Settings.
+3. **Over the limit:** every payout over the approval limit approved by a person: every claim in our queue paid more than the approval limit has a handler's sign-off on its payment. When none has been paid over the limit yet, this one is met.
+
 ## What the agent works from
 
 - **Our records**, the system of record: claims, policies, customers, decisions and payments. The agent reaches them only through our app, and only for the claim it's working on, its policy and its customer (claims manual section 11).

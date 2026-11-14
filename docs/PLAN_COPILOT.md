@@ -167,13 +167,13 @@ Why: "work the queue and tell me what needs me" and "are we meeting the success 
 
 Done when (tests with a stub model and a fake clock):
 
-- [ ] Starting a dispatch gives the run's id, and `wait_for_work` waits on that run without calling the model, then answers with what needs a handler
-- [ ] A start the app refuses ("Dispatch 1 is running") is passed on with the reason
-- [ ] After 15 minutes (fake clock) the wait ends, saying the work is still going and where to follow it
-- [ ] The success criteria from an evaluation's measures, the accuracy objective in Settings and the app's count: with none paid over the limit (met, and why), with one paid over the limit without a sign-off (not met), and with an evaluation that failed (no figures for the first two, the third still reported)
-- [ ] The figures in the tool's answer match the records exactly, and the stub model's answer is built around them
-- [ ] `docs/SPEC.md` lists the three criteria
-- [ ] `npm run check` passes
+- [x] Starting a dispatch gives the run's id, and `wait_for_work` waits on that run without calling the model, then answers with what needs a handler
+- [x] A start the app refuses ("Dispatch 1 is running") is passed on with the reason
+- [x] After 15 minutes (fake clock) the wait ends, saying the work is still going and where to follow it
+- [x] The success criteria from an evaluation's measures, the accuracy objective in Settings and the app's count: with none paid over the limit (met, and why), with one paid over the limit without a sign-off (not met), and with an evaluation that failed (no figures for the first two, the third still reported)
+- [x] The figures in the tool's answer match the records exactly, and the stub model's answer is built around them
+- [x] `docs/SPEC.md` lists the three criteria
+- [x] `npm run check` passes
 
 ## Phase 4: The Copilot as an AgentCore app, on the laptop and ready for Runtime
 

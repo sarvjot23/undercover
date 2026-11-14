@@ -85,6 +85,25 @@ def test_a_dispatch_is_waited_on_in_code_then_what_needs_the_handler(copilot, cl
     assert turn["model_calls"] == 3  # waiting called the model no more
 
 
+def test_what_needs_me_lists_each_claim_with_counts_worked_out_in_code(copilot):
+    finish_dispatch()
+    with copiloting.as_agent() as agent:
+        deciding.decide(agent, "CLM-1004", "refer", 0.0)
+    context = copiloting.begin("What needs me today?")
+    llm = script(call("what_needs_me"), AIMessage("Three claims need you."))
+    copilot_graph.turn(context, "What needs me today?", llm)
+    found = json.loads(tool_answer(context, "what_needs_me")["answer"])
+    assert [c["claim_id"] for c in found["held_for_sign_off"]] == ["CLM-1003"]
+    assert found["referred"] == ["CLM-1002", "CLM-1004"]
+    assert found["counts"] == {
+        "held_for_sign_off": 1,
+        "referred": 2,
+        "left_for_a_handler": 0,
+        "sent_back_not_worked_yet": 0,
+    }
+    assert found["total"] == 3
+
+
 def test_a_dispatch_without_a_number_uses_the_settings(copilot, clock):
     context = copiloting.begin("Work the queue")
     llm = script(call("start_dispatch"), AIMessage("Started."))

@@ -68,6 +68,22 @@ def needs_a_handler(context: CopilotContext) -> dict[str, Any]:
     }
 
 
+def with_counts(needs: dict[str, Any]) -> dict[str, Any]:
+    """What needs a handler, with each count and the total worked out in code."""
+    counts = {name: len(claims) for name, claims in needs.items()}
+    return {**needs, "counts": counts, "total": sum(counts.values())}
+
+
+@tool
+def what_needs_me(runtime: Runtime) -> str:
+    """What needs the handler in the queue now, each claim listed with the counts
+    and the total. Name every claim it lists and use its counts as they are."""
+    try:
+        return as_text(with_counts(needs_a_handler(runtime.context)))
+    except Refused as refused:
+        return str(refused)
+
+
 @tool
 def wait_for_work(run_id: int, runtime: Runtime) -> str:
     """Wait for a dispatch or an evaluation you started to end, up to 15 minutes,
@@ -90,7 +106,7 @@ def wait_for_work(run_id: int, runtime: Runtime) -> str:
     }
     if run["kind"] == "dispatch":
         found["summary"] = run["summary"]
-        found["needs_you"] = needs_a_handler(context)
+        found["needs_you"] = with_counts(needs_a_handler(context))
     else:
         found["measures"] = ask(context, "GET", f"/api/evaluations/{run_id}/measures")[
             "scores"

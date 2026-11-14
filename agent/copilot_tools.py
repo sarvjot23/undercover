@@ -26,6 +26,7 @@ STEPS_SHOWN = 40
 # Each tool's kind, which gives its card an icon; any action stands out.
 KINDS = {
     "list_claims": "claims",
+    "what_needs_me": "claims",
     "get_claim": "claims",
     "get_claim_steps": "claims",
     "get_policy": "customers",

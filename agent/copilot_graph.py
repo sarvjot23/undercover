@@ -37,7 +37,11 @@ from langgraph.types import Command, interrupt
 from agent import checkpoints, copilot_client, memory, model, steps
 from agent.copilot_client import Refused
 from agent.copilot_tools import ACTIONS, KINDS, RECORDS, CopilotContext, context_tools
-from agent.copilot_waiting import check_success_criteria, wait_for_work
+from agent.copilot_waiting import (
+    check_success_criteria,
+    wait_for_work,
+    what_needs_me,
+)
 
 MODEL_CALLS = 25
 RECURSION_LIMIT = 3 * MODEL_CALLS + 20
@@ -368,7 +372,14 @@ def tools_for_turn() -> list[BaseTool]:
     found = context_tools(
         os.getenv("UNDERCOVER_GATEWAY_URL"), os.getenv("UNDERCOVER_CONTEXT")
     )
-    return [*RECORDS, *found, *ACTIONS, wait_for_work, check_success_criteria]
+    return [
+        *RECORDS,
+        what_needs_me,
+        *found,
+        *ACTIONS,
+        wait_for_work,
+        check_success_criteria,
+    ]
 
 
 def config_for(context: CopilotContext) -> RunnableConfig:
